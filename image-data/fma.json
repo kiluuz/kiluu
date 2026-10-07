@@ -1,0 +1,30 @@
+{
+  "success": true,
+  "query": "Fullmetal Alchemist Brotherhood anime poster",
+  "count": 3,
+  "ranked": false,
+  "captioned_count": 0,
+  "results": [
+    {
+      "original_url": "https://z-cdn.chatglm.cn/image-search-mcp/images-ppt/553a8ca91506.jpg",
+      "caption": "",
+      "source": "eBay",
+      "original_width": "1066px",
+      "original_height": "1600px"
+    },
+    {
+      "original_url": "https://z-cdn.chatglm.cn/image-search-mcp/images-ppt/3c6399bbefa8.jpg",
+      "caption": "",
+      "source": "TMDB",
+      "original_width": "1500px",
+      "original_height": "2250px"
+    },
+    {
+      "original_url": "https://z-cdn.chatglm.cn/image-search-mcp/images-ppt/9efa3abab048.jpg",
+      "caption": "",
+      "source": "98 Types Studio",
+      "original_width": "957px",
+      "original_height": "958px"
+    }
+  ]
+}

@@ -1,0 +1,30 @@
+{
+  "success": true,
+  "query": "Tokyo Revengers anime key visual poster",
+  "count": 3,
+  "ranked": false,
+  "captioned_count": 0,
+  "results": [
+    {
+      "original_url": "https://z-cdn.chatglm.cn/image-search-mcp/images-ppt/168a2004f127.jpeg",
+      "caption": "",
+      "source": "Walmart",
+      "original_width": "1185px",
+      "original_height": "1800px"
+    },
+    {
+      "original_url": "https://z-cdn.chatglm.cn/image-search-mcp/images-ppt/809e97e15556.jpg",
+      "caption": "",
+      "source": "Saiga NAK",
+      "original_width": "1200px",
+      "original_height": "675px"
+    },
+    {
+      "original_url": "https://z-cdn.chatglm.cn/image-search-mcp/images-ppt/607907b80109.jpg",
+      "caption": "",
+      "source": "eBay",
+      "original_width": "1200px",
+      "original_height": "1200px"
+    }
+  ]
+}

@@ -1,0 +1,30 @@
+{
+  "success": true,
+  "query": "Your Name Kimi no Na wa anime movie poster",
+  "count": 3,
+  "ranked": false,
+  "captioned_count": 0,
+  "results": [
+    {
+      "original_url": "https://z-cdn.chatglm.cn/image-search-mcp/images-ppt/e9343f43065d.jpg",
+      "caption": "",
+      "source": "The Hollywood Reporter",
+      "original_width": "1296px",
+      "original_height": "730px"
+    },
+    {
+      "original_url": "https://z-cdn.chatglm.cn/image-search-mcp/images-ppt/a58038b327ea.jpg",
+      "caption": "",
+      "source": "Reddit",
+      "original_width": "4284px",
+      "original_height": "5712px"
+    },
+    {
+      "original_url": "https://z-cdn.chatglm.cn/image-search-mcp/images-ppt/4722da647a14.jpg",
+      "caption": "",
+      "source": "YouTube",
+      "original_width": "1280px",
+      "original_height": "720px"
+    }
+  ]
+}

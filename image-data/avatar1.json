@@ -1,0 +1,30 @@
+{
+  "success": true,
+  "query": "anime girl portrait avatar illustration",
+  "count": 3,
+  "ranked": false,
+  "captioned_count": 0,
+  "results": [
+    {
+      "original_url": "https://z-cdn.chatglm.cn/image-search-mcp/images-ppt/58562083409c.webp",
+      "caption": "",
+      "source": "Morphic",
+      "original_width": "832px",
+      "original_height": "1109px"
+    },
+    {
+      "original_url": "https://z-cdn.chatglm.cn/image-search-mcp/images-ppt/8aa14633c6b7.jpg",
+      "caption": "",
+      "source": "Cartoonize.net",
+      "original_width": "1200px",
+      "original_height": "807px"
+    },
+    {
+      "original_url": "https://z-cdn.chatglm.cn/image-search-mcp/images-ppt/bc71bf91aa57.jpg",
+      "caption": "",
+      "source": "Adobe Stock",
+      "original_width": "1000px",
+      "original_height": "1000px"
+    }
+  ]
+}

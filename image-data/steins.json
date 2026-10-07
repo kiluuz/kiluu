@@ -1,0 +1,30 @@
+{
+  "success": true,
+  "query": "Steins Gate anime key visual poster art",
+  "count": 3,
+  "ranked": false,
+  "captioned_count": 0,
+  "results": [
+    {
+      "original_url": "https://z-cdn.chatglm.cn/image-search-mcp/images-ppt/3d4a86bc29f8.jpg",
+      "caption": "",
+      "source": "IMDb",
+      "original_width": "1600px",
+      "original_height": "900px"
+    },
+    {
+      "original_url": "https://z-cdn.chatglm.cn/image-search-mcp/images-ppt/0330b94b5079.jpg",
+      "caption": "",
+      "source": "Amazon.ie",
+      "original_width": "1600px",
+      "original_height": "1600px"
+    },
+    {
+      "original_url": "https://z-cdn.chatglm.cn/image-search-mcp/images-ppt/abc9c4029f91.jpg",
+      "caption": "",
+      "source": "AnimeOshi",
+      "original_width": "2000px",
+      "original_height": "3000px"
+    }
+  ]
+}

@@ -1,0 +1,30 @@
+{
+  "success": true,
+  "query": "Spy x Family anime key visual poster",
+  "count": 3,
+  "ranked": false,
+  "captioned_count": 0,
+  "results": [
+    {
+      "original_url": "https://z-cdn.chatglm.cn/image-search-mcp/images-ppt/13fae1133382.jpg",
+      "caption": "",
+      "source": "Reddit",
+      "original_width": "2000px",
+      "original_height": "2826px"
+    },
+    {
+      "original_url": "https://z-cdn.chatglm.cn/image-search-mcp/images-ppt/df2fb8fc67da.jpg",
+      "caption": "",
+      "source": "Gameranx",
+      "original_width": "1024px",
+      "original_height": "1097px"
+    },
+    {
+      "original_url": "https://z-cdn.chatglm.cn/image-search-mcp/images-ppt/ff5ced3d23af.jpg",
+      "caption": "",
+      "source": "Wallpapers.com",
+      "original_width": "1920px",
+      "original_height": "1080px"
+    }
+  ]
+}

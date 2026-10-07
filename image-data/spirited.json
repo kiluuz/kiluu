@@ -1,0 +1,30 @@
+{
+  "success": true,
+  "query": "Spirited Away Ghibli anime movie art",
+  "count": 3,
+  "ranked": false,
+  "captioned_count": 0,
+  "results": [
+    {
+      "original_url": "https://z-cdn.chatglm.cn/image-search-mcp/images-ppt/37f4291d5630.jpg",
+      "caption": "",
+      "source": "",
+      "original_width": "960px",
+      "original_height": "1355px"
+    },
+    {
+      "original_url": "https://z-cdn.chatglm.cn/image-search-mcp/images-ppt/eac5af775eb4.jpg",
+      "caption": "",
+      "source": "",
+      "original_width": "1130px",
+      "original_height": "1600px"
+    },
+    {
+      "original_url": "https://z-cdn.chatglm.cn/image-search-mcp/images-ppt/0282b1c5facb.jpg",
+      "caption": "",
+      "source": "",
+      "original_width": "764px",
+      "original_height": "1100px"
+    }
+  ]
+}

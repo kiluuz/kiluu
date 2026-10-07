@@ -1,0 +1,30 @@
+{
+  "success": true,
+  "query": "Attack on Titan anime key visual poster art",
+  "count": 3,
+  "ranked": false,
+  "captioned_count": 0,
+  "results": [
+    {
+      "original_url": "https://z-cdn.chatglm.cn/image-search-mcp/images-ppt/ea9deb52ab76.jpg",
+      "caption": "",
+      "source": "Amazon.com",
+      "original_width": "1000px",
+      "original_height": "1000px"
+    },
+    {
+      "original_url": "https://z-cdn.chatglm.cn/image-search-mcp/images-ppt/ae8a4abd7b2e.jpg",
+      "caption": "",
+      "source": "Anime Corner",
+      "original_width": "1810px",
+      "original_height": "2560px"
+    },
+    {
+      "original_url": "https://z-cdn.chatglm.cn/image-search-mcp/images-ppt/d65cd5515a25.jpg",
+      "caption": "",
+      "source": "Reddit",
+      "original_width": "1447px",
+      "original_height": "1975px"
+    }
+  ]
+}

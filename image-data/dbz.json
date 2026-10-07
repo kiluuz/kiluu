@@ -1,0 +1,30 @@
+{
+  "success": true,
+  "query": "Dragon Ball Super anime key visual poster",
+  "count": 3,
+  "ranked": false,
+  "captioned_count": 0,
+  "results": [
+    {
+      "original_url": "https://z-cdn.chatglm.cn/image-search-mcp/images-ppt/c9c5016eea14.jpg",
+      "caption": "",
+      "source": "Animehunch",
+      "original_width": "1280px",
+      "original_height": "720px"
+    },
+    {
+      "original_url": "https://z-cdn.chatglm.cn/image-search-mcp/images-ppt/0ffc9123ae84.jpg",
+      "caption": "",
+      "source": "Amazon.com",
+      "original_width": "1000px",
+      "original_height": "1000px"
+    },
+    {
+      "original_url": "https://z-cdn.chatglm.cn/image-search-mcp/images-ppt/30a9305fffa5.jpg",
+      "caption": "",
+      "source": "Amazon.in",
+      "original_width": "1414px",
+      "original_height": "2000px"
+    }
+  ]
+}

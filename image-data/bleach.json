@@ -1,0 +1,30 @@
+{
+  "success": true,
+  "query": "Bleach Thousand Year Blood War anime poster",
+  "count": 3,
+  "ranked": false,
+  "captioned_count": 0,
+  "results": [
+    {
+      "original_url": "https://z-cdn.chatglm.cn/image-search-mcp/images-ppt/2ae73367c38e.jpg",
+      "caption": "",
+      "source": "eBay",
+      "original_width": "1533px",
+      "original_height": "1110px"
+    },
+    {
+      "original_url": "https://z-cdn.chatglm.cn/image-search-mcp/images-ppt/f5dc8162d0d5.jpg",
+      "caption": "",
+      "source": "Amazon.in",
+      "original_width": "1799px",
+      "original_height": "1799px"
+    },
+    {
+      "original_url": "https://z-cdn.chatglm.cn/image-search-mcp/images-ppt/e15aa3454205.jpg",
+      "caption": "",
+      "source": "Shopee Philippines",
+      "original_width": "1000px",
+      "original_height": "1000px"
+    }
+  ]
+}

@@ -1,0 +1,30 @@
+{
+  "success": true,
+  "query": "Cyberpunk Edgerunners anime key visual poster",
+  "count": 3,
+  "ranked": false,
+  "captioned_count": 0,
+  "results": [
+    {
+      "original_url": "https://z-cdn.chatglm.cn/image-search-mcp/images-ppt/8688968b52ab.jpg",
+      "caption": "",
+      "source": "Etsy",
+      "original_width": "1928px",
+      "original_height": "1927px"
+    },
+    {
+      "original_url": "https://z-cdn.chatglm.cn/image-search-mcp/images-ppt/1e8db67d86d1.jpg",
+      "caption": "",
+      "source": "Windows Central",
+      "original_width": "1200px",
+      "original_height": "675px"
+    },
+    {
+      "original_url": "https://z-cdn.chatglm.cn/image-search-mcp/images-ppt/bd03b3efb1ad.jpg",
+      "caption": "",
+      "source": "Depop",
+      "original_width": "1280px",
+      "original_height": "1280px"
+    }
+  ]
+}

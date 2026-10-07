@@ -1,0 +1,30 @@
+{
+  "success": true,
+  "query": "Cowboy Bebop anime key visual poster art",
+  "count": 3,
+  "ranked": false,
+  "captioned_count": 0,
+  "results": [
+    {
+      "original_url": "https://z-cdn.chatglm.cn/image-search-mcp/images-ppt/d10316cc7a75.jpg",
+      "caption": "",
+      "source": "Amazon.com",
+      "original_width": "1185px",
+      "original_height": "1800px"
+    },
+    {
+      "original_url": "https://z-cdn.chatglm.cn/image-search-mcp/images-ppt/77a1099ae841.jpg",
+      "caption": "",
+      "source": "eBay",
+      "original_width": "824px",
+      "original_height": "1000px"
+    },
+    {
+      "original_url": "https://z-cdn.chatglm.cn/image-search-mcp/images-ppt/0d42e04c66d8.jpg",
+      "caption": "",
+      "source": "Amazon.ca",
+      "original_width": "818px",
+      "original_height": "1000px"
+    }
+  ]
+}

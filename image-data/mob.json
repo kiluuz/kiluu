@@ -1,0 +1,30 @@
+{
+  "success": true,
+  "query": "Mob Psycho 100 anime key visual poster",
+  "count": 3,
+  "ranked": false,
+  "captioned_count": 0,
+  "results": [
+    {
+      "original_url": "https://z-cdn.chatglm.cn/image-search-mcp/images-ppt/0c61d1f5457b.jpg",
+      "caption": "",
+      "source": "Reddit",
+      "original_width": "838px",
+      "original_height": "1200px"
+    },
+    {
+      "original_url": "https://z-cdn.chatglm.cn/image-search-mcp/images-ppt/97b620ea5a9b.png",
+      "caption": "",
+      "source": "Truly Trash Media - WordPress.com",
+      "original_width": "1200px",
+      "original_height": "696px"
+    },
+    {
+      "original_url": "https://z-cdn.chatglm.cn/image-search-mcp/images-ppt/8eafb43f9313.jpg",
+      "caption": "",
+      "source": "IMDb",
+      "original_width": "1920px",
+      "original_height": "1080px"
+    }
+  ]
+}

@@ -1,0 +1,30 @@
+{
+  "success": true,
+  "query": "Demon Slayer Kimetsu no Yaiba anime key visual poster",
+  "count": 3,
+  "ranked": false,
+  "captioned_count": 0,
+  "results": [
+    {
+      "original_url": "https://z-cdn.chatglm.cn/image-search-mcp/images-ppt/32342b98c809.jpg",
+      "caption": "",
+      "source": "",
+      "original_width": "1185px",
+      "original_height": "1800px"
+    },
+    {
+      "original_url": "https://z-cdn.chatglm.cn/image-search-mcp/images-ppt/10b49d35341f.jpeg",
+      "caption": "",
+      "source": "",
+      "original_width": "1085px",
+      "original_height": "1623px"
+    },
+    {
+      "original_url": "https://z-cdn.chatglm.cn/image-search-mcp/images-ppt/2fb1f88cdc08.jpg",
+      "caption": "",
+      "source": "",
+      "original_width": "848px",
+      "original_height": "1199px"
+    }
+  ]
+}

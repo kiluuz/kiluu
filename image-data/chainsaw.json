@@ -1,0 +1,30 @@
+{
+  "success": true,
+  "query": "Chainsaw Man anime key visual poster",
+  "count": 3,
+  "ranked": false,
+  "captioned_count": 0,
+  "results": [
+    {
+      "original_url": "https://z-cdn.chatglm.cn/image-search-mcp/images-ppt/294385561539.jpg",
+      "caption": "",
+      "source": "DualShockers",
+      "original_width": "1920px",
+      "original_height": "1080px"
+    },
+    {
+      "original_url": "https://z-cdn.chatglm.cn/image-search-mcp/images-ppt/66ef59d191ef.jpg",
+      "caption": "",
+      "source": "Amazon.com",
+      "original_width": "1000px",
+      "original_height": "1000px"
+    },
+    {
+      "original_url": "https://z-cdn.chatglm.cn/image-search-mcp/images-ppt/83826b40fe9b.jpeg",
+      "caption": "",
+      "source": "Anime Trending",
+      "original_width": "1809px",
+      "original_height": "1019px"
+    }
+  ]
+}

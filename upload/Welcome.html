@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="uz">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="light">
+<title>Welcome</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300;1,9..144,300&family=Cormorant+Garamond:ital,wght@1,500&family=Playfair+Display:ital,wght@1,500&family=Noto+Serif+SC:wght@300&family=Amiri:ital@1&family=Shippori+Mincho:wght@500&family=PT+Serif:ital@1&display=swap" rel="stylesheet">
+<style>
+:root{--ink:#17151f;--mute:#9a96a8;--a:#ff7a59;--b:#7c5cff;--c:#22c1c3;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+*{box-sizing:border-box;margin:0}
+html,body{height:100%;background:#fff;overflow:hidden}
+body{display:grid;place-items:center;font-family:"Cormorant Garamond",serif;color:var(--ink)}
+.blob{position:fixed;width:46vmax;height:46vmax;border-radius:50%;filter:blur(90px);opacity:.16;pointer-events:none;animation:drift 14s ease-in-out infinite alternate}
+.b1{background:var(--a);top:-18vmax;left:-14vmax}
+.b2{background:var(--b);bottom:-20vmax;right:-14vmax;animation-delay:-5s}
+.b3{background:var(--c);top:30%;left:55%;width:30vmax;height:30vmax;opacity:.1;animation-delay:-9s}
+@keyframes drift{to{transform:translate(8vmax,5vmax) scale(1.2)}}
+.stage{position:relative;text-align:center;width:100%;padding:0 5vw}
+.word{height:clamp(90px,17vw,190px);display:flex;justify-content:center;align-items:center;white-space:nowrap}
+.word span{display:inline-block;font-size:clamp(44px,10.5vw,128px);line-height:1.1;opacity:0;transform:translateY(60%) rotateX(-70deg);filter:blur(14px);transform-origin:50% 100%}
+.word.in span{animation:rise .6s cubic-bezier(.2,.8,.2,1) forwards;animation-delay:calc(var(--i)*32ms)}
+.word.out span{animation:fall .38s cubic-bezier(.6,0,.8,.4) forwards;animation-delay:calc(var(--i)*14ms)}
+@keyframes rise{to{opacity:1;transform:none;filter:blur(0)}}
+@keyframes fall{from{opacity:1;transform:none;filter:blur(0)}to{opacity:0;transform:translateY(-50%) rotateX(60deg);filter:blur(12px)}}
+.word span.grad{background:linear-gradient(100deg,var(--a),var(--b) 55%,var(--c));-webkit-background-clip:text;background-clip:text;color:transparent}
+.bar{position:fixed;left:0;bottom:0;height:3px;width:100%;background:#f1eff7}
+.bar b{display:block;height:100%;width:0;background:linear-gradient(90deg,var(--a),var(--b),var(--c))}
+@media (prefers-reduced-motion:reduce){.blob{animation:none}.word span{transform:none;filter:none}}
+</style>
+</head>
+<body>
+<div class="blob b1"></div><div class="blob b2"></div><div class="blob b3"></div>
+<div class="stage">
+  <div class="word" id="word" aria-live="polite"></div>
+</div>
+<div class="bar"><b id="fill"></b></div>
+<script>
+var L=[
+ {t:"Welcome",f:"'Playfair Display',serif",s:1},
+ {t:"Xush kelibsiz",f:"'Fraunces',serif",s:.82,w:300},
+ {t:"Добро пожаловать",f:"'Cormorant Garamond',serif",s:.78,w:500},
+ {t:"欢迎",f:"'Noto Serif SC',serif",s:1.1,w:300,whole:1},
+ {t:"مرحبا بك",f:"'Amiri',serif",s:1.1,whole:1},
+ {t:"ようこそ",f:"'Shippori Mincho',serif",s:1,whole:1},
+ {t:"Қош келдіңіз",f:"'PT Serif',serif",s:.86,w:400},
+ {t:"Кош келиңиз",f:"'PT Serif',serif",s:.86,w:400}
+];
+var word=document.getElementById('word'),fill=document.getElementById('fill');
+var HOLD=1500,TOTAL=HOLD*L.length+400,idx=0,start=performance.now();
+function show(i){
+  var d=L[i];word.className='word';word.innerHTML='';
+  word.style.fontFamily=d.f;word.style.fontWeight=d.w||500;
+  var parts=d.whole?[d.t]:d.t.split('');
+  parts.forEach(function(ch,k){
+    var s=document.createElement('span');s.className='grad';
+    s.style.setProperty('--i',k);s.style.fontSize='calc(clamp(44px,10.5vw,128px) * '+d.s+')';
+    s.textContent=ch===' '?'\u00a0':ch;
+    if(d.whole)s.style.animationDuration='.8s';
+    word.appendChild(s);
+  });
+  void word.offsetWidth;word.classList.add('in');
+}
+function next(){
+  word.classList.remove('in');word.classList.add('out');
+  setTimeout(function(){idx=(idx+1)%L.length;show(idx)},450);
+}
+document.fonts.ready.then(function(){show(0);setInterval(next,HOLD);start=performance.now();tick()});
+function tick(){
+  var p=Math.min(1,(performance.now()-start)/TOTAL);
+  var e=1-Math.pow(1-p,2.2);
+  fill.style.width=(e*100)+'%';
+  if(p<1)requestAnimationFrame(tick);
+}
+</script>
+</body>
+</html>

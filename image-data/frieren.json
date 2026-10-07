@@ -1,0 +1,30 @@
+{
+  "success": true,
+  "query": "Frieren Beyond Journeys End anime key visual",
+  "count": 3,
+  "ranked": false,
+  "captioned_count": 0,
+  "results": [
+    {
+      "original_url": "https://z-cdn.chatglm.cn/image-search-mcp/images-ppt/55c2c2d4ca42.jpg",
+      "caption": "",
+      "source": "QooApp : Anime Game Platform",
+      "original_width": "1200px",
+      "original_height": "678px"
+    },
+    {
+      "original_url": "https://z-cdn.chatglm.cn/image-search-mcp/images-ppt/823018f0a48a.jpg",
+      "caption": "",
+      "source": "Digital Spy",
+      "original_width": "2837px",
+      "original_height": "1514px"
+    },
+    {
+      "original_url": "https://z-cdn.chatglm.cn/image-search-mcp/images-ppt/0d391a2e0a51.jpg",
+      "caption": "",
+      "source": "Games Radar",
+      "original_width": "1920px",
+      "original_height": "1080px"
+    }
+  ]
+}

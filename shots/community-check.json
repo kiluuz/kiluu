@@ -1,0 +1,28 @@
+{
+  "choices": [
+    {
+      "finish_reason": "stop",
+      "index": 0,
+      "message": {
+        "content": "**1. User Posts with Avatars, Text, and Counts:**\n*   **Yes.** The post by \"Mikasa\" includes a circular avatar, a username/handle, a timestamp (\"1m ago\"), and text content.\n*   **Note:** While the post body is visible, the specific **like/comment counts** are not visible in this specific viewport (they are likely located below the attached content, which is cut off at the bottom of the image).\n\n**2. Post Composer at Top:**\n*   **Yes.** There is a prominent \"Share your anime thoughts...\" composer box at the top of the feed. It includes a user avatar, a text area, an \"Attach anime\" option (with character count), and a \"Post\" button.\n\n**3. Attached Anime Cards:**\n*   **Yes.** The post by Mikasa has an attached card for \"**Violet Evergarden**\" at the bottom, featuring a thumbnail image and the title.\n\n**4. Layout Issues or Broken Elements:**\n*   **No major issues.** The layout is clean, modern, and well-structured.\n*   **Minor Observation:** The bottom of the first post is slightly cut off by the edge of the screenshot, but this appears to be a cropping issue rather than a CSS bug.\n\n**5. Overall Quality:**\n*   **High.** The UI features a polished dark theme with excellent contrast, consistent spacing (padding/margins), and a clear visual hierarchy. The use of purple accents for active states and buttons creates a cohesive brand identity typical of high-quality anime dashboards.",
+        "role": "assistant"
+      }
+    }
+  ],
+  "created": 1791395329,
+  "id": "20261008014841ee1a12df037640ec",
+  "model": "glm-5v-turbo",
+  "object": "chat.completion",
+  "request_id": "20261008014841ee1a12df037640ec",
+  "usage": {
+    "completion_tokens": 331,
+    "completion_tokens_details": {
+      "reasoning_tokens": 0
+    },
+    "prompt_tokens": 957,
+    "prompt_tokens_details": {
+      "cached_tokens": 0
+    },
+    "total_tokens": 1288
+  }
+}

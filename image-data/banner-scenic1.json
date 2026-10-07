@@ -1,0 +1,30 @@
+{
+  "success": true,
+  "query": "anime scenic landscape wallpaper cherry blossom night sky",
+  "count": 3,
+  "ranked": false,
+  "captioned_count": 0,
+  "results": [
+    {
+      "original_url": "https://z-cdn.chatglm.cn/image-search-mcp/images-ppt/5f93419b1097.jpg",
+      "caption": "",
+      "source": "Pinterest",
+      "original_width": "736px",
+      "original_height": "1308px"
+    },
+    {
+      "original_url": "https://z-cdn.chatglm.cn/image-search-mcp/images-ppt/f257ec9f6c6e.jpg",
+      "caption": "",
+      "source": "Wallpapers.com",
+      "original_width": "2400px",
+      "original_height": "1600px"
+    },
+    {
+      "original_url": "https://z-cdn.chatglm.cn/image-search-mcp/images-ppt/a638def63892.jpg",
+      "caption": "",
+      "source": "Amazon UK",
+      "original_width": "894px",
+      "original_height": "894px"
+    }
+  ]
+}

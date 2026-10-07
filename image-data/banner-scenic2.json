@@ -1,0 +1,30 @@
+{
+  "success": true,
+  "query": "anime city night neon lights wallpaper scenery",
+  "count": 3,
+  "ranked": false,
+  "captioned_count": 0,
+  "results": [
+    {
+      "original_url": "https://z-cdn.chatglm.cn/image-search-mcp/images-ppt/b469814fd1a8.jpg",
+      "caption": "",
+      "source": "WallpaperAccess",
+      "original_width": "1920px",
+      "original_height": "1080px"
+    },
+    {
+      "original_url": "https://z-cdn.chatglm.cn/image-search-mcp/images-ppt/c95e91088a9b.jpg",
+      "caption": "",
+      "source": "WallpaperAccess",
+      "original_width": "3840px",
+      "original_height": "2160px"
+    },
+    {
+      "original_url": "https://z-cdn.chatglm.cn/image-search-mcp/images-ppt/0d5cb215bc2b.jpg",
+      "caption": "",
+      "source": "CBR",
+      "original_width": "1200px",
+      "original_height": "700px"
+    }
+  ]
+}

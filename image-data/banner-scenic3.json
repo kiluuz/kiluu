@@ -1,0 +1,30 @@
+{
+  "success": true,
+  "query": "anime fantasy landscape mountains wallpaper art",
+  "count": 3,
+  "ranked": false,
+  "captioned_count": 0,
+  "results": [
+    {
+      "original_url": "https://z-cdn.chatglm.cn/image-search-mcp/images-ppt/bf4a960507c9.jpg",
+      "caption": "",
+      "source": "Wallpaper Abyss - Alpha Coders",
+      "original_width": "1920px",
+      "original_height": "1080px"
+    },
+    {
+      "original_url": "https://z-cdn.chatglm.cn/image-search-mcp/images-ppt/f5c5b4da77ac.jpg",
+      "caption": "",
+      "source": "Wallpapers.com",
+      "original_width": "1920px",
+      "original_height": "895px"
+    },
+    {
+      "original_url": "https://z-cdn.chatglm.cn/image-search-mcp/images-ppt/dfb6a6c05e1e.jpg",
+      "caption": "",
+      "source": "Reddit",
+      "original_width": "3840px",
+      "original_height": "2160px"
+    }
+  ]
+}

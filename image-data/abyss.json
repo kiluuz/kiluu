@@ -1,0 +1,30 @@
+{
+  "success": true,
+  "query": "Made in Abyss anime key visual poster",
+  "count": 3,
+  "ranked": false,
+  "captioned_count": 0,
+  "results": [
+    {
+      "original_url": "https://z-cdn.chatglm.cn/image-search-mcp/images-ppt/3277f864a857.jpg",
+      "caption": "",
+      "source": "Crunchyroll",
+      "original_width": "1460px",
+      "original_height": "2063px"
+    },
+    {
+      "original_url": "https://z-cdn.chatglm.cn/image-search-mcp/images-ppt/8433c81d6741.jpg",
+      "caption": "",
+      "source": "Geek Native",
+      "original_width": "1200px",
+      "original_height": "697px"
+    },
+    {
+      "original_url": "https://z-cdn.chatglm.cn/image-search-mcp/images-ppt/98619ba4b40d.jpg",
+      "caption": "",
+      "source": "www.1999.co.jp",
+      "original_width": "1200px",
+      "original_height": "1200px"
+    }
+  ]
+}

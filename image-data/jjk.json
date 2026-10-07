@@ -1,0 +1,30 @@
+{
+  "success": true,
+  "query": "Jujutsu Kaisen anime key visual poster art",
+  "count": 3,
+  "ranked": false,
+  "captioned_count": 0,
+  "results": [
+    {
+      "original_url": "https://z-cdn.chatglm.cn/image-search-mcp/images-ppt/13e0bbb56a6a.jpg",
+      "caption": "",
+      "source": "Anime Trending",
+      "original_width": "1813px",
+      "original_height": "1024px"
+    },
+    {
+      "original_url": "https://z-cdn.chatglm.cn/image-search-mcp/images-ppt/80aaf17e5cd5.jpg",
+      "caption": "",
+      "source": "Japan Anime News powered by ORICON NEWS",
+      "original_width": "943px",
+      "original_height": "1200px"
+    },
+    {
+      "original_url": "https://z-cdn.chatglm.cn/image-search-mcp/images-ppt/d0fc3eabfb95.png",
+      "caption": "",
+      "source": "ScreenRant",
+      "original_width": "1600px",
+      "original_height": "900px"
+    }
+  ]
+}

@@ -1,0 +1,216 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id             String   @id @default(cuid())
+  email          String   @unique
+  username       String   @unique
+  password       String
+  displayName    String?
+  role           String   @default("VIEWER") // CREATOR | VIEWER
+  avatarUrl      String?
+  bannerUrl      String?
+  bio            String?
+  accentColor    String   @default("#a855f7")
+  credits        Int      @default(0)
+  onboardingDone Boolean  @default(false)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  sessions          Session[]
+  purchases         Purchase[]
+  favoriteAnimes    FavoriteAnime[]
+  favoriteUsersFrom FavoriteUser[]      @relation("Favoriter")
+  favoriteUsersTo   FavoriteUser[]      @relation("Favorited")
+  posts             Post[]
+  postLikes         PostLike[]
+  comments          Comment[]
+  watchProgress     WatchProgress[]
+  creditTransactions CreditTransaction[]
+  exchangeOffers    ExchangeOffer[]
+  proposalsMade     ExchangeProposal[]  @relation("Proposer")
+  createdAnimes     Anime[]             @relation("AnimeCreator")
+}
+
+model Session {
+  id        String   @id @default(cuid())
+  token     String   @unique
+  userId    String
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Anime {
+  id          String   @id @default(cuid())
+  slug        String   @unique
+  title       String
+  altTitle    String?
+  description String
+  coverImage  String
+  bannerImage String?
+  genres      String // comma separated: "Action,Fantasy"
+  year        Int
+  rating      Float    @default(8.0)
+  studio      String?
+  status      String   @default("COMPLETED") // ONGOING | COMPLETED | UPCOMING
+  type        String   @default("TV") // TV | MOVIE | OVA
+  isFree      Boolean  @default(false)
+  price       Int      @default(0) // in credits
+  trending    Int      @default(0) // sort weight
+  featured    Boolean  @default(false)
+  creatorId   String?
+  creator     User?    @relation("AnimeCreator", fields: [creatorId], references: [id], onDelete: SetNull)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  episodes    Episode[]
+  purchases   Purchase[]
+  favorites   FavoriteAnime[]
+  progress    WatchProgress[]
+  exchangeOffers ExchangeOffer[]
+  postAnimes  Post[]
+  proposalAnimes ExchangeProposal[]
+}
+
+model Episode {
+  id          String   @id @default(cuid())
+  animeId     String
+  number      Int
+  title       String
+  description String?
+  videoUrl    String
+  duration    Int      @default(0) // seconds
+  createdAt   DateTime @default(now())
+  anime       Anime    @relation(fields: [animeId], references: [id], onDelete: Cascade)
+
+  progress    WatchProgress[]
+}
+
+model Purchase {
+  id        String   @id @default(cuid())
+  userId    String
+  animeId   String
+  pricePaid Int      @default(0)
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  anime     Anime    @relation(fields: [animeId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, animeId])
+}
+
+model FavoriteAnime {
+  id        String   @id @default(cuid())
+  userId    String
+  animeId   String
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  anime     Anime    @relation(fields: [animeId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, animeId])
+}
+
+model FavoriteUser {
+  id          String   @id @default(cuid())
+  followerId  String
+  followingId String
+  createdAt   DateTime @default(now())
+  follower    User     @relation("Favoriter", fields: [followerId], references: [id], onDelete: Cascade)
+  following   User     @relation("Favorited", fields: [followingId], references: [id], onDelete: Cascade)
+
+  @@unique([followerId, followingId])
+}
+
+model WatchProgress {
+  id         String   @id @default(cuid())
+  userId     String
+  episodeId  String
+  animeId    String
+  position   Float    @default(0)
+  duration   Float    @default(0)
+  completed  Boolean  @default(false)
+  updatedAt  DateTime @updatedAt
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  episode    Episode  @relation(fields: [episodeId], references: [id], onDelete: Cascade)
+  anime      Anime    @relation(fields: [animeId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, episodeId])
+}
+
+model CreditTransaction {
+  id          String   @id @default(cuid())
+  userId      String
+  amount      Int // positive = gain, negative = spend
+  type        String // TOPUP | PURCHASE | EXCHANGE | BONUS
+  description String
+  createdAt   DateTime @default(now())
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Post {
+  id        String   @id @default(cuid())
+  userId    String
+  content   String
+  animeId   String?
+  imageUrl  String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  anime     Anime?   @relation(fields: [animeId], references: [id], onDelete: SetNull)
+
+  likes    PostLike[]
+  comments Comment[]
+}
+
+model PostLike {
+  id        String   @id @default(cuid())
+  userId    String
+  postId    String
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  post      Post     @relation(fields: [postId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, postId])
+}
+
+model Comment {
+  id        String   @id @default(cuid())
+  userId    String
+  postId    String
+  content   String
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  post      Post     @relation(fields: [postId], references: [id], onDelete: Cascade)
+}
+
+model ExchangeOffer {
+  id          String   @id @default(cuid())
+  userId      String
+  animeId     String
+  wantedNote  String?  // what they want in return
+  status      String   @default("OPEN") // OPEN | MATCHED | CLOSED
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  anime       Anime    @relation(fields: [animeId], references: [id], onDelete: Cascade)
+  proposals   ExchangeProposal[]
+}
+
+model ExchangeProposal {
+  id        String   @id @default(cuid())
+  offerId   String
+  proposerId String
+  animeId   String   // anime the proposer gives
+  message   String?
+  status    String   @default("PENDING") // PENDING | ACCEPTED | DECLINED
+  createdAt DateTime @default(now())
+  offer     ExchangeOffer @relation(fields: [offerId], references: [id], onDelete: Cascade)
+  proposer  User     @relation("Proposer", fields: [proposerId], references: [id], onDelete: Cascade)
+  anime     Anime    @relation(fields: [animeId], references: [id], onDelete: Cascade)
+}

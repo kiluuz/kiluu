@@ -1,0 +1,30 @@
+{
+  "success": true,
+  "query": "One Piece anime key visual poster art",
+  "count": 3,
+  "ranked": false,
+  "captioned_count": 0,
+  "results": [
+    {
+      "original_url": "https://z-cdn.chatglm.cn/image-search-mcp/images-ppt/f836130be8bb.jpg",
+      "caption": "",
+      "source": "Amazon.com",
+      "original_width": "1000px",
+      "original_height": "1000px"
+    },
+    {
+      "original_url": "https://z-cdn.chatglm.cn/image-search-mcp/images-ppt/ef403f100ee6.jpg",
+      "caption": "",
+      "source": "Beebom",
+      "original_width": "1168px",
+      "original_height": "700px"
+    },
+    {
+      "original_url": "https://z-cdn.chatglm.cn/image-search-mcp/images-ppt/e4870dafdd40.jpg",
+      "caption": "",
+      "source": "TurtleWings",
+      "original_width": "2800px",
+      "original_height": "2800px"
+    }
+  ]
+}

@@ -1,0 +1,30 @@
+{
+  "success": true,
+  "query": "Hunter x Hunter anime key visual poster",
+  "count": 3,
+  "ranked": false,
+  "captioned_count": 0,
+  "results": [
+    {
+      "original_url": "https://z-cdn.chatglm.cn/image-search-mcp/images-ppt/2c1cb8067e47.jpg",
+      "caption": "",
+      "source": "Amazon.com",
+      "original_width": "945px",
+      "original_height": "1417px"
+    },
+    {
+      "original_url": "https://z-cdn.chatglm.cn/image-search-mcp/images-ppt/89f0a7ae789f.jpg",
+      "caption": "",
+      "source": "Amazon.com",
+      "original_width": "1000px",
+      "original_height": "1000px"
+    },
+    {
+      "original_url": "https://z-cdn.chatglm.cn/image-search-mcp/images-ppt/3a777278e181.png",
+      "caption": "",
+      "source": "About Anime and Manga",
+      "original_width": "1414px",
+      "original_height": "2000px"
+    }
+  ]
+}

@@ -1,0 +1,30 @@
+{
+  "success": true,
+  "query": "Sword Art Online anime key visual poster",
+  "count": 3,
+  "ranked": false,
+  "captioned_count": 0,
+  "results": [
+    {
+      "original_url": "https://z-cdn.chatglm.cn/image-search-mcp/images-ppt/2cf9f61db429.jpg",
+      "caption": "",
+      "source": "IMDb",
+      "original_width": "1000px",
+      "original_height": "1500px"
+    },
+    {
+      "original_url": "https://z-cdn.chatglm.cn/image-search-mcp/images-ppt/359a3df4abf9.jpg",
+      "caption": "",
+      "source": "IMDb",
+      "original_width": "1282px",
+      "original_height": "721px"
+    },
+    {
+      "original_url": "https://z-cdn.chatglm.cn/image-search-mcp/images-ppt/c653dbdfd24b.jpg",
+      "caption": "",
+      "source": "Polygon.com",
+      "original_width": "1600px",
+      "original_height": "1080px"
+    }
+  ]
+}

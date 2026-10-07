@@ -1,0 +1,30 @@
+{
+  "success": true,
+  "query": "Violet Evergarden anime key visual poster",
+  "count": 3,
+  "ranked": false,
+  "captioned_count": 0,
+  "results": [
+    {
+      "original_url": "https://z-cdn.chatglm.cn/image-search-mcp/images-ppt/d4ab88c6837a.jpg",
+      "caption": "",
+      "source": "",
+      "original_width": "2560px",
+      "original_height": "1744px"
+    },
+    {
+      "original_url": "https://z-cdn.chatglm.cn/image-search-mcp/images-ppt/f6773e85764a.jpeg",
+      "caption": "",
+      "source": "",
+      "original_width": "1596px",
+      "original_height": "2008px"
+    },
+    {
+      "original_url": "https://z-cdn.chatglm.cn/image-search-mcp/images-ppt/5cf28c9b9f36.jpg",
+      "caption": "",
+      "source": "",
+      "original_width": "800px",
+      "original_height": "1200px"
+    }
+  ]
+}

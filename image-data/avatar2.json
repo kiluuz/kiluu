@@ -1,0 +1,30 @@
+{
+  "success": true,
+  "query": "anime boy portrait avatar illustration",
+  "count": 3,
+  "ranked": false,
+  "captioned_count": 0,
+  "results": [
+    {
+      "original_url": "https://z-cdn.chatglm.cn/image-search-mcp/images-ppt/ced6309cf467.jpg",
+      "caption": "",
+      "source": "Pinterest",
+      "original_width": "1080px",
+      "original_height": "1080px"
+    },
+    {
+      "original_url": "https://z-cdn.chatglm.cn/image-search-mcp/images-ppt/11fc1ac70b3e.jpg",
+      "caption": "",
+      "source": "Pinterest",
+      "original_width": "736px",
+      "original_height": "1308px"
+    },
+    {
+      "original_url": "https://z-cdn.chatglm.cn/image-search-mcp/images-ppt/5e30ef0e1367.jpg",
+      "caption": "",
+      "source": "Dreamstime",
+      "original_width": "1280px",
+      "original_height": "1690px"
+    }
+  ]
+}

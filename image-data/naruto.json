@@ -1,0 +1,30 @@
+{
+  "success": true,
+  "query": "Naruto Shippuden anime key visual poster",
+  "count": 3,
+  "ranked": false,
+  "captioned_count": 0,
+  "results": [
+    {
+      "original_url": "https://z-cdn.chatglm.cn/image-search-mcp/images-ppt/4feca9b15a78.jpg",
+      "caption": "",
+      "source": "Amazon.com",
+      "original_width": "1360px",
+      "original_height": "1836px"
+    },
+    {
+      "original_url": "https://z-cdn.chatglm.cn/image-search-mcp/images-ppt/0efb2ff1d077.jpg",
+      "caption": "",
+      "source": "GameBoost",
+      "original_width": "1064px",
+      "original_height": "1419px"
+    },
+    {
+      "original_url": "https://z-cdn.chatglm.cn/image-search-mcp/images-ppt/ff5702fff3ca.jpg",
+      "caption": "",
+      "source": "GameRant",
+      "original_width": "2048px",
+      "original_height": "1152px"
+    }
+  ]
+}
