@@ -73,7 +73,14 @@ export const useAppStore = create<AppStore>((set, get) => ({
   },
   openProfileCard: (username) => set({ profileModalOpen: true, profileCardUser: username }),
   closeProfileCard: () => set({ profileModalOpen: false, profileCardUser: null }),
-  setAuthOpen: (authOpen) => set({ authOpen }),
+  setAuthOpen: (authOpen) => {
+    // Full-page split login — "Sign in" now navigates to the login view
+    if (authOpen) {
+      get().navigate("login");
+    } else if (get().view.name === "login") {
+      set({ view: { name: "home" } });
+    }
+  },
   setSearchOpen: (searchOpen) => set({ searchOpen }),
 }));
 

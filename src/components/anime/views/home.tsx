@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useAppStore } from "../store";
 import type { AnimeSummary, HomeData } from "../types";
-import { AnimeCard, ContinueCard, SectionHeader, ScrollRow, SmartImage, formatCredits } from "../ui-bits";
+import { AnimeCard, ContinueCard, SectionHeader, ScrollRow, SmartImage, RankedCard, WideCard, formatCredits } from "../ui-bits";
 import { toast } from "sonner";
 
 export function HomeView() {
@@ -229,7 +229,7 @@ export function HomeView() {
             />
             <ScrollRow>
               {data.trending.map((a, i) => (
-                <AnimeCard key={a.id} anime={a} rank={i + 1} />
+                <RankedCard key={a.id} anime={a} rank={i + 1} />
               ))}
             </ScrollRow>
           </section>
@@ -244,7 +244,7 @@ export function HomeView() {
             />
             <ScrollRow>
               {data.topRated.map((a, i) => (
-                <AnimeCard key={a.id} anime={a} rank={i + 1} />
+                <RankedCard key={a.id} anime={a} rank={i + 1} />
               ))}
             </ScrollRow>
           </section>
@@ -260,8 +260,8 @@ export function HomeView() {
               onAction={() => navigate("browse", { filters: { sort: "newest" } })}
             />
             <ScrollRow>
-              {data.newReleases.map((a) => (
-                <AnimeCard key={a.id} anime={a} />
+              {data.newReleases.map((a, i) => (
+                <WideCard key={a.id} anime={a} tag={i === 0 ? "FRESH DROP" : a.status === "ONGOING" ? "NEW EPISODES" : undefined} />
               ))}
             </ScrollRow>
           </section>

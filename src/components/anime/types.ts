@@ -277,6 +277,35 @@ export interface CreditTx {
   createdAt: string;
 }
 
+export interface ScheduleItem extends AnimeSummary {
+  airDay: number; // 0=Sun..6=Sat
+  airTime: string; // "18:30"
+  episodeCount: number;
+}
+
+export interface DubJobItem {
+  id: string;
+  animeSlug: string;
+  animeTitle: string;
+  coverImage: string;
+  episodeNumber: number;
+  episodeTitle: string;
+  duration: number;
+  targetLang: string;
+  voice: string;
+  status: string;
+  pricePaid: number;
+  createdAt: string;
+}
+
+export interface EpisodeOption {
+  id: string;
+  number: number;
+  title: string;
+  duration: number;
+  dubbed: boolean;
+}
+
 export type ViewName =
   | "home"
   | "browse"
@@ -289,7 +318,10 @@ export type ViewName =
   | "exchange"
   | "user-profile"
   | "studio"
-  | "settings";
+  | "settings"
+  | "login"
+  | "schedule"
+  | "dubbing";
 
 export interface View {
   name: ViewName;

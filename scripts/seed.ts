@@ -33,6 +33,8 @@ interface AnimeSeed {
   description: string; genres: string[]; year: number; rating: number;
   studio: string; status: string; type: string; isFree: boolean; price: number;
   trending: number; featured?: boolean; episodes: { title: string; description: string }[];
+  airDay?: number; // 0=Sun..6=Sat broadcast slot
+  airTime?: string; // "18:30"
 }
 
 const EP_TITLES = [
@@ -60,6 +62,7 @@ const ANIMES: AnimeSeed[] = [
     description: "After a demon attack leaves his family slaughtered and his sister cursed, Tanjiro Kamado takes up the blade to become a Demon Slayer. His quest: restore Nezuko's humanity and avenge his family. Breath-taking sakuga animation, sword techniques that bloom like flowers, and a story about siblings that refuses to let go.",
     genres: ["Action", "Supernatural", "Adventure", "Drama"], year: 2019, rating: 8.6, studio: "ufotable",
     status: "ONGOING", type: "TV", isFree: false, price: 180, trending: 100, featured: true, episodes: eps(8),
+    airDay: 0, airTime: "22:00",
   },
   {
     key: "jjk", slug: "jujutsu-kaisen", title: "Jujutsu Kaisen",
@@ -67,6 +70,7 @@ const ANIMES: AnimeSeed[] = [
     description: "Yuji Itadori swallows a cursed finger and becomes the vessel of the King of Curses, Ryomen Sukuna. Enrolled in Tokyo Jujutsu High, he fights curses alongside sorcerers who treat death as an occupational hazard. MAPPA's stylish action, domain expansions, and morally grey characters make this a modern classic.",
     genres: ["Action", "Supernatural", "Horror", "Shounen"], year: 2020, rating: 8.5, studio: "MAPPA",
     status: "ONGOING", type: "TV", isFree: false, price: 200, trending: 98, featured: true, episodes: eps(8),
+    airDay: 4, airTime: "21:30",
   },
   {
     key: "aot", slug: "attack-on-titan", title: "Attack on Titan",
@@ -80,6 +84,7 @@ const ANIMES: AnimeSeed[] = [
     description: "Monkey D. Luffy sails the Grand Line with a crew of misfits, hunting the legendary treasure that will make him King of the Pirates. Twenty-five years of world-building, emotionally devastating backstories, and battles that shake the seas — the best-selling manga of all time deserves its crown.",
     genres: ["Adventure", "Action", "Comedy", "Fantasy"], year: 1999, rating: 9.0, studio: "Toei Animation",
     status: "ONGOING", type: "TV", isFree: false, price: 150, trending: 94, episodes: eps(8),
+    airDay: 0, airTime: "10:30",
   },
   {
     key: "frieren", slug: "frieren-beyond-journeys-end", title: "Frieren: Beyond Journey's End",
@@ -87,12 +92,14 @@ const ANIMES: AnimeSeed[] = [
     description: "The elf mage Frieren defeated the Demon King with her party of heroes — then watched her human friends age and die while she barely changed. Now she retraces their journey, learning what a decade meant to those who lived it. A meditation on time, grief and friendship wrapped in gorgeous fantasy scenery.",
     genres: ["Fantasy", "Drama", "Adventure", "Slice of Life"], year: 2023, rating: 9.3, studio: "Madhouse",
     status: "ONGOING", type: "TV", isFree: false, price: 220, trending: 92, featured: true, episodes: eps(8),
+    airDay: 5, airTime: "23:00",
   },
   {
     key: "chainsaw", slug: "chainsaw-man", title: "Chainsaw Man",
     description: "Denji is a debt-riddled teen who merges with his chainsaw devil dog Pochita to become Chainsaw Man. Recruited by Public Safety's devil hunters, he chases a normal life — toast with jam, a girlfriend, a warm bed — while slicing through devils in MAPPA's grungiest, most cinematic production.",
     genres: ["Action", "Supernatural", "Horror", "Comedy"], year: 2022, rating: 8.7, studio: "MAPPA",
     status: "ONGOING", type: "TV", isFree: false, price: 190, trending: 90, episodes: eps(8),
+    airDay: 2, airTime: "22:30",
   },
   {
     key: "deathnote", slug: "death-note", title: "Death Note",
@@ -105,6 +112,7 @@ const ANIMES: AnimeSeed[] = [
     description: "Master spy Twilight must build a fake family to infiltrate an elite school. Problem: his adopted daughter Anya reads minds, and his wife Yor is an assassin. None of them know the truth about each other. Espionage chaos meets found-family warmth — and Anya's faces cure depression.",
     genres: ["Comedy", "Action", "Slice of Life", "Spy"], year: 2022, rating: 8.5, studio: "WIT Studio / CloverWorks",
     status: "ONGOING", type: "TV", isFree: false, price: 120, trending: 86, episodes: eps(8),
+    airDay: 6, airTime: "18:30",
   },
   {
     key: "yourname", slug: "your-name", title: "Your Name",
@@ -160,12 +168,14 @@ const ANIMES: AnimeSeed[] = [
     description: "Gon Freecss leaves Whale Island to find his missing father, a legendary Hunter. With Killua, Kurapika and Leorio, he faces the world's deadliest exam. Togashi's magnum opus subverts shounen at every arc — the Chimera Ant run is literature with superpowers.",
     genres: ["Adventure", "Action", "Fantasy", "Shounen"], year: 2011, rating: 9.0, studio: "Madhouse",
     status: "ONGOING", type: "TV", isFree: false, price: 160, trending: 68, episodes: eps(8),
+    airDay: 3, airTime: "19:00",
   },
   {
     key: "tokyorev", slug: "tokyo-revengers", title: "Tokyo Revengers",
     description: "Pushed onto train tracks, Takemichi wakes up twelve years in the past — before his middle-school crush was murdered by the Tokyo Manji Gang. He time-leaps between eras, clawing at fate to save everyone. Crybaby hero, time paradoxes, delinquent warfare and brutal stakes.",
     genres: ["Action", "Drama", "Supernatural", "Romance"], year: 2021, rating: 8.1, studio: "LIDENFILMS",
     status: "ONGOING", type: "TV", isFree: false, price: 100, trending: 66, episodes: eps(8),
+    airDay: 6, airTime: "21:00",
   },
   {
     key: "sao", slug: "sword-art-online", title: "Sword Art Online",
@@ -178,6 +188,7 @@ const ANIMES: AnimeSeed[] = [
     description: "In a world of superpowers called Quirks, Quirkless Izuku Midoriya still dreams of being a hero. When the world's greatest hero chooses him as successor, he enrolls at U.A. High to inherit the legendary One For All. Superhero shounen with western comics DNA.",
     genres: ["Action", "Shounen", "Comedy", "Superhero"], year: 2016, rating: 8.2, studio: "Bones",
     status: "ONGOING", type: "TV", isFree: false, price: 120, trending: 62, episodes: eps(8),
+    airDay: 6, airTime: "17:30",
   },
   {
     key: "mob", slug: "mob-psycho-100", title: "Mob Psycho 100",
@@ -190,18 +201,21 @@ const ANIMES: AnimeSeed[] = [
     description: "With peace restored, Goku settles into farming — until Beerus the Destroyer wakes up hungry. Gods, angels and multiverses expand the Saiyan legend beyond imagination. The franchise that taught the world what a power-up looks like.",
     genres: ["Action", "Adventure", "Shounen", "Comedy"], year: 2015, rating: 8.0, studio: "Toei Animation",
     status: "ONGOING", type: "TV", isFree: false, price: 90, trending: 58, episodes: eps(8),
+    airDay: 1, airTime: "11:00",
   },
   {
     key: "bleach", slug: "bleach-tybw", title: "Bleach: Thousand-Year Blood War",
     description: "The Quincy army returns from the shadows to declare war on Soul Society. Ichigo's final arc erupts with the truth about his mother, his sword and the Soul King himself. Kubo's stylish paneling translated into jaw-dropping animation by Studio Pierrot's best team.",
     genres: ["Action", "Supernatural", "Adventure", "Shounen"], year: 2022, rating: 8.8, studio: "Studio Pierrot",
     status: "ONGOING", type: "TV", isFree: false, price: 150, trending: 56, episodes: eps(8),
+    airDay: 1, airTime: "22:00",
   },
   {
     key: "abyss", slug: "made-in-abyss", title: "Made in Abyss",
     description: "The Abyss: a colossal pit swallowing the world's secrets, layered with a curse that mutates all who ascend. Orphan Riko descends to find her mother, guided by a robot boy named Reg. Cuteness and cosmic horror in the same frame — adventure anime's most beautiful nightmare.",
     genres: ["Adventure", "Fantasy", "Mystery", "Drama"], year: 2017, rating: 8.7, studio: "Kinema Citrus",
     status: "ONGOING", type: "TV", isFree: true, price: 0, trending: 54, episodes: eps(8),
+    airDay: 3, airTime: "23:30",
   },
 ];
 
@@ -300,6 +314,8 @@ async function main() {
         price: a.price,
         trending: a.trending,
         featured: Boolean(a.featured),
+        airDay: a.airDay ?? null,
+        airTime: a.airTime ?? null,
       },
     });
     animeMap.set(a.slug, anime.id);

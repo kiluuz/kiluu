@@ -2,8 +2,8 @@
 
 import { useEffect } from "react";
 import { useAppStore } from "./store";
-import { TopNav, MobileNav } from "./shell";
-import { AuthModal, Onboarding } from "./auth";
+import { Sidebar, TopBar, MobileNav } from "./shell";
+import { Onboarding } from "./auth";
 import { ProfileModal } from "./profile-card";
 import { WelcomeLoader } from "./welcome-loader";
 import { Logo } from "./logo";
@@ -19,6 +19,9 @@ import { ExchangeView } from "./views/exchange";
 import { ProfileFullView } from "./profile";
 import { StudioView } from "./views/studio";
 import { SettingsView } from "./views/settings";
+import { LoginView } from "./views/login";
+import { ScheduleView } from "./views/schedule";
+import { DubbingView } from "./views/dubbing";
 import type { AuthUser } from "./types";
 
 export default function AnimeApp() {
@@ -51,15 +54,29 @@ export default function AnimeApp() {
     return () => window.removeEventListener("keydown", onKey);
   }, []);
 
+  // Full-page login — no chrome
+  if (view.name === "login") {
+    return (
+      <div className="min-h-screen bg-background">
+        <WelcomeLoader appReady={!loading} />
+        <LoginView />
+        <Onboarding />
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen flex flex-col bg-background">
       <WelcomeLoader appReady={!loading} />
 
-      <TopNav />
+      <Sidebar />
+      <TopBar />
 
-      <main className="flex-1 w-full pb-20 lg:pb-0">
+      <main className="flex-1 w-full lg:pl-[264px] pb-20 lg:pb-0">
         {view.name === "home" && <HomeView />}
         {view.name === "browse" && <BrowseView />}
+        {view.name === "schedule" && <ScheduleView />}
+        {view.name === "dubbing" && <DubbingView />}
         {view.name === "detail" && <DetailView />}
         {view.name === "watch" && <WatchView />}
         {view.name === "library" && <LibraryView />}
@@ -73,7 +90,7 @@ export default function AnimeApp() {
       </main>
 
       {/* Footer */}
-      <footer className="mt-auto border-t px-6 py-5 hidden lg:block">
+      <footer className="mt-auto border-t px-6 py-5 hidden lg:block lg:ml-[264px]">
         <div className="max-w-[1280px] mx-auto flex items-center justify-between gap-6">
           <div className="flex items-center gap-5">
             <Logo variant="full" size={24} />
@@ -92,7 +109,6 @@ export default function AnimeApp() {
       </footer>
 
       <MobileNav />
-      <AuthModal />
       <ProfileModal />
       <Onboarding />
     </div>

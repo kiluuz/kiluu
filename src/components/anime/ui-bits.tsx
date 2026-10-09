@@ -158,7 +158,7 @@ export function SmartImage({
   );
 }
 
-/** Standard anime poster card */
+/** Standard anime poster card — cinematic size */
 export function AnimeCard({ anime, rank }: { anime: AnimeSummary; rank?: number }) {
   const navigate = useAppStore((s) => s.navigate);
   const genres: string[] = typeof anime.genres === "string"
@@ -166,14 +166,14 @@ export function AnimeCard({ anime, rank }: { anime: AnimeSummary; rank?: number 
     : anime.genres || [];
   return (
     <div
-      className="group relative w-[150px] sm:w-[168px] cursor-pointer glow-hover rounded-xl"
+      className="group relative w-[176px] sm:w-[196px] xl:w-[210px] cursor-pointer glow-hover rounded-xl"
       onClick={() => navigate("detail", { animeId: anime.slug })}
       role="button"
       tabIndex={0}
       onKeyDown={(e) => e.key === "Enter" && navigate("detail", { animeId: anime.slug })}
       aria-label={`Open ${anime.title}`}
     >
-      <div className="img-zoom relative aspect-[2/3] rounded-xl overflow-hidden bg-muted shadow-lg">
+      <div className="img-zoom relative aspect-[2/3] rounded-xl overflow-hidden bg-muted shadow-lg border border-white/[0.06]">
         <SmartImage
           src={anime.coverImage}
           alt={anime.title}
@@ -183,7 +183,7 @@ export function AnimeCard({ anime, rank }: { anime: AnimeSummary; rank?: number 
         <div className="absolute top-2 left-2 flex flex-col gap-1">
           {rank !== undefined && (
             <span
-              className="text-[13px] font-black leading-none text-white/95 drop-shadow-[0_1px_4px_rgba(0,0,0,0.9)]"
+              className="text-[13px] font-black leading-none text-white/95"
               style={{ textShadow: "0 2px 8px rgba(0,0,0,0.8)" }}
             >
               {String(rank).padStart(2, "0")}
@@ -204,22 +204,25 @@ export function AnimeCard({ anime, rank }: { anime: AnimeSummary; rank?: number 
           </div>
         )}
         {/* Hover play overlay */}
-        <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex flex-col justify-end p-2.5">
-          <div className="flex items-center gap-1.5 translate-y-2 group-hover:translate-y-0 transition-transform duration-300">
-            <span className="bg-white/95 text-black rounded-full p-1.5">
-              <Play className="w-3.5 h-3.5 fill-black" />
+        <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/25 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex flex-col justify-end p-3">
+          <div className="flex items-center gap-2 translate-y-2 group-hover:translate-y-0 transition-transform duration-300">
+            <span className="bg-white/95 text-black rounded-full p-2 shadow-lg">
+              <Play className="w-4 h-4 fill-black" />
             </span>
-            <span className="text-[11px] font-semibold text-white">
-              {anime.owned || anime.isFree ? "Watch now" : anime.isFree ? "Free" : `${anime.price} credits`}
+            <span className="text-[12px] font-bold text-white">
+              {anime.owned || anime.isFree ? "Watch now" : `${anime.price} credits`}
             </span>
           </div>
+          <p className="text-[11px] text-white/75 mt-2 line-clamp-2 opacity-0 group-hover:opacity-100 transition-opacity duration-500">
+            {anime.description}
+          </p>
         </div>
         {/* Bottom gradient always for rating */}
-        <div className="absolute bottom-0 inset-x-0 bg-gradient-to-t from-black/80 to-transparent p-1.5 pt-6">
+        <div className="absolute bottom-0 inset-x-0 bg-gradient-to-t from-black/80 to-transparent p-2 pt-6">
           <div className="flex items-center gap-1">
-            <Star className="w-3 h-3 fill-amber-400 text-amber-400" />
-            <span className="text-[11px] font-bold text-white">{anime.rating.toFixed(1)}</span>
-            <span className="text-[10px] text-white/70 ml-auto">{anime.year}</span>
+            <Star className="w-3.5 h-3.5 fill-amber-400 text-amber-400" />
+            <span className="text-[12px] font-bold text-white">{anime.rating.toFixed(1)}</span>
+            <span className="text-[11px] text-white/70 ml-auto">{anime.year}</span>
           </div>
         </div>
         {/* Lock for unowned paid */}
@@ -231,13 +234,116 @@ export function AnimeCard({ anime, rank }: { anime: AnimeSummary; rank?: number 
           </div>
         )}
       </div>
-      <div className="pt-2 px-0.5">
-        <h3 className="text-[13px] font-semibold leading-tight line-clamp-2 group-hover:text-primary transition-colors">
+      <div className="pt-2.5 px-0.5">
+        <h3 className="text-[14px] font-bold leading-tight line-clamp-2 group-hover:text-primary transition-colors">
           {anime.title}
         </h3>
-        <p className="text-[11px] text-muted-foreground mt-0.5 line-clamp-1">
+        <p className="text-[11.5px] text-muted-foreground mt-1 line-clamp-1">
           {anime.type} · {genres.slice(0, 2).join(", ")}
         </p>
+      </div>
+    </div>
+  );
+}
+
+/** Netflix-style ranked card — oversized outline numeral beside a large poster */
+export function RankedCard({ anime, rank }: { anime: AnimeSummary; rank: number }) {
+  const navigate = useAppStore((s) => s.navigate);
+  return (
+    <div
+      className="rank-card group relative flex items-end gap-0 cursor-pointer shrink-0"
+      onClick={() => navigate("detail", { animeId: anime.slug })}
+      role="button"
+      tabIndex={0}
+      onKeyDown={(e) => e.key === "Enter" && navigate("detail", { animeId: anime.slug })}
+      aria-label={`#${rank} ${anime.title}`}
+    >
+      <span
+        className="rank-numeral relative z-0 text-[104px] sm:text-[122px] xl:text-[136px] -mr-3 sm:-mr-4 select-none translate-y-[8px]"
+        aria-hidden="true"
+      >
+        {rank}
+      </span>
+      <div className="img-zoom relative z-10 w-[152px] sm:w-[168px] xl:w-[184px] aspect-[2/3] rounded-xl overflow-hidden bg-muted shadow-xl border border-white/[0.06]">
+        <SmartImage src={anime.coverImage} alt={anime.title} className="w-full h-full object-cover" />
+        <div className="absolute bottom-0 inset-x-0 bg-gradient-to-t from-black/90 via-black/30 to-transparent p-2.5 pt-8">
+          <div className="flex items-center gap-1.5">
+            <Star className="w-3.5 h-3.5 fill-amber-400 text-amber-400 shrink-0" />
+            <span className="text-[12px] font-bold text-white">{anime.rating.toFixed(1)}</span>
+            {anime.isFree ? (
+              <span className="ml-auto text-[9px] font-black px-1.5 py-0.5 rounded-full bg-emerald-500/90 text-white">FREE</span>
+            ) : anime.owned ? (
+              <span className="ml-auto text-[9px] font-black px-1.5 py-0.5 rounded-full bg-primary/90 text-white">OWNED</span>
+            ) : (
+              <span className="ml-auto text-[9px] font-black px-1.5 py-0.5 rounded-full bg-amber-500/90 text-white">
+                {anime.price} CR
+              </span>
+            )}
+          </div>
+        </div>
+        {/* hover preview */}
+        <div className="absolute inset-0 bg-black/55 opacity-0 group-hover:opacity-100 transition flex flex-col justify-end p-3">
+          <h3 className="text-[13px] font-bold text-white line-clamp-2 leading-tight">{anime.title}</h3>
+          <p className="text-[10.5px] text-white/65 mt-1 line-clamp-1">
+            {anime.year} · {anime.type}
+          </p>
+          <span className="mt-2 self-start bg-white/95 text-black rounded-full p-1.5">
+            <Play className="w-3.5 h-3.5 fill-black" />
+          </span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/** Wide 16:9 spotlight card — Fresh Drops / editorial rows */
+export function WideCard({ anime, tag }: { anime: AnimeSummary; tag?: string }) {
+  const navigate = useAppStore((s) => s.navigate);
+  const genres: string[] = typeof anime.genres === "string"
+    ? String(anime.genres).split(",").filter(Boolean)
+    : anime.genres || [];
+  return (
+    <div
+      className="group relative w-[290px] sm:w-[340px] xl:w-[380px] shrink-0 cursor-pointer glow-hover rounded-2xl"
+      onClick={() => navigate("detail", { animeId: anime.slug })}
+      role="button"
+      tabIndex={0}
+      onKeyDown={(e) => e.key === "Enter" && navigate("detail", { animeId: anime.slug })}
+      aria-label={`Open ${anime.title}`}
+    >
+      <div className="img-zoom relative aspect-video rounded-2xl overflow-hidden bg-muted shadow-xl border border-white/[0.06]">
+        <SmartImage
+          src={anime.bannerImage || anime.coverImage}
+          alt={anime.title}
+          className="w-full h-full object-cover"
+        />
+        <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/25 to-transparent" />
+        {tag && (
+          <span className="absolute top-3 left-3 brand-gradient text-white text-[10px] font-black px-2.5 py-1 rounded-full tracking-wide shadow-lg">
+            {tag}
+          </span>
+        )}
+        <div className="absolute bottom-0 inset-x-0 p-3.5">
+          <h3 className="text-[15px] font-black text-white truncate drop-shadow">{anime.title}</h3>
+          <div className="flex items-center gap-2 mt-1 text-[11px] text-white/75">
+            <Star className="w-3 h-3 fill-amber-400 text-amber-400" />
+            <span className="font-bold text-white">{anime.rating.toFixed(1)}</span>
+            <span>· {anime.year}</span>
+            <span>· {genres[0]}</span>
+            {anime.isFree ? (
+              <span className="ml-auto text-[9px] font-black px-1.5 py-0.5 rounded-full bg-emerald-500/90 text-white">FREE</span>
+            ) : (
+              <span className="ml-auto text-[9px] font-black px-1.5 py-0.5 rounded-full bg-amber-500/90 text-white">
+                {anime.price} CR
+              </span>
+            )}
+          </div>
+        </div>
+        <span className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition">
+            <span className="bg-white/95 rounded-full p-3 shadow-2xl">
+              <Play className="w-5 h-5 fill-black text-black" />
+            </span>
+        </span>
       </div>
     </div>
   );
