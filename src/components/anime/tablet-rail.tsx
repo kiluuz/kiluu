@@ -107,7 +107,7 @@ export function TabletRail() {
         aria-label="Tablet navigation"
         onMouseEnter={reducedMotion ? undefined : scheduleOpen}
         onMouseLeave={scheduleClose}
-        className="hidden md:max-[1099.98px]:flex fixed left-0 top-0 bottom-0 w-[76px] flex-col items-center glass-strong border-r z-40 py-3"
+        className="hidden md:max-[1099.98px]:flex fixed left-0 top-0 bottom-0 w-[76px] flex-col items-center glass-strong border-r z-50 py-3"
       >
         <button
           onClick={() => navigate("home")}
@@ -182,7 +182,7 @@ export function TabletRail() {
               animate={{ opacity: 1 }}
               exit={reducedMotion ? undefined : { opacity: 0 }}
               transition={{ duration: 0.18 }}
-              className="hidden md:max-[1099.98px]:block fixed inset-0 z-40 bg-black/45 backdrop-blur-[2px]"
+              className="hidden md:max-[1099.98px]:block fixed inset-0 z-[45] bg-black/45 backdrop-blur-[2px]"
               onClick={() => setExpanded(false)}
               aria-hidden="true"
             />

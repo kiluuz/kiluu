@@ -150,6 +150,27 @@
   line-height: 1;
 }
 
+/* ---- nav top-bar brand ----
+   Used by the mobile/tablet top bar lockup:
+   • on scroll the wordmark collapses (page title fades in — YouTube-style swap)
+   • < 360px: too narrow — mark only
+   • tablet (768–1100px): the icon rail carries the mark — top bar shows wordmark only */
+.dbx-navbrand .dbx-wm {
+  max-width: 120px;
+  transition: max-width 0.22s ease, opacity 0.16s ease;
+}
+.dbx-navbrand.dbx-collapse .dbx-wm {
+  min-width: 0;
+  max-width: 0;
+  opacity: 0;
+}
+@media (max-width: 359.98px) {
+  .dbx-navbrand .dbx-wm { min-width: 0; max-width: 0; opacity: 0; }
+}
+@media (min-width: 768px) and (max-width: 1099.98px) {
+  .dbx-navbrand .dbx-mk { display: none; }
+}
+
 /* ---- reduced motion: static mark, no intro, no sweep ---- */
 @media (prefers-reduced-motion: reduce) {
   .dbx-bars .dbx-bar,
@@ -159,4 +180,5 @@
   .dbx-lock:hover .dbx-mk { transform: none; filter: none; }
   .dbx-bars .dbx-bar,
   .dbx-ltr { opacity: 1 !important; transform: none !important; filter: none !important; }
+  .dbx-navbrand .dbx-wm { transition: none; }
 }

@@ -21,7 +21,7 @@ import type { AnimeSummary } from "./types";
 import type { ViewName } from "./types";
 
 /** Brand lockup — DubAniX logo (animated mark + wordmark), links home */
-export function BrandLockup({ compact = false }: { compact?: boolean }) {
+export function BrandLockup() {
   const navigate = useAppStore((s) => s.navigate);
   return (
     <button
@@ -29,7 +29,7 @@ export function BrandLockup({ compact = false }: { compact?: boolean }) {
       onClick={() => navigate("home")}
       aria-label="DubAniX home"
     >
-      {compact ? <Logo variant="mark" size={32} /> : <Logo variant="full" size={38} />}
+      <Logo variant="full" size={38} />
     </button>
   );
 }
@@ -320,7 +320,7 @@ export function Sidebar({ variant = "fixed" }: { variant?: "fixed" | "overlay" }
 
   return (
     <aside
-      className="hidden min-[1100px]:flex fixed left-0 top-0 bottom-0 w-[264px] flex-col glass-strong border-r z-40 grain"
+      className="hidden min-[1100px]:flex fixed left-0 top-0 bottom-0 w-[264px] flex-col glass-strong border-r z-50 grain"
       aria-label="Sidebar navigation"
     >
       {inner}
@@ -377,7 +377,10 @@ export function TopBar() {
       )}
     >
       <div className="flex items-center gap-2 sm:gap-3 px-3 sm:px-6 h-14 min-[1100px]:h-16">
-        {/* Mobile/tablet: back or logo (desktop brand is in sidebar) */}
+        {/* Mobile/tablet: back or brand (desktop brand is in sidebar).
+            Brand = mark + DubAniX wordmark; on scroll the wordmark collapses
+            to a sliver and the page title fades in (YouTube-style swap).
+            Tablet rail carries the mark — the top bar shows the wordmark only. */}
         {inSubView ? (
           <button
             onClick={goBack}
@@ -387,8 +390,16 @@ export function TopBar() {
             <ChevronRight className="w-5 h-5 rotate-180" />
           </button>
         ) : (
-          <div className="min-[1100px]:hidden pl-1">
-            <BrandLockup compact />
+          <div className="min-[1100px]:hidden pl-1 flex items-center min-w-0">
+            <Logo
+              variant="full"
+              size={28}
+              onClick={() => navigate("home")}
+              className={cn(
+                "dbx-navbrand rounded-xl focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-primary",
+                scrolled && "dbx-collapse"
+              )}
+            />
           </div>
         )}
 
@@ -435,7 +446,7 @@ export function TopBar() {
             >
               <Coins className="w-4 h-4" />
               <span className="tabular-nums">{formatCredits(user.credits)}</span>
-              <Plus className="w-3.5 h-3.5 opacity-70" />
+              <Plus className="w-3.5 h-3.5 opacity-70 hidden sm:block" />
             </button>
           ) : (
             <button
@@ -456,7 +467,7 @@ export function TopBar() {
           </button>
 
           <button
-            className="p-2.5 rounded-xl hover:bg-accent transition relative min-h-[44px] min-w-[44px] inline-flex items-center justify-center"
+            className="p-2.5 rounded-xl hover:bg-accent transition relative min-h-[44px] min-w-[44px] hidden sm:inline-flex items-center justify-center"
             aria-label="Notifications"
             onClick={() => toast.info("You're all caught up! Nothing new here.", { id: "notif" })}
           >
