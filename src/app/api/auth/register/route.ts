@@ -58,7 +58,8 @@ export async function POST(req: NextRequest) {
     });
 
     await createSession(user.id);
-    return NextResponse.json({ user: toPublicUser(user) }, { status: 201 });
+    // New accounts own nothing — 0/20 toward Exchange unlock
+    return NextResponse.json({ user: { ...toPublicUser(user), ownedCount: 0 } }, { status: 201 });
   } catch (e) {
     console.error("register error", e);
     return NextResponse.json({ error: "Registration failed" }, { status: 500 });

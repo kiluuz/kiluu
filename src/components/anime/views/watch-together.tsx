@@ -84,6 +84,12 @@ export function WatchTogetherView() {
   const [reactions, setReactions] = useState<FloatingReaction[]>([]);
   const controlsRef = useRef<PlayerControls | null>(null);
 
+  // Inside a watch-party room the mobile dock hides (immersive mode)
+  useEffect(() => {
+    useAppStore.getState().setImmersive(Boolean(activeRoom));
+    return () => useAppStore.getState().setImmersive(false);
+  }, [activeRoom]);
+
   const refreshRooms = useCallback(() => {
     const s = socketRef.current;
     if (!s) return;

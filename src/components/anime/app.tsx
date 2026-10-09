@@ -2,7 +2,10 @@
 
 import { useEffect } from "react";
 import { useAppStore } from "./store";
-import { Sidebar, TopBar, MobileNav } from "./shell";
+import { Sidebar, TopBar } from "./shell";
+import { TabletRail } from "./tablet-rail";
+import { MobileDock } from "./mobile-dock";
+import { MobileSearch } from "./mobile-search";
 import { Onboarding } from "./auth";
 import { ProfileModal } from "./profile-card";
 import { WelcomeLoader } from "./welcome-loader";
@@ -40,19 +43,43 @@ export default function AnimeApp() {
 
   const loading = useAppStore((s) => s.userLoading);
 
-  // Keyboard shortcut for search (/)
+  // Keyboard shortcut for search (/) — full-screen overlay below 1100px, inline box on desktop
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
       const tag = (e.target as HTMLElement)?.tagName;
       if (tag === "INPUT" || tag === "TEXTAREA") return;
       if (e.key === "/" && !useAppStore.getState().searchOpen) {
         e.preventDefault();
-        useAppStore.getState().setSearchOpen(true);
+        if (window.matchMedia("(max-width: 1099.98px)").matches) {
+          useAppStore.getState().setMobileSearchOpen(true);
+        } else {
+          useAppStore.getState().setSearchOpen(true);
+        }
       }
     }
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, []);
+
+  // Does anything air today? → drives the Schedule notification dot in the nav
+  useEffect(() => {
+    let alive = true;
+    fetch("/api/schedule")
+      .then((r) => r.json())
+      .then((d) => {
+        if (!alive) return;
+        const today = new Date().getDay();
+        const airs = Array.isArray(d?.schedule) && d.schedule.some((a: { airDay?: number }) => a?.airDay === today);
+        useAppStore.getState().setScheduleAirsToday(Boolean(airs));
+      })
+      .catch(() => {});
+    return () => { alive = false; };
+  }, []);
+
+  // The video player view is immersive — the mobile dock hides completely
+  useEffect(() => {
+    useAppStore.getState().setImmersive(view.name === "watch");
+  }, [view.name]);
 
   // Full-page login — no chrome
   if (view.name === "login") {
@@ -70,9 +97,10 @@ export default function AnimeApp() {
       <WelcomeLoader appReady={!loading} />
 
       <Sidebar />
+      <TabletRail />
       <TopBar />
 
-      <main className="flex-1 w-full lg:pl-[264px] pb-20 lg:pb-0">
+      <main className="flex-1 w-full md:max-[1099.98px]:pl-[76px] min-[1100px]:pl-[264px] pb-[calc(116px+env(safe-area-inset-bottom,0px))] md:pb-0">
         {view.name === "home" && <HomeView />}
         {view.name === "browse" && <BrowseView />}
         {view.name === "schedule" && <ScheduleView />}
@@ -90,7 +118,7 @@ export default function AnimeApp() {
       </main>
 
       {/* Footer */}
-      <footer className="mt-auto border-t px-6 py-5 hidden lg:block lg:ml-[264px]">
+      <footer className="mt-auto border-t px-6 py-5 hidden min-[1100px]:block min-[1100px]:ml-[264px]">
         <div className="max-w-[1280px] mx-auto flex items-center justify-between gap-6">
           <div className="flex items-center gap-5">
             <Logo variant="full" size={24} />
@@ -108,7 +136,8 @@ export default function AnimeApp() {
         </div>
       </footer>
 
-      <MobileNav />
+      <MobileDock />
+      <MobileSearch />
       <ProfileModal />
       <Onboarding />
     </div>

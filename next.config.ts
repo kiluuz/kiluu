@@ -7,6 +7,9 @@ const nextConfig: NextConfig = {
     ignoreBuildErrors: true,
   },
   reactStrictMode: false,
+  // Hide the Next.js dev tools badge (dark "N" circle) — it overlapped the
+  // mobile floating dock. It never exists in production builds.
+  devIndicators: false,
 };
 
 export default nextConfig;

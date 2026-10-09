@@ -20,7 +20,9 @@ export async function POST(req: NextRequest) {
     }
 
     await createSession(user.id);
-    return NextResponse.json({ user: toPublicUser(user) });
+    // Owned count powers the Exchange badge/lock in the nav
+    const ownedCount = await db.purchase.count({ where: { userId: user.id } });
+    return NextResponse.json({ user: { ...toPublicUser(user), ownedCount } });
   } catch (e) {
     console.error("login error", e);
     return NextResponse.json({ error: "Login failed" }, { status: 500 });

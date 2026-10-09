@@ -50,6 +50,8 @@ export interface AuthUser {
   bannerPreset: string | null;
   showcase: string | null;
   privacy: string | null;
+  /** owned animes count — powers the Exchange "20+" badge + lock (may lag after purchases) */
+  ownedCount?: number;
 }
 
 export interface AnimeSummary {

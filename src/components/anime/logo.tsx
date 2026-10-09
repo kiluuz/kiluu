@@ -128,12 +128,15 @@ export function Logo({
     <span className="dbx-mk" aria-hidden="true">
       <svg viewBox="0 0 64 64" width="100%" height="100%" focusable="false">
         <defs>
-          <linearGradient id={gid} x1="0" y1="0" x2="1" y2="1">
+          {/* useId() differs between server/client in React 19.2 dev SSR —
+              suppress the harmless id/fill warning (React keeps server ids,
+              which are internally consistent, so the gradient still renders) */}
+          <linearGradient id={gid} x1="0" y1="0" x2="1" y2="1" suppressHydrationWarning>
             <stop offset="0" stopColor="#ff4d1c" />
             <stop offset="1" stopColor="#ffa23a" />
           </linearGradient>
         </defs>
-        <rect width="64" height="64" rx="17" fill={mono ? "#fff" : `url(#${gid})`} />
+        <rect width="64" height="64" rx="17" fill={mono ? "#fff" : `url(#${gid})`} suppressHydrationWarning />
         <g className={animated ? "dbx-bars" : undefined}>
           {BAR_H.map((h, i) => (
             <rect

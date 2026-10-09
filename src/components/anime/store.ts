@@ -22,6 +22,15 @@ interface AppStore {
   closeProfileCard: () => void;
   setAuthOpen: (open: boolean) => void;
   setSearchOpen: (open: boolean) => void;
+  /** full-screen mobile search overlay (poster thumbnails) */
+  setMobileSearchOpen: (open: boolean) => void;
+  /** true inside the video player / fullscreen / watch-party room — hides the dock */
+  setImmersive: (immersive: boolean) => void;
+  /** any anime airs today — drives the Schedule nav dot */
+  setScheduleAirsToday: (airs: boolean) => void;
+  mobileSearchOpen: boolean;
+  immersive: boolean;
+  scheduleAirsToday: boolean;
 }
 
 export const useAppStore = create<AppStore>((set, get) => ({
@@ -33,6 +42,9 @@ export const useAppStore = create<AppStore>((set, get) => ({
   profileCardUser: null,
   authOpen: false,
   searchOpen: false,
+  mobileSearchOpen: false,
+  immersive: false,
+  scheduleAirsToday: false,
   setUser: (user) => set({ user }),
   updateUser: (patch) => {
     const current = get().user;
@@ -47,6 +59,7 @@ export const useAppStore = create<AppStore>((set, get) => ({
       profileModalOpen: false,
       profileCardUser: null,
       searchOpen: false,
+      mobileSearchOpen: false,
     });
     if (typeof window !== "undefined") {
       window.scrollTo({ top: 0, behavior: "instant" as ScrollBehavior });
@@ -82,6 +95,9 @@ export const useAppStore = create<AppStore>((set, get) => ({
     }
   },
   setSearchOpen: (searchOpen) => set({ searchOpen }),
+  setMobileSearchOpen: (mobileSearchOpen) => set({ mobileSearchOpen }),
+  setImmersive: (immersive) => set({ immersive }),
+  setScheduleAirsToday: (scheduleAirsToday) => set({ scheduleAirsToday }),
 }));
 
 /** Open the Discord-style profile card from anywhere (avatar/name clicks) */

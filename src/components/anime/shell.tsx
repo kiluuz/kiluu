@@ -1,19 +1,24 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
 import {
-  Home, Compass, Users, Clock, Repeat, Wallet, Video, AudioLines,
-  Search, Bell, Sun, Moon, LogOut, CalendarDays,
-  Settings, Clapperboard, ChevronRight, Plus, Coins, UserRound,
+  Sun, Moon, LogOut, Settings, ChevronRight, Plus, Coins, UserRound,
+  Search, Bell, Lock,
 } from "lucide-react";
 import { useTheme } from "next-themes";
 import { useAppStore } from "./store";
 import { Avatar, formatCredits } from "./ui-bits";
 import { Logo } from "./logo";
+import {
+  useResolvedNav, NAV_GROUP_LABELS, EXCHANGE_REQUIRED,
+  type NavGroup, type ResolvedNavItem,
+} from "./nav-config";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import type { AnimeSummary } from "./types";
+import type { ViewName } from "./types";
 
 /** Brand lockup — DubAniX logo (animated mark + wordmark), links home */
 export function BrandLockup({ compact = false }: { compact?: boolean }) {
@@ -29,7 +34,7 @@ export function BrandLockup({ compact = false }: { compact?: boolean }) {
   );
 }
 
-/* ================= SEARCH ================= */
+/* ================= SEARCH (desktop inline) ================= */
 
 function SearchBox() {
   const navigate = useAppStore((s) => s.navigate);
@@ -136,41 +141,13 @@ function SearchBox() {
   );
 }
 
-/* ================= SIDEBAR (desktop) ================= */
+/* ================= SIDEBAR (desktop > 1100px / tablet overlay) ================= */
 
-const MAIN_LINKS = [
-  { id: "home", label: "Home", icon: Home },
-  { id: "browse", label: "Discover", icon: Compass },
-  { id: "schedule", label: "Schedule", icon: CalendarDays },
-  { id: "dubbing", label: "AI Dubbing", icon: AudioLines, badge: "UZ" },
-  { id: "community", label: "Community", icon: Users },
-  { id: "watch-together", label: "Watch Together", icon: Video },
-] as const;
-
-const MY_LINKS = [
-  { id: "library", label: "My Library", icon: Clock },
-  { id: "exchange", label: "Exchange", icon: Repeat },
-  { id: "credits", label: "Get Credits", icon: Wallet },
-] as const;
-
-function NavButton({
-  id,
-  label,
-  icon: Icon,
-  badge,
-  active,
-  onClick,
-}: {
-  id: string;
-  label: string;
-  icon: React.ComponentType<{ className?: string }>;
-  badge?: string;
-  active: boolean;
-  onClick: () => void;
-}) {
+function NavButton({ item, onClick }: { item: ResolvedNavItem; onClick: () => void }) {
+  const { def, active, badgeText, locked } = item;
+  const Icon = def.icon;
   return (
     <button
-      key={id}
       onClick={onClick}
       className={cn(
         "relative w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-[14px] font-semibold transition-all group",
@@ -179,25 +156,36 @@ function NavButton({
           : "text-muted-foreground hover:text-foreground hover:bg-accent/60"
       )}
       aria-current={active ? "page" : undefined}
+      aria-label={
+        def.id === "exchange" && locked
+          ? `Exchange — locked, ${item.ownedCount} of ${EXCHANGE_REQUIRED} animes owned`
+          : def.label
+      }
     >
       {active && (
         <span className="absolute left-0 top-1/2 -translate-y-1/2 -translate-x-[9px] w-[3px] h-6 rounded-full brand-gradient" />
       )}
       <Icon className={cn("w-[18px] h-[18px] shrink-0", active && "drop-shadow-[0_0_6px_var(--glow)]")} />
-      <span className="truncate">{label}</span>
-      {badge && (
-        <span className="ml-auto text-[9px] font-black px-1.5 py-0.5 rounded-full bg-primary/15 text-primary border border-primary/30 tracking-wide">
-          {badge}
+      <span className="truncate">{def.label}</span>
+      {badgeText && (
+        <span className="ml-auto flex items-center gap-1 text-[9px] font-black px-1.5 py-0.5 rounded-full bg-primary/15 text-primary border border-primary/30 tracking-wide">
+          {locked && <Lock className="w-2.5 h-2.5" aria-label="locked" />}
+          {badgeText}
         </span>
       )}
     </button>
   );
 }
 
-/** Desktop left sidebar — ALL main navigation lives here */
-export function Sidebar() {
-  const { user, view, navigate, setProfileModalOpen } = useAppStore();
+/**
+ * Desktop left sidebar — ALL main navigation lives here (> 1100px).
+ * `variant="overlay"` renders the same sidebar as an expanding overlay for
+ * the tablet icon rail (768–1100px).
+ */
+export function Sidebar({ variant = "fixed" }: { variant?: "fixed" | "overlay" }) {
+  const { user, view, navigate } = useAppStore();
   const { theme, setTheme } = useTheme();
+  const items = useResolvedNav();
 
   async function logout() {
     try {
@@ -210,11 +198,11 @@ export function Sidebar() {
     }
   }
 
-  return (
-    <aside
-      className="hidden lg:flex fixed left-0 top-0 bottom-0 w-[264px] flex-col glass-strong border-r z-40 grain"
-      aria-label="Sidebar navigation"
-    >
+  const grouped: Record<NavGroup, ResolvedNavItem[]> = { browse: [], my: [], creator: [] };
+  for (const it of items) grouped[it.def.group].push(it);
+
+  const inner = (
+    <>
       {/* Brand */}
       <div className="px-5 py-5 border-b border-border/70">
         <BrandLockup />
@@ -225,43 +213,22 @@ export function Sidebar() {
 
       {/* Links */}
       <nav className="flex-1 overflow-y-auto no-scrollbar px-3 py-4 space-y-6" aria-label="Main">
-        <div className="space-y-1">
-          <p className="px-3 pb-1.5 text-[10.5px] font-bold uppercase tracking-[0.14em] text-muted-foreground/60">
-            Browse
-          </p>
-          {MAIN_LINKS.map((item) => (
-            <NavButton
-              key={item.id}
-              {...item}
-              active={view.name === item.id}
-              onClick={() => navigate(item.id as never)}
-            />
-          ))}
-        </div>
-
-        <div className="space-y-1">
-          <p className="px-3 pb-1.5 text-[10.5px] font-bold uppercase tracking-[0.14em] text-muted-foreground/60">
-            My Stuff
-          </p>
-          {MY_LINKS.map((item) => (
-            <NavButton
-              key={item.id}
-              {...item}
-              badge={item.id === "exchange" && user ? "20+" : undefined}
-              active={view.name === item.id}
-              onClick={() => navigate(item.id as never)}
-            />
-          ))}
-          {user?.role === "CREATOR" && (
-            <NavButton
-              id="studio"
-              label="Creator Studio"
-              icon={Clapperboard}
-              active={view.name === "studio"}
-              onClick={() => navigate("studio")}
-            />
-          )}
-        </div>
+        {(["browse", "my", "creator"] as NavGroup[]).map((group) =>
+          grouped[group].length === 0 ? null : (
+            <div key={group} className="space-y-1">
+              <p className="px-3 pb-1.5 text-[10.5px] font-bold uppercase tracking-[0.14em] text-muted-foreground/60">
+                {NAV_GROUP_LABELS[group]}
+              </p>
+              {grouped[group].map((item) => (
+                <NavButton
+                  key={item.def.id}
+                  item={item}
+                  onClick={() => navigate(item.def.id as never)}
+                />
+              ))}
+            </div>
+          )
+        )}
       </nav>
 
       {/* Footer: user area */}
@@ -336,50 +303,125 @@ export function Sidebar() {
           </button>
         )}
       </div>
+    </>
+  );
+
+  if (variant === "overlay") {
+    return (
+      <motion.aside
+        initial={false}
+        className="flex fixed left-0 top-0 bottom-0 w-[264px] flex-col glass-strong border-r z-50 grain shadow-2xl"
+        aria-label="Sidebar navigation"
+      >
+        {inner}
+      </motion.aside>
+    );
+  }
+
+  return (
+    <aside
+      className="hidden min-[1100px]:flex fixed left-0 top-0 bottom-0 w-[264px] flex-col glass-strong border-r z-40 grain"
+      aria-label="Sidebar navigation"
+    >
+      {inner}
     </aside>
   );
 }
 
 /* ================= TOP BAR (search + actions) ================= */
 
-/** Slim top bar — search + quick actions. Nav links live in the sidebar. */
+const VIEW_TITLES: Partial<Record<ViewName, string>> = {
+  home: "Home",
+  browse: "Discover",
+  schedule: "Schedule",
+  dubbing: "AI Dubbing",
+  community: "Community",
+  "watch-together": "Watch Together",
+  library: "My Library",
+  exchange: "Exchange",
+  credits: "Get Credits",
+  studio: "Creator Studio",
+  settings: "Settings",
+  "user-profile": "Profile",
+  detail: "Details",
+  watch: "Now Playing",
+  login: "Sign in",
+};
+
+/** Slim top bar — compact on mobile/tablet, search + actions on desktop. */
 export function TopBar() {
   const { user, view, goBack, setProfileModalOpen, navigate } = useAppStore();
   const { theme, setTheme } = useTheme();
+  const [scrolled, setScrolled] = useState(false);
+  const reducedMotion = useReducedMotion();
 
   const inSubView = ["detail", "watch", "user-profile", "studio", "settings"].includes(view.name);
 
+  /* border-on-scroll for the compact bar */
+  useEffect(() => {
+    const onScroll = () => setScrolled(window.scrollY > 8);
+    onScroll();
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => window.removeEventListener("scroll", onScroll);
+  }, []);
+
+  const title = VIEW_TITLES[view.name];
+
   return (
-    <header className="sticky top-0 z-40 glass-strong border-b lg:pl-[264px]">
-      <div className="flex items-center gap-3 px-4 sm:px-6 h-16">
-        {/* Mobile: back or logo (desktop brand is in sidebar) */}
+    <header
+      data-scrolled={scrolled}
+      className={cn(
+        "sticky top-0 z-40 glass-strong transition-[box-shadow,background-color] duration-300",
+        scrolled ? "border-b shadow-[0_8px_24px_-16px_rgba(0,0,0,0.5)]" : "border-b border-transparent",
+        "md:max-[1099.98px]:pl-[76px] min-[1100px]:pl-[264px]"
+      )}
+    >
+      <div className="flex items-center gap-2 sm:gap-3 px-3 sm:px-6 h-14 min-[1100px]:h-16">
+        {/* Mobile/tablet: back or logo (desktop brand is in sidebar) */}
         {inSubView ? (
           <button
             onClick={goBack}
-            className="lg:hidden p-2 -ml-2 rounded-lg hover:bg-accent transition"
+            className="min-[1100px]:hidden p-2.5 -ml-1.5 rounded-xl hover:bg-accent transition min-h-[44px] min-w-[44px] flex items-center justify-center"
             aria-label="Go back"
           >
             <ChevronRight className="w-5 h-5 rotate-180" />
           </button>
         ) : (
-          <div className="lg:hidden">
+          <div className="min-[1100px]:hidden pl-1">
             <BrandLockup compact />
           </div>
         )}
 
+        {/* Collapsed page title (mobile/tablet, appears on scroll) */}
+        <div className="min-[1100px]:hidden flex-1 min-w-0 overflow-hidden">
+          <AnimatePresence initial={false}>
+            {scrolled && title && (
+              <motion.p
+                initial={reducedMotion ? false : { opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={reducedMotion ? undefined : { opacity: 0, y: 8 }}
+                transition={{ duration: 0.18 }}
+                className="font-display text-[15px] font-bold truncate"
+              >
+                {title}
+              </motion.p>
+            )}
+          </AnimatePresence>
+        </div>
+
         {/* Search — full width on desktop */}
-        <div className="flex-1 flex justify-end lg:justify-start">
-          <div className="hidden lg:block w-full max-w-xl">
+        <div className="hidden min-[1100px]:block flex-1 justify-start">
+          <div className="w-full max-w-xl">
             <SearchBox />
           </div>
         </div>
 
         {/* Right actions */}
-        <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
-          {/* Mobile search trigger */}
+        <div className="flex items-center gap-1 sm:gap-1.5 shrink-0 ml-auto min-[1100px]:ml-0">
+          {/* Mobile/tablet search trigger → full-screen search */}
           <button
-            onClick={() => useAppStore.getState().setSearchOpen(true)}
-            className="lg:hidden p-2.5 rounded-xl hover:bg-accent transition"
+            onClick={() => useAppStore.getState().setMobileSearchOpen(true)}
+            className="min-[1100px]:hidden p-2.5 rounded-xl hover:bg-accent transition min-h-[44px] min-w-[44px] flex items-center justify-center"
             aria-label="Open search"
           >
             <Search className="w-[18px] h-[18px]" />
@@ -388,7 +430,7 @@ export function TopBar() {
           {user ? (
             <button
               onClick={() => navigate("credits")}
-              className="flex items-center gap-1.5 h-9 px-3 rounded-full bg-amber-500/10 border border-amber-500/30 text-amber-500 hover:bg-amber-500/20 transition font-bold text-xs sm:text-sm"
+              className="flex items-center gap-1.5 h-9 px-2.5 sm:px-3 rounded-full bg-amber-500/10 border border-amber-500/30 text-amber-500 hover:bg-amber-500/20 transition font-bold text-xs sm:text-sm"
               aria-label="Your credits balance"
             >
               <Coins className="w-4 h-4" />
@@ -398,7 +440,7 @@ export function TopBar() {
           ) : (
             <button
               onClick={() => navigate("login")}
-              className="flex items-center gap-1.5 h-9 px-4 rounded-full brand-gradient text-white font-bold text-sm hover:opacity-90 transition"
+              className="flex items-center gap-1.5 h-9 px-3 sm:px-4 rounded-full brand-gradient text-white font-bold text-xs sm:text-sm hover:opacity-90 transition"
             >
               Sign in
             </button>
@@ -406,7 +448,7 @@ export function TopBar() {
 
           <button
             onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
-            className="p-2.5 rounded-xl hover:bg-accent transition"
+            className="hidden min-[1100px]:inline-flex p-2.5 rounded-xl hover:bg-accent transition"
             aria-label="Toggle theme"
           >
             <Sun className="w-[18px] h-[18px] hidden dark:block" />
@@ -414,7 +456,7 @@ export function TopBar() {
           </button>
 
           <button
-            className="p-2.5 rounded-xl hover:bg-accent transition relative hidden sm:block"
+            className="p-2.5 rounded-xl hover:bg-accent transition relative min-h-[44px] min-w-[44px] inline-flex items-center justify-center"
             aria-label="Notifications"
             onClick={() => toast.info("You're all caught up! Nothing new here.", { id: "notif" })}
           >
@@ -425,7 +467,7 @@ export function TopBar() {
           {user && (
             <button
               onClick={() => setProfileModalOpen(true)}
-              className="rounded-full hover:ring-2 ring-primary/50 transition"
+              className="rounded-full hover:ring-2 ring-primary/50 transition min-h-[44px] min-w-[44px] flex items-center justify-center"
               aria-label="Open my profile"
             >
               <Avatar
@@ -434,86 +476,13 @@ export function TopBar() {
                 accent={user.accentColor}
                 accentTo={user.accentTo}
                 frame={user.avatarFrame}
-                size={36}
+                size={34}
               />
             </button>
           )}
         </div>
       </div>
-
-      {/* Expanded mobile search row */}
-      <MobileSearchRow />
     </header>
-  );
-}
-
-function MobileSearchRow() {
-  const searchOpen = useAppStore((s) => s.searchOpen);
-  if (!searchOpen) return null;
-  return (
-    <div className="lg:hidden px-4 pb-3 -mt-1">
-      <SearchBox />
-    </div>
-  );
-}
-
-/* ================= MOBILE BOTTOM TABS ================= */
-
-const MOBILE_NAV = [
-  { id: "home", label: "Home", icon: Home },
-  { id: "browse", label: "Discover", icon: Compass },
-  { id: "schedule", label: "Schedule", icon: CalendarDays },
-  { id: "dubbing", label: "AI Dub", icon: AudioLines },
-] as const;
-
-export function MobileNav() {
-  const { view, navigate, user } = useAppStore();
-  return (
-    <nav
-      className="lg:hidden fixed bottom-0 inset-x-0 z-40 glass-strong border-t rounded-t-2xl"
-      style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
-      aria-label="Mobile navigation"
-    >
-      <div className="flex items-stretch justify-around px-1 py-1.5">
-        {MOBILE_NAV.map((item) => {
-          const active = view.name === item.id;
-          return (
-            <button
-              key={item.id}
-              onClick={() => navigate(item.id as never)}
-              className={cn(
-                "flex flex-col items-center gap-0.5 px-3 py-1.5 rounded-xl min-w-[62px] transition",
-                active ? "text-primary" : "text-muted-foreground"
-              )}
-              aria-current={active ? "page" : undefined}
-            >
-              <item.icon className={cn("w-5 h-5", active && "drop-shadow-[0_0_8px_var(--glow)]")} />
-              <span className="text-[9.5px] font-semibold">{item.label}</span>
-            </button>
-          );
-        })}
-        {user ? (
-          <button
-            onClick={() => navigate("library")}
-            className={cn(
-              "flex flex-col items-center gap-0.5 px-3 py-1.5 rounded-xl min-w-[62px] transition",
-              view.name === "library" ? "text-primary" : "text-muted-foreground"
-            )}
-          >
-            <Clock className="w-5 h-5" />
-            <span className="text-[9.5px] font-semibold">Library</span>
-          </button>
-        ) : (
-          <button
-            onClick={() => navigate("login")}
-            className="flex flex-col items-center gap-0.5 px-3 py-1.5 rounded-xl min-w-[62px] text-primary"
-          >
-            <Logo variant="mark" size={22} />
-            <span className="text-[9.5px] font-semibold">Sign in</span>
-          </button>
-        )}
-      </div>
-    </nav>
   );
 }
 
