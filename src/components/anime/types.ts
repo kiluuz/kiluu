@@ -1,5 +1,29 @@
 export type Role = "CREATOR" | "VIEWER";
 
+export interface SocialLinks {
+  telegram?: string;
+  instagram?: string;
+  youtube?: string;
+  x?: string;
+}
+
+export interface ShowcaseConfig {
+  topFive: string[]; // anime ids in rank order
+  pinnedPostId: string | null;
+  genres: string[];
+  achievementIds: string[]; // max 6
+  order: string[]; // section order
+  hidden: Record<string, boolean>; // section id -> hidden
+}
+
+export interface PrivacyConfig {
+  showWatchTime: boolean;
+  showFavorites: boolean;
+  showActivity: boolean;
+  allowFollows: boolean;
+  profileVisibility: "everyone" | "followers" | "private";
+}
+
 export interface AuthUser {
   id: string;
   email: string;
@@ -13,6 +37,19 @@ export interface AuthUser {
   credits: number;
   onboardingDone: boolean;
   createdAt: string;
+  // customization
+  pronouns: string | null;
+  tagline: string | null;
+  country: string | null;
+  timezone: string | null;
+  socialLinks: string | null;
+  statusEmoji: string | null;
+  statusText: string | null;
+  accentTo: string | null;
+  avatarFrame: string | null;
+  bannerPreset: string | null;
+  showcase: string | null;
+  privacy: string | null;
 }
 
 export interface AnimeSummary {
@@ -131,19 +168,50 @@ export interface PublicProfile {
   bannerUrl: string | null;
   bio: string | null;
   accentColor: string;
+  accentTo: string | null;
+  avatarFrame: string | null;
   createdAt: string;
+  // identity
+  pronouns: string | null;
+  tagline: string | null;
+  country: string | null;
+  timezone: string | null;
+  socialLinks: Record<string, string>;
+  statusEmoji: string | null;
+  statusText: string | null;
+  showcase: ShowcaseConfig;
+  privacy?: PrivacyConfig;
   stats: {
     purchaseCount: number;
     postCount: number;
-    watchSeconds: number;
+    watchSeconds: number | null;
     followers: number;
     following: number;
+    favoriteCount: number;
     exchangeUnlocked: boolean;
   };
-  favoriteAnimes: { id: string; slug: string; title: string; coverImage: string; rating: number; year: number }[];
+  achievements: { id: string; current: number; target: number }[];
+  currentlyWatching: {
+    anime: AnimeSummary;
+    episode: { id: string; number: number; title: string };
+    position: number;
+    duration: number;
+    updatedAt: string;
+  } | null;
+  favoriteAnimes: AnimeSummary[];
   favoriteUsers: UserMini[];
   followersList: UserMini[];
-  recentAnimes: { id: string; slug: string; title: string; coverImage: string; rating: number }[];
+  ownedAnimes: AnimeSummary[];
+  posts: {
+    id: string;
+    content: string;
+    imageUrl: string | null;
+    createdAt: string;
+    anime: { id: string; slug: string; title: string; coverImage: string } | null;
+    likeCount: number;
+    commentCount: number;
+    liked: boolean;
+  }[];
   isFollowing: boolean;
   isMe: boolean;
 }
@@ -154,6 +222,8 @@ export interface UserMini {
   displayName: string | null;
   avatarUrl: string | null;
   accentColor: string;
+  accentTo?: string | null;
+  role?: string;
 }
 
 export interface ExchangeOfferItem {

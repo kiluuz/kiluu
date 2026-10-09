@@ -64,7 +64,7 @@ export async function getCurrentUser() {
   }
 }
 
-export type PublicUser = {
+export interface PublicUser {
   id: string;
   email: string;
   username: string;
@@ -77,7 +77,20 @@ export type PublicUser = {
   credits: number;
   onboardingDone: boolean;
   createdAt: string;
-};
+  // customization
+  pronouns: string | null;
+  tagline: string | null;
+  country: string | null;
+  timezone: string | null;
+  socialLinks: string | null;
+  statusEmoji: string | null;
+  statusText: string | null;
+  accentTo: string | null;
+  avatarFrame: string | null;
+  bannerPreset: string | null;
+  showcase: string | null;
+  privacy: string | null;
+}
 
 export function toPublicUser(user: {
   id: string;
@@ -92,6 +105,18 @@ export function toPublicUser(user: {
   credits: number;
   onboardingDone: boolean;
   createdAt: Date;
+  pronouns?: string | null;
+  tagline?: string | null;
+  country?: string | null;
+  timezone?: string | null;
+  socialLinks?: string | null;
+  statusEmoji?: string | null;
+  statusText?: string | null;
+  accentTo?: string | null;
+  avatarFrame?: string | null;
+  bannerPreset?: string | null;
+  showcase?: string | null;
+  privacy?: string | null;
 }): PublicUser {
   return {
     id: user.id,
@@ -106,5 +131,17 @@ export function toPublicUser(user: {
     credits: user.credits,
     onboardingDone: user.onboardingDone,
     createdAt: user.createdAt.toISOString(),
+    pronouns: user.pronouns ?? null,
+    tagline: user.tagline ?? null,
+    country: user.country ?? null,
+    timezone: user.timezone ?? null,
+    socialLinks: user.socialLinks ?? null,
+    statusEmoji: user.statusEmoji ?? null,
+    statusText: user.statusText ?? null,
+    accentTo: user.accentTo ?? null,
+    avatarFrame: user.avatarFrame ?? null,
+    bannerPreset: user.bannerPreset ?? null,
+    showcase: user.showcase ?? null,
+    privacy: user.privacy ?? null,
   };
 }

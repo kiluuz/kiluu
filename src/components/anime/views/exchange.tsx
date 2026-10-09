@@ -437,7 +437,7 @@ export function ExchangeView() {
                   <p className="text-[9px] font-bold text-center py-1 truncate px-1">You get</p>
                 </div>
                 <ArrowLeftRight className="w-6 h-6 text-primary shrink-0" />
-                <div className="w-24 rounded-xl overflow-hidden border-2 border-fuchsia-500/40">
+                <div className="w-24 rounded-xl overflow-hidden border-2 border-primary/40">
                   <div className="aspect-[2/3]">
                     <SmartImage
                       src={elig?.ownedAnimes.find((a) => a.id === proposeAnime)?.coverImage || ""}
@@ -461,7 +461,7 @@ export function ExchangeView() {
                           onClick={() => setProposeAnime(a.id)}
                           className={cn(
                             "relative aspect-[2/3] rounded-lg overflow-hidden border-2 transition",
-                            proposeAnime === a.id ? "border-fuchsia-500 shadow-lg shadow-fuchsia-500/25" : "border-transparent opacity-70 hover:opacity-100"
+                            proposeAnime === a.id ? "border-primary shadow-lg shadow-primary/25" : "border-transparent opacity-70 hover:opacity-100"
                           )}
                           aria-label={a.title}
                           title={a.title}
@@ -522,7 +522,7 @@ function ProposalCard({
               <SmartImage src={p.offer.anime.coverImage} alt={p.offer.anime.title} className="w-full h-full object-cover" />
             </div>
           </button>
-          <ArrowLeftRight className={cn("w-5 h-5 shrink-0", type === "received" ? "text-primary" : "text-fuchsia-400")} />
+          <ArrowLeftRight className={cn("w-5 h-5 shrink-0", type === "received" ? "text-primary" : "text-primary")} />
           <button onClick={() => navigate("detail", { animeId: p.anime.slug })} className="w-12 rounded-lg overflow-hidden hover:scale-105 transition">
             <div className="aspect-[2/3]">
               <SmartImage src={p.anime.coverImage} alt={p.anime.title} className="w-full h-full object-cover" />

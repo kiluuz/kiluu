@@ -65,7 +65,7 @@ export function BrowseView() {
   }
 
   return (
-    <div className="max-w-[1400px] mx-auto px-4 sm:px-8 py-6 pb-10">
+    <div className="max-w-[1280px] mx-auto px-4 sm:px-8 py-6 pb-10">
       <div className="mb-6">
         <h1 className="text-2xl sm:text-3xl font-black flex items-center gap-3">
           <span className="w-10 h-10 rounded-xl brand-gradient flex items-center justify-center">

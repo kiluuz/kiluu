@@ -40,11 +40,13 @@ export function initials(name: string | null | undefined): string {
   return name.slice(0, 2).toUpperCase();
 }
 
-/** Avatar with accent ring, image or gradient fallback */
+/** Avatar with accent ring, image or gradient fallback, optional frame */
 export function Avatar({
   src,
   name,
-  accent = "#a855f7",
+  accent = "#f97316",
+  accentTo,
+  frame,
   size = 40,
   className,
   onClick,
@@ -53,6 +55,8 @@ export function Avatar({
   src?: string | null;
   name?: string | null;
   accent?: string;
+  accentTo?: string | null;
+  frame?: string | null;
   size?: number;
   className?: string;
   onClick?: () => void;
@@ -60,54 +64,67 @@ export function Avatar({
 }) {
   const [err, setErr] = useState(false);
   const showImg = src && !err;
+  const to = accentTo || accent;
+  const frameStyle =
+    frame && frame !== "none"
+      ? { padding: Math.max(2, Math.round(size * 0.06)), background: FRAMES[frame] || FRAMES.ember }
+      : undefined;
   return (
     <div
       className={cn(
         "relative shrink-0 rounded-full overflow-hidden select-none",
-        ring && "ring-2 ring-offset-2 ring-offset-background",
         onClick && "cursor-pointer hover:brightness-110 transition",
         className
       )}
       style={{
-        width: size,
-        height: size,
+        width: frameStyle ? size + (frameStyle.padding * 2) : size,
+        height: frameStyle ? size + (frameStyle.padding * 2) : size,
+        ...(frameStyle || {}),
         ...(ring ? { boxShadow: `0 0 0 2px ${accent}` } : {}),
       }}
       onClick={onClick}
       role={onClick ? "button" : undefined}
       aria-label={name ? `${name} avatar` : undefined}
     >
-      {showImg ? (
-         
-        <img
-          src={src!}
-          alt={name || "avatar"}
-          className="w-full h-full object-cover"
-          onError={() => setErr(true)}
-          loading="lazy"
-        />
-      ) : (
-        <div
-          className="w-full h-full flex items-center justify-center font-bold text-white"
-          style={{
-            background: `linear-gradient(135deg, ${accent}, color-mix(in srgb, ${accent} 55%, #1e1b4b))`,
-            fontSize: size * 0.38,
-          }}
-        >
-          {initials(name)}
-        </div>
-      )}
+      <div className="w-full h-full rounded-full overflow-hidden bg-background">
+        {showImg ? (
+          <img
+            src={src!}
+            alt={name || "avatar"}
+            className="w-full h-full object-cover"
+            onError={() => setErr(true)}
+            loading="lazy"
+          />
+        ) : (
+          <div
+            className="w-full h-full flex items-center justify-center font-bold text-white"
+            style={{
+              background: `linear-gradient(135deg, ${accent}, ${to})`,
+              fontSize: size * 0.38,
+            }}
+          >
+            {initials(name)}
+          </div>
+        )}
+      </div>
     </div>
   );
 }
 
-/** Smart image with gradient fallback */
+const FRAMES: Record<string, string> = {
+  ember: "conic-gradient(from 140deg, #f97316, #fbbf24, #f43f5e, #f97316)",
+  gold: "conic-gradient(from 0deg, #fbbf24, #fef3c7, #d97706, #fbbf24)",
+  neon: "conic-gradient(from 200deg, #06b6d4, #8b5cf6, #ec4899, #06b6d4)",
+  sakura: "conic-gradient(from 90deg, #fda4af, #f472b6, #c084fc, #fda4af)",
+};
+
+/** Smart image with gradient fallback — never renders raw URLs as text */
 export function SmartImage({
   src,
   alt,
   className,
-  accentFrom = "#7c3aed",
-  accentTo = "#db2777",
+  accentFrom = "#f97316",
+  accentTo = "#b91c1c",
 }: {
   src?: string | null;
   alt: string;
@@ -116,7 +133,8 @@ export function SmartImage({
   accentTo?: string;
 }) {
   const [err, setErr] = useState(false);
-  if (!src || err) {
+  const valid = typeof src === "string" && (/^https?:\/\//.test(src) || /^\/(?!\/)/.test(src));
+  if (!src || err || !valid) {
     return (
       <div
         className={cn("flex items-center justify-center p-4", className)}
@@ -181,7 +199,7 @@ export function AnimeCard({ anime, rank }: { anime: AnimeSummary; rank?: number 
           )}
         </div>
         {anime.owned && (
-          <div className="absolute top-2 right-2 bg-violet-600/95 rounded-full p-1" title="Owned">
+          <div className="absolute top-2 right-2 bg-primary/95 rounded-full p-1" title="Owned">
             <BadgeCheck className="w-3 h-3 text-white" />
           </div>
         )}

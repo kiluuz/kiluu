@@ -7,7 +7,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import { useAppStore } from "../store";
+import { useAppStore, useOpenProfile } from "../store";
 import type { CommunityPost, CommentItem, AnimeSummary } from "../types";
 import { Avatar as UiAvatar, timeAgo, SmartImage } from "../ui-bits";
 import { toast } from "sonner";
@@ -15,6 +15,7 @@ import { cn } from "@/lib/utils";
 
 export function CommunityView() {
   const { user, setAuthOpen, navigate } = useAppStore();
+  const openProfile = useOpenProfile();
   const [posts, setPosts] = useState<CommunityPost[]>([]);
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState("trending");
@@ -265,13 +266,13 @@ export function CommunityView() {
                   name={post.user.displayName}
                   accent={post.user.accentColor}
                   size={40}
-                  onClick={() => navigate("user-profile", { username: post.user.username })}
+                  onClick={() => openProfile(post.user.username)}
                 />
                 <div className="min-w-0 flex-1">
                   <p className="text-sm font-bold flex items-center gap-1.5">
                     <button
                       className="truncate hover:text-primary transition"
-                      onClick={() => navigate("user-profile", { username: post.user.username })}
+                      onClick={() => openProfile(post.user.username)}
                     >
                       {post.user.displayName || post.user.username}
                     </button>
@@ -341,7 +342,7 @@ export function CommunityView() {
                         <p className="text-xs">
                           <button
                             className="font-bold hover:text-primary"
-                            onClick={() => navigate("user-profile", { username: c.user.username })}
+                            onClick={() => openProfile(c.user.username)}
                           >
                             {c.user.displayName || c.user.username}
                           </button>{" "}

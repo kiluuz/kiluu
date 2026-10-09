@@ -52,7 +52,7 @@ export function DetailView() {
   if (loading) {
     return (
       <div className="pb-10">
-        <div className="h-[46vh] -mt-16 skeleton" />
+        <div className="h-[46vh] skeleton" />
         <div className="max-w-[1100px] mx-auto px-4 sm:px-8 mt-6 space-y-4">
           <div className="h-10 w-2/3 rounded-xl skeleton" />
           <div className="h-4 w-1/2 rounded skeleton" />
@@ -157,7 +157,7 @@ export function DetailView() {
   return (
     <div className="pb-10">
       {/* Banner */}
-      <div className="relative h-[46vh] min-h-[320px] -mt-16 overflow-hidden">
+      <div className="relative h-[46vh] min-h-[320px] overflow-hidden">
         <SmartImage src={anime.bannerImage || anime.coverImage} alt={anime.title} className="w-full h-full object-cover" />
         <div className="absolute inset-0 bg-gradient-to-t from-background via-background/55 to-background/15" />
       </div>
@@ -177,7 +177,7 @@ export function DetailView() {
               {anime.isFree ? (
                 <Badge className="bg-emerald-500/90 border-0 font-bold">FREE</Badge>
               ) : canWatch ? (
-                <Badge className="bg-violet-600/90 border-0 font-bold gap-1"><BadgeCheck className="w-3 h-3" /> OWNED</Badge>
+                <Badge className="bg-primary/90 border-0 font-bold gap-1 text-primary-foreground"><BadgeCheck className="w-3 h-3" /> OWNED</Badge>
               ) : (
                 <Badge className="bg-amber-500/90 border-0 font-bold gap-1">
                   <Coins className="w-3 h-3" /> {formatCredits(anime.price)} credits
@@ -390,7 +390,7 @@ export function DetailView() {
                 { icon: <Star className="w-4 h-4 text-amber-400" />, label: "Rating", value: anime.rating.toFixed(1) },
                 { icon: <Users className="w-4 h-4 text-primary" />, label: "Collectors", value: formatCredits(anime.purchaseCount) },
                 { icon: <Heart className="w-4 h-4 text-rose-400" />, label: "Favorites", value: formatCredits(anime.favoriteCount) },
-                { icon: <Sparkles className="w-4 h-4 text-fuchsia-400" />, label: "Status", value: anime.status },
+                { icon: <Sparkles className="w-4 h-4 text-primary" />, label: "Status", value: anime.status },
               ].map((row) => (
                 <div key={row.label} className="flex items-center justify-between text-sm">
                   <span className="flex items-center gap-2 text-muted-foreground">{row.icon}{row.label}</span>

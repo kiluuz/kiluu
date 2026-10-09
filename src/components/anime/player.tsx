@@ -334,7 +334,7 @@ export function VideoPlayer({
       {/* Sync badge */}
       {syncMode && (
         <div className="absolute top-3 left-3 flex items-center gap-2 px-3 py-1.5 rounded-full bg-black/60 backdrop-blur text-white text-xs font-bold border border-white/15">
-          <Users className="w-3.5 h-3.5 text-fuchsia-400" />
+          <Users className="w-3.5 h-3.5 text-amber-400" />
           Watch Party
           <span className="text-white/60 font-normal">· {isHost ? "You control playback" : "Host controls playback"}</span>
         </div>
@@ -455,7 +455,7 @@ export function VideoPlayer({
                       onClick={() => setRate(s)}
                       className={cn(
                         "w-full text-left px-3 py-1.5 rounded-lg text-xs font-semibold hover:bg-white/15 transition flex items-center justify-between",
-                        s === speed ? "text-fuchsia-400" : "text-white/80"
+                        s === speed ? "text-amber-400" : "text-white/80"
                       )}
                     >
                       {s}x {s === speed && <Check className="w-3 h-3" />}
@@ -492,7 +492,7 @@ export function VideoPlayer({
                       >
                         <span className={cn(
                           "text-[10px] font-black w-7 shrink-0",
-                          ep.id === episode.id ? "text-fuchsia-400" : "text-white/50"
+                          ep.id === episode.id ? "text-amber-400" : "text-white/50"
                         )}>
                           {String(ep.number).padStart(2, "0")}
                         </span>

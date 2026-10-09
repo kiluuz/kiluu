@@ -17,11 +17,25 @@ model User {
   avatarUrl      String?
   bannerUrl      String?
   bio            String?
-  accentColor    String   @default("#a855f7")
+  accentColor    String   @default("#f97316")
   credits        Int      @default(0)
   onboardingDone Boolean  @default(false)
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
+
+  // ---- Discord-level customization ----
+  pronouns       String?   // e.g. "they/them"
+  tagline        String?   // short one-liner under name
+  country        String?   // ISO country code
+  timezone       String?   // IANA tz e.g. "Asia/Tashkent"
+  socialLinks    String?   // JSON {telegram, instagram, youtube, x}
+  statusEmoji    String?   // custom status emoji
+  statusText     String?   // custom status text
+  accentTo       String?   // gradient end color (accentColor is "from")
+  avatarFrame    String?   // none | gold | ember | neon | sakura (unlockable)
+  bannerPreset   String?   // preset banner id when using gallery
+  showcase       String?   // JSON {topFive:[], pinnedPostId, genres:[], achievementIds:[], order:[], hidden:{}}
+  privacy        String?   // JSON {showWatchTime, showFavorites, showActivity, allowFollows, profileVisibility}
 
   sessions          Session[]
   purchases         Purchase[]

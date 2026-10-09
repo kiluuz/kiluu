@@ -9,6 +9,7 @@ interface AppStore {
   view: View;
   viewHistory: View[];
   profileModalOpen: boolean;
+  profileCardUser: string | null;
   authOpen: boolean;
   searchOpen: boolean;
   setUser: (user: AuthUser | null) => void;
@@ -17,6 +18,8 @@ interface AppStore {
   navigate: (name: ViewName, params?: Omit<View, "name">) => void;
   goBack: () => void;
   setProfileModalOpen: (open: boolean) => void;
+  openProfileCard: (username: string) => void;
+  closeProfileCard: () => void;
   setAuthOpen: (open: boolean) => void;
   setSearchOpen: (open: boolean) => void;
 }
@@ -27,6 +30,7 @@ export const useAppStore = create<AppStore>((set, get) => ({
   view: { name: "home" },
   viewHistory: [],
   profileModalOpen: false,
+  profileCardUser: null,
   authOpen: false,
   searchOpen: false,
   setUser: (user) => set({ user }),
@@ -41,6 +45,7 @@ export const useAppStore = create<AppStore>((set, get) => ({
       view: { name, ...params },
       viewHistory: current.name === name && current.animeId === params.animeId ? get().viewHistory : [...get().viewHistory.slice(-9), current],
       profileModalOpen: false,
+      profileCardUser: null,
       searchOpen: false,
     });
     if (typeof window !== "undefined") {
@@ -59,7 +64,21 @@ export const useAppStore = create<AppStore>((set, get) => ({
       window.scrollTo({ top: 0, behavior: "instant" as ScrollBehavior });
     }
   },
-  setProfileModalOpen: (profileModalOpen) => set({ profileModalOpen }),
+  setProfileModalOpen: (profileModalOpen) => {
+    const me = get().user;
+    set({
+      profileModalOpen,
+      profileCardUser: profileModalOpen ? me?.username ?? null : null,
+    });
+  },
+  openProfileCard: (username) => set({ profileModalOpen: true, profileCardUser: username }),
+  closeProfileCard: () => set({ profileModalOpen: false, profileCardUser: null }),
   setAuthOpen: (authOpen) => set({ authOpen }),
   setSearchOpen: (searchOpen) => set({ searchOpen }),
 }));
+
+/** Open the Discord-style profile card from anywhere (avatar/name clicks) */
+export function useOpenProfile() {
+  const openProfileCard = useAppStore((s) => s.openProfileCard);
+  return (username: string) => openProfileCard(username);
+}

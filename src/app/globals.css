@@ -8,6 +8,7 @@
   --color-foreground: var(--foreground);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
+  --font-display: var(--font-space-grotesk);
   --color-sidebar-ring: var(--sidebar-ring);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
@@ -40,105 +41,119 @@
   --color-glow: var(--glow);
   --color-glow-2: var(--glow-2);
   --color-surface-2: var(--surface-2);
+  --color-ink-2: var(--ink-2);
+  --color-ink-3: var(--ink-3);
   --radius-sm: calc(var(--radius) - 4px);
   --radius-md: calc(var(--radius) - 2px);
   --radius-lg: var(--radius);
   --radius-xl: calc(var(--radius) + 4px);
 }
 
-/* ============ LIGHT THEME ============ */
+/* ============================================================
+   MIDNIGHT CINEMA — light theme (warm paper matinee)
+   ============================================================ */
 :root {
   --radius: 0.75rem;
-  --background: oklch(0.975 0.008 300);
-  --foreground: oklch(0.18 0.03 300);
+  --background: oklch(0.972 0.008 75);
+  --foreground: oklch(0.2 0.02 55);
   --card: oklch(1 0 0);
-  --card-foreground: oklch(0.18 0.03 300);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.18 0.03 300);
-  --primary: oklch(0.58 0.25 295);
-  --primary-foreground: oklch(0.985 0 0);
-  --secondary: oklch(0.95 0.015 300);
-  --secondary-foreground: oklch(0.25 0.04 295);
-  --muted: oklch(0.95 0.012 300);
-  --muted-foreground: oklch(0.52 0.02 300);
-  --accent: oklch(0.93 0.03 310);
-  --accent-foreground: oklch(0.3 0.08 300);
+  --card-foreground: oklch(0.2 0.02 55);
+  --popover: oklch(0.995 0.004 75);
+  --popover-foreground: oklch(0.2 0.02 55);
+  --primary: oklch(0.66 0.21 45);
+  --primary-foreground: oklch(0.99 0.01 75);
+  --secondary: oklch(0.945 0.014 70);
+  --secondary-foreground: oklch(0.28 0.03 50);
+  --muted: oklch(0.945 0.012 70);
+  --muted-foreground: oklch(0.5 0.02 60);
+  --accent: oklch(0.93 0.035 60);
+  --accent-foreground: oklch(0.32 0.07 45);
   --destructive: oklch(0.577 0.245 27.325);
-  --border: oklch(0.9 0.015 300);
-  --input: oklch(0.9 0.015 300);
-  --ring: oklch(0.58 0.25 295);
-  --chart-1: oklch(0.58 0.25 295);
-  --chart-2: oklch(0.65 0.28 330);
-  --chart-3: oklch(0.75 0.14 200);
+  --border: oklch(0.895 0.014 70);
+  --input: oklch(0.895 0.014 70);
+  --ring: oklch(0.66 0.21 45);
+  --chart-1: oklch(0.66 0.21 45);
+  --chart-2: oklch(0.72 0.17 30);
+  --chart-3: oklch(0.68 0.15 100);
   --chart-4: oklch(0.828 0.189 84.429);
   --chart-5: oklch(0.769 0.188 70.08);
-  --sidebar: oklch(0.985 0.006 300);
-  --sidebar-foreground: oklch(0.18 0.03 300);
-  --sidebar-primary: oklch(0.58 0.25 295);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.94 0.02 305);
-  --sidebar-accent-foreground: oklch(0.25 0.04 295);
-  --sidebar-border: oklch(0.9 0.015 300);
-  --sidebar-ring: oklch(0.58 0.25 295);
-  --glow: oklch(0.65 0.26 300 / 0.25);
-  --glow-2: oklch(0.75 0.18 200 / 0.2);
-  --surface-2: oklch(0.965 0.01 300);
+  --sidebar: oklch(0.985 0.006 75);
+  --sidebar-foreground: oklch(0.2 0.02 55);
+  --sidebar-primary: oklch(0.66 0.21 45);
+  --sidebar-primary-foreground: oklch(0.99 0.01 75);
+  --sidebar-accent: oklch(0.94 0.025 65);
+  --sidebar-accent-foreground: oklch(0.28 0.04 50);
+  --sidebar-border: oklch(0.895 0.014 70);
+  --sidebar-ring: oklch(0.66 0.21 45);
+  --glow: oklch(0.66 0.21 45 / 0.25);
+  --glow-2: oklch(0.78 0.16 60 / 0.2);
+  --surface-2: oklch(0.962 0.012 72);
+  --ink-2: oklch(0.955 0.01 72);
+  --ink-3: oklch(0.935 0.014 70);
 }
 
-/* ============ DARK THEME (default premium) ============ */
+/* ============================================================
+   MIDNIGHT CINEMA — dark theme (default: projector ink)
+   ============================================================ */
 .dark {
-  --background: oklch(0.13 0.02 295);
-  --foreground: oklch(0.96 0.005 300);
-  --card: oklch(0.17 0.025 295);
-  --card-foreground: oklch(0.96 0.005 300);
-  --popover: oklch(0.16 0.025 295);
-  --popover-foreground: oklch(0.96 0.005 300);
-  --primary: oklch(0.67 0.25 300);
-  --primary-foreground: oklch(0.13 0.02 295);
-  --secondary: oklch(0.22 0.03 295);
-  --secondary-foreground: oklch(0.96 0.005 300);
-  --muted: oklch(0.21 0.025 295);
-  --muted-foreground: oklch(0.68 0.02 300);
-  --accent: oklch(0.24 0.05 305);
-  --accent-foreground: oklch(0.96 0.005 300);
+  --background: oklch(0.128 0.008 55);
+  --foreground: oklch(0.955 0.006 75);
+  --card: oklch(0.165 0.011 55);
+  --card-foreground: oklch(0.955 0.006 75);
+  --popover: oklch(0.155 0.011 55);
+  --popover-foreground: oklch(0.955 0.006 75);
+  --primary: oklch(0.705 0.195 47);
+  --primary-foreground: oklch(0.14 0.02 50);
+  --secondary: oklch(0.215 0.014 55);
+  --secondary-foreground: oklch(0.955 0.006 75);
+  --muted: oklch(0.205 0.012 55);
+  --muted-foreground: oklch(0.665 0.015 65);
+  --accent: oklch(0.235 0.028 55);
+  --accent-foreground: oklch(0.955 0.006 75);
   --destructive: oklch(0.704 0.191 22.216);
   --border: oklch(1 0 0 / 8%);
   --input: oklch(1 0 0 / 12%);
-  --ring: oklch(0.67 0.25 300);
-  --chart-1: oklch(0.67 0.25 300);
-  --chart-2: oklch(0.7 0.27 330);
-  --chart-3: oklch(0.78 0.14 200);
+  --ring: oklch(0.705 0.195 47);
+  --chart-1: oklch(0.705 0.195 47);
+  --chart-2: oklch(0.72 0.17 30);
+  --chart-3: oklch(0.68 0.15 100);
   --chart-4: oklch(0.828 0.189 84.429);
   --chart-5: oklch(0.769 0.188 70.08);
-  --sidebar: oklch(0.155 0.022 295);
-  --sidebar-foreground: oklch(0.96 0.005 300);
-  --sidebar-primary: oklch(0.67 0.25 300);
-  --sidebar-primary-foreground: oklch(0.13 0.02 295);
-  --sidebar-accent: oklch(0.22 0.03 295);
-  --sidebar-accent-foreground: oklch(0.96 0.005 300);
+  --sidebar: oklch(0.15 0.01 55);
+  --sidebar-foreground: oklch(0.955 0.006 75);
+  --sidebar-primary: oklch(0.705 0.195 47);
+  --sidebar-primary-foreground: oklch(0.14 0.02 50);
+  --sidebar-accent: oklch(0.215 0.014 55);
+  --sidebar-accent-foreground: oklch(0.955 0.006 75);
   --sidebar-border: oklch(1 0 0 / 8%);
-  --sidebar-ring: oklch(0.67 0.25 300);
-  --glow: oklch(0.67 0.26 300 / 0.35);
-  --glow-2: oklch(0.78 0.15 200 / 0.25);
-  --surface-2: oklch(0.19 0.025 295);
+  --sidebar-ring: oklch(0.705 0.195 47);
+  --glow: oklch(0.705 0.2 47 / 0.32);
+  --glow-2: oklch(0.8 0.16 60 / 0.22);
+  --surface-2: oklch(0.185 0.012 55);
+  --ink-2: oklch(0.19 0.012 55);
+  --ink-3: oklch(0.225 0.014 55);
 }
 
 @layer base {
   * {
-    @apply border-border outline-ring/50;
+    @apply border-border outline-ring/60;
   }
   body {
     @apply bg-background text-foreground;
   }
   ::selection {
-    background: color-mix(in oklch, var(--primary) 35%, transparent);
+    background: color-mix(in oklch, var(--primary) 40%, transparent);
+  }
+  h1, h2, h3, .font-display {
+    font-family: var(--font-space-grotesk), var(--font-geist-sans), sans-serif;
   }
 }
 
-/* ============ PREMIUM UTILITIES ============ */
+/* ============ MIDNIGHT CINEMA UTILITIES ============ */
 
+/* Ember gradient text — warm ambers rolling like projector light */
 .gradient-text {
-  background: linear-gradient(120deg, oklch(0.7 0.25 300), oklch(0.72 0.27 330), oklch(0.8 0.14 200));
+  background: linear-gradient(115deg, oklch(0.78 0.16 65), oklch(0.705 0.195 47), oklch(0.63 0.2 35));
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
@@ -150,20 +165,37 @@
   to { background-position: 200% center; }
 }
 
+/* Brand ember gradient for buttons / active pills */
 .brand-gradient {
-  background: linear-gradient(120deg, oklch(0.6 0.24 295), oklch(0.66 0.26 315));
+  background: linear-gradient(120deg, oklch(0.75 0.17 55), oklch(0.68 0.2 42));
 }
-
 .brand-gradient-hover:hover {
-  background: linear-gradient(120deg, oklch(0.65 0.25 295), oklch(0.71 0.27 315));
+  background: linear-gradient(120deg, oklch(0.79 0.17 55), oklch(0.72 0.2 42));
 }
 
-/* Glass card */
+/* Opaque-enough glass — fixes see-through sticky header artifacts */
 .glass {
-  background: color-mix(in oklch, var(--card) 72%, transparent);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
+  background: color-mix(in oklch, var(--background) 82%, transparent);
+  backdrop-filter: blur(18px) saturate(1.4);
+  -webkit-backdrop-filter: blur(18px) saturate(1.4);
   border: 1px solid var(--border);
+}
+.glass-strong {
+  background: color-mix(in oklch, var(--popover) 94%, transparent);
+  backdrop-filter: blur(22px) saturate(1.5);
+  -webkit-backdrop-filter: blur(22px) saturate(1.5);
+  border: 1px solid var(--border);
+}
+
+/* Cinematic film grain — subtle, cheap (one tiny SVG data-uri) */
+.grain::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0.05;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2'/%3E%3C/filter%3E%3Crect width='120' height='120' filter='url(%23n)' opacity='1'/%3E%3C/svg%3E");
+  mix-blend-mode: overlay;
 }
 
 /* Glow ring on hover */
@@ -177,7 +209,7 @@
   transform: translateY(-4px);
 }
 
-/* Animated aurora background for hero sections */
+/* Ember aurora — warm light leaks, not purple haze */
 .aurora {
   position: relative;
   overflow: hidden;
@@ -187,9 +219,9 @@
   position: absolute;
   inset: -50%;
   background:
-    radial-gradient(ellipse 35% 45% at 25% 40%, oklch(0.6 0.24 300 / 0.22), transparent 65%),
-    radial-gradient(ellipse 30% 40% at 75% 55%, oklch(0.65 0.24 330 / 0.18), transparent 65%),
-    radial-gradient(ellipse 28% 35% at 55% 20%, oklch(0.75 0.14 200 / 0.14), transparent 65%);
+    radial-gradient(ellipse 35% 45% at 25% 40%, oklch(0.705 0.19 47 / 0.2), transparent 65%),
+    radial-gradient(ellipse 30% 40% at 75% 55%, oklch(0.72 0.17 30 / 0.16), transparent 65%),
+    radial-gradient(ellipse 28% 35% at 55% 20%, oklch(0.78 0.15 70 / 0.13), transparent 65%);
   animation: aurora-move 18s ease-in-out infinite alternate;
   pointer-events: none;
 }
@@ -264,7 +296,7 @@ input[type="range"].player-range::-webkit-slider-runnable-track {
   border-radius: 99px;
   background: linear-gradient(
     to right,
-    oklch(0.7 0.25 300) var(--fill, 0%),
+    oklch(0.705 0.195 47) var(--fill, 0%),
     oklch(1 0 0 / 0.25) var(--fill, 0%)
   );
 }
@@ -275,7 +307,7 @@ input[type="range"].player-range::-webkit-slider-thumb {
   margin-top: -4.5px;
   border-radius: 99px;
   background: white;
-  box-shadow: 0 0 8px oklch(0.7 0.25 300 / 0.9);
+  box-shadow: 0 0 8px oklch(0.705 0.195 47 / 0.9);
   transform: scale(1);
   transition: transform 0.15s ease;
 }
@@ -290,7 +322,7 @@ input[type="range"].player-range::-moz-range-track {
 input[type="range"].player-range::-moz-range-progress {
   height: 4px;
   border-radius: 99px;
-  background: oklch(0.7 0.25 300);
+  background: oklch(0.705 0.195 47);
 }
 input[type="range"].player-range::-moz-range-thumb {
   height: 13px;
@@ -298,7 +330,7 @@ input[type="range"].player-range::-moz-range-thumb {
   border-radius: 99px;
   background: white;
   border: none;
-  box-shadow: 0 0 8px oklch(0.7 0.25 300 / 0.9);
+  box-shadow: 0 0 8px oklch(0.705 0.195 47 / 0.9);
 }
 
 /* Episode list custom scrollbar area */
@@ -363,4 +395,112 @@ input[type="range"].player-range::-moz-range-thumb {
 @keyframes banner-sweep {
   0%, 60% { transform: translateX(-100%); }
   100% { transform: translateX(100%); }
+}
+
+/* ============ PROFILE SYSTEM UTILITIES ============ */
+
+/* "Currently watching" animated equalizer */
+@keyframes eq {
+  0%, 100% { transform: scaleY(0.35); }
+  50% { transform: scaleY(1); }
+}
+.eq-bar {
+  transform-origin: bottom;
+  animation: eq 1s ease-in-out infinite;
+}
+.eq-bar:nth-child(2) { animation-delay: 0.18s; }
+.eq-bar:nth-child(3) { animation-delay: 0.36s; }
+.eq-bar:nth-child(4) { animation-delay: 0.1s; }
+
+/* Avatar ring — solid page-bg ring so banner never bleeds through */
+.avatar-solid-ring {
+  box-shadow: 0 0 0 5px var(--background), 0 0 0 7px color-mix(in srgb, var(--avatar-accent, var(--primary)) 65%, transparent);
+}
+
+/* Accent focus ring — clean, never browser-default red */
+.focus-ring-accent:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--avatar-accent, var(--primary)) 80%, transparent);
+  outline-offset: 2px;
+  border-radius: inherit;
+}
+
+/* Rank number for Top-5 showcase */
+.rank-numeral {
+  font-family: var(--font-space-grotesk), sans-serif;
+  font-weight: 700;
+  line-height: 0.8;
+  -webkit-text-stroke: 1.5px color-mix(in srgb, var(--avatar-accent, var(--primary)) 55%, transparent);
+  color: color-mix(in srgb, var(--avatar-accent, var(--primary)) 16%, transparent);
+  text-shadow: 0 4px 24px color-mix(in srgb, var(--avatar-accent, var(--primary)) 35%, transparent);
+}
+
+/* Rarity glow for achievements */
+.rarity-common   { --rarity: oklch(0.7 0.03 70); }
+.rarity-rare     { --rarity: oklch(0.62 0.16 250); }
+.rarity-epic     { --rarity: oklch(0.58 0.21 300); }
+.rarity-legendary { --rarity: oklch(0.74 0.18 75); }
+.rarity-glow {
+  box-shadow: inset 0 1px 0 oklch(1 0 0 / 6%), 0 0 24px -6px var(--rarity, var(--primary));
+}
+
+/* Markdown-lite renderer for About me */
+.md-lite p { margin: 0 0 0.5em; }
+.md-lite p:last-child { margin-bottom: 0; }
+.md-lite a { color: var(--primary); text-decoration: underline; text-underline-offset: 2px; }
+.md-lite strong { color: var(--foreground); font-weight: 700; }
+.md-lite em { font-style: italic; }
+.md-lite code {
+  font-family: var(--font-geist-mono), monospace;
+  font-size: 0.85em;
+  background: var(--ink-2);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 0.1em 0.4em;
+}
+
+/* Banner parallax wrapper */
+.parallax-banner {
+  will-change: transform;
+}
+
+/* Count-up stat tabular figures */
+.stat-numeral {
+  font-family: var(--font-space-grotesk), sans-serif;
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+}
+
+/* Showcase drag handle affordance */
+.drag-handle {
+  cursor: grab;
+}
+.drag-handle:active {
+  cursor: grabbing;
+}
+
+/* Tab underline indicator */
+.tab-underline {
+  position: relative;
+}
+.tab-underline::after {
+  content: "";
+  position: absolute;
+  left: 0; right: 0; bottom: -1px;
+  height: 2px;
+  border-radius: 2px;
+  background: linear-gradient(90deg, transparent, var(--primary), transparent);
+  opacity: 0;
+  transition: opacity 0.25s ease;
+}
+.tab-underline[data-active="true"]::after {
+  opacity: 1;
+}
+
+/* Mobile bottom sheet entrance */
+@keyframes bottom-sheet-in {
+  from { transform: translateY(100%); }
+  to { transform: translateY(0); }
+}
+.bottom-sheet-in {
+  animation: bottom-sheet-in 0.32s cubic-bezier(0.22, 1, 0.36, 1);
 }

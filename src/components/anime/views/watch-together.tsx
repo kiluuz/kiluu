@@ -277,9 +277,10 @@ export function WatchTogetherView() {
           setIsHost((res.participants || []).some((p) => p.userId === user.id && p.isHost));
           // Catch up to current state
           if (res.state) {
+            const st = res.state;
             setTimeout(() => {
-              controlsRef.current?.seek(res.state.position);
-              if (res.state.isPlaying) controlsRef.current?.play();
+              controlsRef.current?.seek(st.position);
+              if (st.isPlaying) controlsRef.current?.play();
             }, 600);
           }
           toast.success(`Joined ${res.room.name}! 🎉`);
@@ -348,7 +349,7 @@ export function WatchTogetherView() {
             <div className="flex items-start justify-between gap-3 flex-wrap">
               <div className="min-w-0">
                 <h1 className="text-lg font-black flex items-center gap-2 flex-wrap">
-                  <Users className="w-5 h-5 text-fuchsia-500" />
+                  <Users className="w-5 h-5 text-primary" />
                   {activeRoom.name}
                 </h1>
                 <p className="text-sm text-muted-foreground mt-0.5">

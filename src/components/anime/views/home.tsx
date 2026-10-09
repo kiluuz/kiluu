@@ -70,18 +70,26 @@ export function HomeView() {
     <div className="pb-8">
       {/* ===== HERO ===== */}
       {hero && (
-        <section className="relative h-[68vh] min-h-[440px] max-h-[620px] w-full overflow-hidden -mt-16" aria-label="Featured anime">
+        <section className="relative h-[64vh] min-h-[420px] max-h-[600px] w-full overflow-hidden" aria-label="Featured anime">
           <div className="absolute inset-0">
-            {data.featured.map((a, i) => (
-              <div key={a.id} className={`absolute inset-0 transition-opacity duration-1000 ${i === heroIdx ? "opacity-100" : "opacity-0"}`}>
-                <SmartImage src={a.bannerImage || a.coverImage} alt={a.title} className="w-full h-full object-cover" />
-              </div>
-            ))}
+            {data.featured.map((a, i) => {
+              const src = a.bannerImage || a.coverImage;
+              const valid = typeof src === "string" && /^https?:\/\/|^\//.test(src);
+              return (
+                <div key={a.id} className={`absolute inset-0 transition-opacity duration-1000 ${i === heroIdx ? "opacity-100" : "opacity-0"}`}>
+                  {valid ? (
+                    <img src={src} alt={a.title} className="w-full h-full object-cover" loading={i === 0 ? "eager" : "lazy"} onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }} />
+                  ) : (
+                    <SmartImage src={null} alt={a.title} className="w-full h-full" />
+                  )}
+                </div>
+              );
+            })}
             <div className="absolute inset-0 bg-gradient-to-t from-background via-background/60 to-background/20" />
             <div className="absolute inset-0 bg-gradient-to-r from-background/80 via-transparent to-transparent" />
           </div>
 
-          <div className="relative h-full max-w-[1400px] mx-auto px-4 sm:px-8 flex flex-col justify-end pb-10 sm:pb-14 pt-24">
+          <div className="relative h-full max-w-[1280px] mx-auto px-4 sm:px-8 flex flex-col justify-end pb-10 sm:pb-14 pt-24">
             <div key={hero.id} className="fade-in-up max-w-2xl">
               <div className="flex items-center gap-2 mb-3 flex-wrap">
                 <Badge className="brand-gradient text-white border-0 gap-1 font-bold">
@@ -159,7 +167,7 @@ export function HomeView() {
         </section>
       )}
 
-      <div className="max-w-[1400px] mx-auto px-4 sm:px-8 space-y-9 mt-6">
+      <div className="max-w-[1280px] mx-auto px-4 sm:px-8 space-y-9 mt-6">
         {/* ===== CONTINUE WATCHING ===== */}
         {data.continueWatching.length > 0 && (
           <section aria-label="Continue watching">
@@ -285,8 +293,8 @@ export function HomeView() {
 function HomeSkeleton() {
   return (
     <div className="pb-10">
-      <div className="h-[68vh] min-h-[440px] max-h-[620px] -mt-16 skeleton" />
-      <div className="max-w-[1400px] mx-auto px-4 sm:px-8 mt-8 space-y-9">
+      <div className="h-[64vh] min-h-[420px] max-h-[600px] skeleton" />
+      <div className="max-w-[1280px] mx-auto px-4 sm:px-8 mt-8 space-y-9">
         {[0, 1, 2].map((r) => (
           <div key={r}>
             <div className="h-7 w-48 rounded-lg skeleton mb-4" />

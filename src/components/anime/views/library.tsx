@@ -52,7 +52,7 @@ export function LibraryView() {
   const exchangeProgress = data ? Math.min(100, (data.stats.purchaseCount / 20) * 100) : 0;
 
   return (
-    <div className="max-w-[1400px] mx-auto px-4 sm:px-8 py-6 pb-10">
+    <div className="max-w-[1280px] mx-auto px-4 sm:px-8 py-6 pb-10">
       <h1 className="text-2xl sm:text-3xl font-black flex items-center gap-3 mb-1">
         <span className="w-10 h-10 rounded-xl brand-gradient flex items-center justify-center">
           <Clock className="w-5 h-5 text-white" />
@@ -82,7 +82,7 @@ export function LibraryView() {
             <p className="text-xs text-muted-foreground">Episodes completed</p>
           </div>
           <div className="glass rounded-2xl p-4 sm:p-5">
-            <Sparkles className="w-5 h-5 text-fuchsia-400 mb-2" />
+            <Sparkles className="w-5 h-5 text-primary mb-2" />
             <p className="text-2xl font-black tabular-nums">{formatCredits(data.stats.credits)}</p>
             <p className="text-xs text-muted-foreground">Credit balance</p>
           </div>

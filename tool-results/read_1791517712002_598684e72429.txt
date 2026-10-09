@@ -1,0 +1,823 @@
+     1→"use client";
+     2→
+     3→import { useEffect, useMemo, useState } from "react";
+     4→import {
+     5→  BadgeCheck, Crown, CalendarDays, Heart, Film, Star, Timer, Package, Users,
+     6→  Pencil, Loader2, Image as ImageIcon, Smile, Sparkles, Lock, MessageSquareOff, Check, Link2,
+     7→} from "lucide-react";
+     8→import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+     9→import { Button } from "@/components/ui/button";
+    10→import { Input } from "@/components/ui/input";
+    11→import { Label } from "@/components/ui/label";
+    12→import { Textarea } from "@/components/ui/textarea";
+    13→import { useAppStore } from "./store";
+    14→import type { PublicProfile, AuthUser } from "./types";
+    15→import { Avatar, SmartImage, formatDuration, timeAgo } from "./ui-bits";
+    16→import { BANNER_PRESETS, AVATAR_PRESETS, COVER_BANNER_PRESETS, ACCENT_PRESETS } from "./profile-assets";
+    17→import { toast } from "sonner";
+    18→import { cn } from "@/lib/utils";
+    19→
+    20→/* ============ ACHIEVEMENTS (special AniVerse touch) ============ */
+    21→function getAchievements(p: PublicProfile | AuthUser) {
+    22→  const isCreator = p.role === "CREATOR";
+    23→  const purchaseCount = "stats" in p ? p.stats.purchaseCount : 0;
+    24→  const watchSeconds = "stats" in p ? p.stats.watchSeconds : 0;
+    25→  const postCount = "stats" in p ? p.stats.postCount : 0;
+    26→  return [
+    27→    { id: "join", emoji: "🎬", name: "AniVerse Citizen", desc: "Joined AniVerse", earned: true },
+    28→    { id: "first", emoji: "💎", name: "First Purchase", desc: "Bought 1 anime", earned: purchaseCount >= 1 },
+    29→    { id: "collector", emoji: "📚", name: "Collector", desc: "Owns 10 animes", earned: purchaseCount >= 10 },
+    30→    { id: "exchange", emoji: "🔄", name: "Exchange Master", desc: "Owns 20 animes & trades", earned: purchaseCount >= 20 },
+    31→    { id: "binge", emoji: "🍿", name: "Binge Watcher", desc: "5+ hours watched", earned: watchSeconds >= 5 * 3600 },
+    32→    { id: "star", emoji: "⭐", name: "Community Star", desc: "Posted 5 times", earned: postCount >= 5 },
+    33→    { id: "creator", emoji: "👑", name: "Creator", desc: "Publishes animes", earned: isCreator },
+    34→  ];
+    35→}
+    36→
+    37→/* ============ SHARED PROFILE PIECES ============ */
+    38→
+    39→function ProfileBadges({ p }: { p: PublicProfile }) {
+    40→  return (
+    41→    <div className="flex items-center gap-1.5">
+    42→      {p.role === "CREATOR" ? (
+    43→        <span className="inline-flex items-center gap-1 text-[10px] font-black uppercase tracking-wider bg-primary/10 text-primary border border-primary/30 rounded-full px-2.5 py-1">
+    44→          <Crown className="w-3 h-3" /> Creator
+    45→        </span>
+    46→      ) : (
+    47→        <span className="inline-flex items-center gap-1 text-[10px] font-black uppercase tracking-wider bg-cyan-500/10 text-cyan-500 border border-cyan-500/30 rounded-full px-2.5 py-1">
+    48→          <BadgeCheck className="w-3 h-3" /> Viewer
+    49→        </span>
+    50→      )}
+    51→      {p.stats.exchangeUnlocked && (
+    52→        <span className="inline-flex items-center gap-1 text-[10px] font-black uppercase tracking-wider bg-amber-500/10 text-amber-500 border border-amber-500/30 rounded-full px-2.5 py-1">
+    53→          <Sparkles className="w-3 h-3" /> Trader
+    54→        </span>
+    55→      )}
+    56→    </div>
+    57→  );
+    58→}
+    59→
+    60→function StatsGrid({ p }: { p: PublicProfile }) {
+    61→  const stats = [
+    62→    { icon: <Package className="w-3.5 h-3.5" />, label: "Owned", value: p.stats.purchaseCount },
+    63→    { icon: <Timer className="w-3.5 h-3.5" />, label: "Watch time", value: formatDuration(p.stats.watchSeconds) },
+    64→    { icon: <Users className="w-3.5 h-3.5" />, label: "Followers", value: p.stats.followers },
+    65→    { icon: <Film className="w-3.5 h-3.5" />, label: "Posts", value: p.stats.postCount },
+    66→  ];
+    67→  return (
+    68→    <div className="grid grid-cols-2 gap-2">
+    69→      {stats.map((s) => (
+    70→        <div key={s.label} className="rounded-xl bg-secondary/50 border px-3 py-2.5">
+    71→          <p className="text-[10px] uppercase tracking-wide text-muted-foreground font-bold flex items-center gap-1">
+    72→            {s.icon} {s.label}
+    73→          </p>
+    74→          <p className="text-lg font-black tabular-nums mt-0.5">{s.value}</p>
+    75→        </div>
+    76→      ))}
+    77→    </div>
+    78→  );
+    79→}
+    80→
+    81→function AchievementBadges({ p }: { p: PublicProfile }) {
+    82→  const achievements = getAchievements(p);
+    83→  const earned = achievements.filter((a) => a.earned);
+    84→  return (
+    85→    <div className="flex flex-wrap gap-1.5">
+    86→      {earned.map((a) => (
+    87→        <span
+    88→          key={a.id}
+    89→          title={`${a.name} — ${a.desc}`}
+    90→          className="w-9 h-9 rounded-xl bg-secondary/70 border flex items-center justify-center text-lg hover:scale-110 transition cursor-help"
+    91→        >
+    92→          {a.emoji}
+    93→        </span>
+    94→      ))}
+    95→      <span className="text-[10px] text-muted-foreground self-center ml-1">
+    96→        {earned.length}/{achievements.length} achievements
+    97→      </span>
+    98→    </div>
+    99→  );
+   100→}
+   101→
+   102→/* ============ DESKTOP PROFILE MODAL (Discord-style small mirror) ============ */
+   103→export function ProfileModal() {
+   104→  const { profileModalOpen, setProfileModalOpen, user, navigate } = useAppStore();
+   105→  const [profile, setProfile] = useState<PublicProfile | null>(null);
+   106→  const [editOpen, setEditOpen] = useState(false);
+   107→
+   108→  useEffect(() => {
+   109→    if (profileModalOpen && user) {
+   110→      fetch(`/api/users/${user.username}`)
+   111→        .then((r) => r.json())
+   112→        .then((d) => d.profile && setProfile(d.profile))
+   113→        .catch(() => {});
+   114→    }
+   115→  }, [profileModalOpen, user]);
+   116→
+   117→  return (
+   118→    <>
+   119→      <Dialog open={profileModalOpen} onOpenChange={setProfileModalOpen}>
+   120→        <DialogContent
+   121→          className="sm:max-w-[720px] p-0 gap-0 overflow-hidden rounded-3xl border-primary/20 hidden sm:block max-h-[86vh]"
+   122→          aria-describedby={undefined}
+   123→        >
+   124→          <DialogTitle className="sr-only">{profile ? `${profile.displayName || profile.username} profile` : "Profile"}</DialogTitle>
+   125→          {profile ? (
+   126→            <div className="grid grid-cols-[280px_1fr] h-[560px] max-h-[86vh]">
+   127→              {/* LEFT — identity */}
+   128→              <div className="overflow-y-auto fancy-scroll bg-sidebar/60 border-r">
+   129→                <div className="relative banner-shine">
+   130→                  <div className="h-28 w-full">
+   131→                    <SmartImage
+   132→                      src={profile.bannerUrl || profile.avatarUrl}
+   133→                      alt="Profile banner"
+   134→                      className="w-full h-full object-cover"
+   135→                      accentFrom={profile.accentColor}
+   136→                      accentTo="#1e1b4b"
+   137→                    />
+   138→                  </div>
+   139→                  <div
+   140→                    className="absolute -bottom-8 left-1/2 -translate-x-1/2 rounded-full p-1"
+   141→                    style={{ background: "var(--card)" }}
+   142→                  >
+   143→                    <Avatar
+   144→                      src={profile.avatarUrl}
+   145→                      name={profile.displayName || profile.username}
+   146→                      accent={profile.accentColor}
+   147→                      size={72}
+   148→                    />
+   149→                  </div>
+   150→                </div>
+   151→
+   152→                <div className="pt-11 px-4 pb-5 text-center">
+   153→                  <h2 className="font-black text-lg truncate">{profile.displayName || profile.username}</h2>
+   154→                  <p className="text-xs text-muted-foreground mb-2">@{profile.username}</p>
+   155→                  <div className="flex justify-center mb-4">
+   156→                    <ProfileBadges p={profile} />
+   157→                  </div>
+   158→
+   159→                  <Button
+   160→                    size="sm"
+   161→                    className="w-full rounded-xl h-9 font-bold"
+   162→                    variant="secondary"
+   163→                    onClick={() => setEditOpen(true)}
+   164→                  >
+   165→                    <Pencil className="w-3.5 h-3.5" /> Customize Profile
+   166→                  </Button>
+   167→                  <Button
+   168→                    size="sm"
+   169→                    className="w-full rounded-xl h-9 font-bold mt-2"
+   170→                    variant="outline"
+   171→                    onClick={() => {
+   172→                      setProfileModalOpen(false);
+   173→                      navigate("user-profile", { username: profile.username });
+   174→                    }}
+   175→                  >
+   176→                    View Full Profile
+   177→                  </Button>
+   178→
+   179→                  <div className="mt-5 text-left space-y-4">
+   180→                    {profile.bio && (
+   181→                      <div>
+   182→                        <p className="text-[10px] font-black uppercase tracking-wider text-muted-foreground mb-1.5">About me</p>
+   183→                        <p className="text-xs leading-relaxed text-foreground/90 whitespace-pre-line">{profile.bio}</p>
+   184→                      </div>
+   185→                    )}
+   186→                    <div>
+   187→                      <p className="text-[10px] font-black uppercase tracking-wider text-muted-foreground mb-1.5 flex items-center gap-1">
+   188→                        <CalendarDays className="w-3 h-3" /> Member since
+   189→                      </p>
+   190→                      <p className="text-xs">
+   191→                        {new Date(profile.createdAt).toLocaleDateString("en-US", { month: "long", year: "numeric" })}
+   192→                      </p>
+   193→                    </div>
+   194→                    <div>
+   195→                      <p className="text-[10px] font-black uppercase tracking-wider text-muted-foreground mb-1.5">Achievements</p>
+   196→                      <AchievementBadges p={profile} />
+   197→                    </div>
+   198→                  </div>
+   199→                </div>
+   200→              </div>
+   201→
+   202→              {/* RIGHT — content tabs */}
+   203→              <div className="overflow-y-auto fancy-scroll p-5">
+   204→                <ProfileRightPanel profile={profile} />
+   205→              </div>
+   206→            </div>
+   207→          ) : (
+   208→            <div className="p-16 flex items-center justify-center">
+   209→              <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+   210→            </div>
+   211→          )}
+   212→        </DialogContent>
+   213→      </Dialog>
+   214→
+   215→      {/* Edit dialog (works for both modal & mobile contexts) */}
+   216→      {profile && <EditProfileDialog open={editOpen} onOpenChange={setEditOpen} onSaved={setProfile} />}
+   217→    </>
+   218→  );
+   219→}
+   220→
+   221→export function ProfileRightPanel({ profile }: { profile: PublicProfile }) {
+   222→  const { navigate } = useAppStore();
+   223→  return (
+   224→    <div className="space-y-6">
+   225→      <StatsGrid p={profile} />
+   226→
+   227→      {profile.recentAnimes.length > 0 && (
+   228→        <div>
+   229→          <p className="text-[10px] font-black uppercase tracking-wider text-muted-foreground mb-2 flex items-center gap-1">
+   230→            <Film className="w-3 h-3" /> Recent pickups
+   231→          </p>
+   232→          <div className="flex gap-2.5 overflow-x-auto no-scrollbar pb-1">
+   233→            {profile.recentAnimes.map((a) => (
+   234→              <button
+   235→                key={a.id}
+   236→                onClick={() => navigate("detail", { animeId: a.slug })}
+   237→                className="w-[84px] shrink-0 group text-left"
+   238→              >
+   239→                <div className="aspect-[2/3] rounded-lg overflow-hidden border">
+   240→                  <SmartImage src={a.coverImage} alt={a.title} className="w-full h-full object-cover group-hover:scale-105 transition" />
+   241→                </div>
+   242→                <p className="text-[10px] font-semibold mt-1 line-clamp-2 group-hover:text-primary transition">{a.title}</p>
+   243→              </button>
+   244→            ))}
+   245→          </div>
+   246→        </div>
+   247→      )}
+   248→
+   249→      {profile.favoriteAnimes.length > 0 && (
+   250→        <div>
+   251→          <p className="text-[10px] font-black uppercase tracking-wider text-muted-foreground mb-2 flex items-center gap-1">
+   252→            <Heart className="w-3 h-3 text-rose-400" /> Favorite animes
+   253→          </p>
+   254→          <div className="flex gap-2.5 overflow-x-auto no-scrollbar pb-1">
+   255→            {profile.favoriteAnimes.map((a) => (
+   256→              <button
+   257→                key={a.id}
+   258→                onClick={() => navigate("detail", { animeId: a.slug })}
+   259→                className="w-[84px] shrink-0 group text-left"
+   260→              >
+   261→                <div className="aspect-[2/3] rounded-lg overflow-hidden border">
+   262→                  <SmartImage src={a.coverImage} alt={a.title} className="w-full h-full object-cover group-hover:scale-105 transition" />
+   263→                </div>
+   264→                <p className="text-[10px] font-semibold mt-1 line-clamp-2 group-hover:text-primary transition">{a.title}</p>
+   265→              </button>
+   266→            ))}
+   267→          </div>
+   268→        </div>
+   269→      )}
+   270→
+   271→      {profile.favoriteUsers.length > 0 && (
+   272→        <div>
+   273→          <p className="text-[10px] font-black uppercase tracking-wider text-muted-foreground mb-2 flex items-center gap-1">
+   274→            <Users className="w-3 h-3" /> Favorite members
+   275→          </p>
+   276→          <div className="space-y-1.5">
+   277→            {profile.favoriteUsers.map((u) => (
+   278→              <button
+   279→                key={u.id}
+   280→                onClick={() => navigate("user-profile", { username: u.username })}
+   281→                className="w-full flex items-center gap-2.5 p-2 rounded-xl hover:bg-accent transition text-left group"
+   282→              >
+   283→                <Avatar src={u.avatarUrl} name={u.displayName} accent={u.accentColor} size={32} />
+   284→                <div className="min-w-0">
+   285→                  <p className="text-xs font-bold truncate group-hover:text-primary transition">{u.displayName || u.username}</p>
+   286→                  <p className="text-[10px] text-muted-foreground">@{u.username}</p>
+   287→                </div>
+   288→              </button>
+   289→            ))}
+   290→          </div>
+   291→        </div>
+   292→      )}
+   293→
+   294→      <div className="rounded-xl border border-dashed p-3.5 flex items-start gap-2.5">
+   295→        <MessageSquareOff className="w-4 h-4 text-muted-foreground shrink-0 mt-0.5" />
+   296→        <p className="text-[11px] text-muted-foreground leading-relaxed">
+   297→          AniVerse has no direct messages — connect through community posts, watch parties and favorites instead.
+   298→        </p>
+   299→      </div>
+   300→    </div>
+   301→  );
+   302→}
+   303→
+   304→/* ============ MOBILE / FULL PAGE PROFILE ============ */
+   305→export function ProfileFullView({ username }: { username: string }) {
+   306→  const { user, setAuthOpen, navigate } = useAppStore();
+   307→  const [profile, setProfile] = useState<PublicProfile | null>(null);
+   308→  const [loading, setLoading] = useState(true);
+   309→  const [editOpen, setEditOpen] = useState(false);
+   310→  const [favBusy, setFavBusy] = useState(false);
+   311→
+   312→  const isMe = user && profile && user.username === profile.username;
+   313→
+   314→  useEffect(() => {
+   315→    setLoading(true);
+   316→    fetch(`/api/users/${username}`)
+   317→      .then((r) => r.json())
+   318→      .then((d) => setProfile(d.profile || null))
+   319→      .catch(() => toast.error("Failed to load profile"))
+   320→      .finally(() => setLoading(false));
+   321→  }, [username, user]);
+   322→
+   323→  async function toggleFollow() {
+   324→    if (!user) {
+   325→      setAuthOpen(true);
+   326→      return;
+   327→    }
+   328→    if (!profile || isMe) return;
+   329→    setFavBusy(true);
+   330→    try {
+   331→      const res = await fetch(`/api/users/${profile.username}/favorite`, { method: "POST" });
+   332→      const d = await res.json();
+   333→      if (res.ok) {
+   334→        setProfile({
+   335→          ...profile,
+   336→          isFollowing: d.following,
+   337→          stats: { ...profile.stats, followers: profile.stats.followers + (d.following ? 1 : -1) },
+   338→        });
+   339→        toast.success(d.following ? `Added ${profile.displayName} to favorites ♥` : "Removed from favorites");
+   340→      }
+   341→    } finally {
+   342→      setFavBusy(false);
+   343→    }
+   344→  }
+   345→
+   346→  if (loading) {
+   347→    return (
+   348→      <div className="max-w-[760px] mx-auto px-4 py-6">
+   349→        <div className="h-40 rounded-3xl skeleton mb-4" />
+   350→        <div className="flex gap-4 items-end -mt-12 mb-4">
+   351→          <div className="w-24 h-24 rounded-full skeleton" />
+   352→          <div className="flex-1 space-y-2 pb-2">
+   353→            <div className="h-5 w-40 rounded skeleton" />
+   354→            <div className="h-3 w-28 rounded skeleton" />
+   355→          </div>
+   356→        </div>
+   357→        <div className="h-24 rounded-2xl skeleton" />
+   358→      </div>
+   359→    );
+   360→  }
+   361→
+   362→  if (!profile) {
+   363→    return (
+   364→      <div className="text-center py-32 px-4">
+   365→        <p className="text-6xl mb-4">👻</p>
+   366→        <p className="font-bold text-lg">User not found</p>
+   367→        <Button variant="outline" className="mt-4 rounded-full" onClick={() => navigate("home")}>Back to Home</Button>
+   368→      </div>
+   369→    );
+   370→  }
+   371→
+   372→  return (
+   373→    <div className="max-w-[760px] mx-auto px-4 sm:px-8 py-4 sm:py-6 pb-10">
+   374→      {/* Banner + avatar */}
+   375→      <div className="relative banner-shine rounded-3xl overflow-hidden">
+   376→        <div className="h-40 sm:h-56">
+   377→          <SmartImage
+   378→            src={profile.bannerUrl || profile.avatarUrl}
+   379→            alt="Profile banner"
+   380→            className="w-full h-full object-cover"
+   381→            accentFrom={profile.accentColor}
+   382→            accentTo="#1e1b4b"
+   383→          />
+   384→        </div>
+   385→        <div className="absolute inset-0 bg-gradient-to-t from-background/80 via-transparent to-transparent" />
+   386→      </div>
+   387→
+   388→      <div className="flex items-end gap-4 -mt-12 sm:-mt-14 px-2">
+   389→        <div className="rounded-full p-1 bg-background shrink-0 shadow-xl">
+   390→          <Avatar
+   391→            src={profile.avatarUrl}
+   392→            name={profile.displayName || profile.username}
+   393→            accent={profile.accentColor}
+   394→            size={96}
+   395→          />
+   396→        </div>
+   397→        <div className="flex-1 min-w-0 pb-1">
+   398→          <h1 className="text-xl sm:text-2xl font-black truncate">{profile.displayName || profile.username}</h1>
+   399→          <p className="text-xs text-muted-foreground">@{profile.username}</p>
+   400→        </div>
+   401→      </div>
+   402→
+   403→      <div className="flex items-center gap-2 mt-4 px-1 flex-wrap">
+   404→        <ProfileBadges p={profile} />
+   405→        <span className="text-[11px] text-muted-foreground flex items-center gap-1">
+   406→          <CalendarDays className="w-3 h-3" />
+   407→          Joined {new Date(profile.createdAt).toLocaleDateString("en-US", { month: "short", year: "numeric" })}
+   408→        </span>
+   409→      </div>
+   410→
+   411→      {/* Actions */}
+   412→      <div className="flex items-center gap-2.5 mt-4 flex-wrap">
+   413→        {isMe ? (
+   414→          <>
+   415→            <Button className="rounded-full brand-gradient text-white font-bold" onClick={() => setEditOpen(true)}>
+   416→              <Pencil className="w-4 h-4" /> Customize Profile
+   417→            </Button>
+   418→            {user?.role === "CREATOR" && (
+   419→              <Button variant="secondary" className="rounded-full font-bold" onClick={() => navigate("studio")}>
+   420→                <Crown className="w-4 h-4" /> Creator Studio
+   421→              </Button>
+   422→            )}
+   423→          </>
+   424→        ) : (
+   425→          <Button
+   426→            disabled={favBusy}
+   427→            onClick={toggleFollow}
+   428→            className={cn(
+   429→              "rounded-full font-bold",
+   430→              profile.isFollowing ? "bg-secondary hover:bg-secondary/80" : "brand-gradient text-white"
+   431→            )}
+   432→          >
+   433→            <Heart className={cn("w-4 h-4", profile.isFollowing && "fill-current")} />
+   434→            {profile.isFollowing ? "Favorited" : "Favorite"}
+   435→          </Button>
+   436→        )}
+   437→      </div>
+   438→
+   439→      {/* Body */}
+   440→      <div className="mt-6 space-y-6">
+   441→        {profile.bio && (
+   442→          <section className="glass rounded-2xl p-4 sm:p-5">
+   443→            <p className="text-[10px] font-black uppercase tracking-wider text-muted-foreground mb-2 flex items-center gap-1.5">
+   444→              <Smile className="w-3.5 h-3.5" /> About me
+   445→            </p>
+   446→            <p className="text-sm leading-relaxed whitespace-pre-line">{profile.bio}</p>
+   447→          </section>
+   448→        )}
+   449→
+   450→        <section className="glass rounded-2xl p-4 sm:p-5">
+   451→          <p className="text-[10px] font-black uppercase tracking-wider text-muted-foreground mb-3">Stats</p>
+   452→          <StatsGrid p={profile} />
+   453→          <div className="mt-3">
+   454→            <p className="text-[10px] font-black uppercase tracking-wider text-muted-foreground mb-2">Achievements</p>
+   455→            <AchievementBadges p={profile} />
+   456→          </div>
+   457→        </section>
+   458→
+   459→        {profile.favoriteAnimes.length > 0 && (
+   460→          <section className="glass rounded-2xl p-4 sm:p-5">
+   461→            <p className="text-[10px] font-black uppercase tracking-wider text-muted-foreground mb-3 flex items-center gap-1.5">
+   462→              <Heart className="w-3.5 h-3.5 text-rose-400" /> Favorite animes
+   463→            </p>
+   464→            <div className="grid grid-cols-3 sm:grid-cols-6 gap-3">
+   465→              {profile.favoriteAnimes.map((a) => (
+   466→                <button
+   467→                  key={a.id}
+   468→                  onClick={() => navigate("detail", { animeId: a.slug })}
+   469→                  className="group text-left"
+   470→                >
+   471→                  <div className="aspect-[2/3] rounded-xl overflow-hidden border">
+   472→                    <SmartImage src={a.coverImage} alt={a.title} className="w-full h-full object-cover group-hover:scale-105 transition" />
+   473→                  </div>
+   474→                  <p className="text-[10px] font-semibold mt-1.5 line-clamp-2 group-hover:text-primary transition">{a.title}</p>
+   475→                </button>
+   476→              ))}
+   477→            </div>
+   478→          </section>
+   479→        )}
+   480→
+   481→        {profile.recentAnimes.length > 0 && (
+   482→          <section className="glass rounded-2xl p-4 sm:p-5">
+   483→            <p className="text-[10px] font-black uppercase tracking-wider text-muted-foreground mb-3 flex items-center gap-1.5">
+   484→              <Film className="w-3.5 h-3.5" /> Collection highlights
+   485→            </p>
+   486→            <div className="grid grid-cols-4 sm:grid-cols-8 gap-2.5">
+   487→              {profile.recentAnimes.map((a) => (
+   488→                <button
+   489→                  key={a.id}
+   490→                  onClick={() => navigate("detail", { animeId: a.slug })}
+   491→                  className="group text-left"
+   492→                  title={a.title}
+   493→                >
+   494→                  <div className="aspect-[2/3] rounded-lg overflow-hidden border">
+   495→                    <SmartImage src={a.coverImage} alt={a.title} className="w-full h-full object-cover group-hover:scale-105 transition" />
+   496→                  </div>
+   497→                </button>
+   498→              ))}
+   499→            </div>
+   500→          </section>
+   501→        )}
+   502→
+   503→        {/* Favorite users */}
+   504→        <section className="glass rounded-2xl p-4 sm:p-5">
+   505→          <p className="text-[10px] font-black uppercase tracking-wider text-muted-foreground mb-3 flex items-center gap-1.5">
+   506→            <Users className="w-3.5 h-3.5" /> Favorite members
+   507→            <span className="text-muted-foreground/60 font-normal normal-case">({profile.stats.following})</span>
+   508→          </p>
+   509→          {profile.favoriteUsers.length > 0 ? (
+   510→            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+   511→              {profile.favoriteUsers.map((u) => (
+   512→                <button
+   513→                  key={u.id}
+   514→                  onClick={() => navigate("user-profile", { username: u.username })}
+   515→                  className="flex items-center gap-3 p-2.5 rounded-xl hover:bg-accent transition text-left group border border-transparent hover:border-primary/30"
+   516→                >
+   517→                  <Avatar src={u.avatarUrl} name={u.displayName} accent={u.accentColor} size={40} />
+   518→                  <div className="min-w-0">
+   519→                    <p className="text-sm font-bold truncate group-hover:text-primary transition">{u.displayName || u.username}</p>
+   520→                    <p className="text-[11px] text-muted-foreground">@{u.username}</p>
+   521→                  </div>
+   522→                </button>
+   523→              ))}
+   524→            </div>
+   525→          ) : (
+   526→            <p className="text-xs text-muted-foreground">No favorites yet</p>
+   527→          )}
+   528→        </section>
+   529→
+   530→        {/* Followers */}
+   531→        {profile.followersList.length > 0 && (
+   532→          <section className="glass rounded-2xl p-4 sm:p-5">
+   533→            <p className="text-[10px] font-black uppercase tracking-wider text-muted-foreground mb-3 flex items-center gap-1.5">
+   534→              <Star className="w-3.5 h-3.5 text-amber-400" /> Favorited by
+   535→              <span className="text-muted-foreground/60 font-normal normal-case">({profile.stats.followers})</span>
+   536→            </p>
+   537→            <div className="flex flex-wrap gap-2">
+   538→              {profile.followersList.map((u) => (
+   539→                <button
+   540→                  key={u.id}
+   541→                  onClick={() => navigate("user-profile", { username: u.username })}
+   542→                  className="flex items-center gap-2 pl-1 pr-3 py-1 rounded-full bg-secondary/60 border hover:border-primary/40 transition"
+   543→                  title={`@${u.username}`}
+   544→                >
+   545→                  <Avatar src={u.avatarUrl} name={u.displayName} accent={u.accentColor} size={22} />
+   546→                  <span className="text-xs font-semibold">{u.displayName || u.username}</span>
+   547→                </button>
+   548→              ))}
+   549→            </div>
+   550→          </section>
+   551→        )}
+   552→
+   553→        <div className="rounded-2xl border border-dashed p-4 flex items-start gap-2.5">
+   554→          <MessageSquareOff className="w-4 h-4 text-muted-foreground shrink-0 mt-0.5" />
+   555→          <p className="text-[11px] text-muted-foreground leading-relaxed">
+   556→            AniVerse keeps things friendly — no DMs. Interact through community posts, watch parties and favorites.
+   557→          </p>
+   558→        </div>
+   559→      </div>
+   560→
+   561→      {isMe && user && <EditProfileDialog open={editOpen} onOpenChange={setEditOpen} onSaved={setProfile} me={user} />}
+   562→    </div>
+   563→  );
+   564→}
+   565→
+   566→/* ============ EDIT PROFILE DIALOG ============ */
+   567→export function EditProfileDialog({
+   568→  open, onOpenChange, onSaved, me,
+   569→}: {
+   570→  open: boolean;
+   571→  onOpenChange: (open: boolean) => void;
+   572→  onSaved: (p: PublicProfile) => void;
+   573→  me?: AuthUser;
+   574→}) {
+   575→  const { user, updateUser } = useAppStore();
+   576→  const base = me || user;
+   577→  const [displayName, setDisplayName] = useState("");
+   578→  const [bio, setBio] = useState("");
+   579→  const [avatarUrl, setAvatarUrl] = useState("");
+   580→  const [bannerUrl, setBannerUrl] = useState("");
+   581→  const [accent, setAccent] = useState("#a855f7");
+   582→  const [tab, setTab] = useState<"avatar" | "banner" | "color">("avatar");
+   583→  const [saving, setSaving] = useState(false);
+   584→
+   585→  useEffect(() => {
+   586→    if (open && base) {
+   587→      setDisplayName(base.displayName || "");
+   588→      setBio(base.bio || "");
+   589→      setAvatarUrl(base.avatarUrl || "");
+   590→      setBannerUrl(base.bannerUrl || "");
+   591→      setAccent(base.accentColor || "#a855f7");
+   592→    }
+   593→  }, [open, base]);
+   594→
+   595→  async function save() {
+   596→    if (!displayName.trim()) {
+   597→      toast.error("Display name cannot be empty");
+   598→      return;
+   599→    }
+   600→    setSaving(true);
+   601→    try {
+   602→      const res = await fetch("/api/profile", {
+   603→        method: "PATCH",
+   604→        headers: { "Content-Type": "application/json" },
+   605→        body: JSON.stringify({ displayName: displayName.trim(), bio, avatarUrl, bannerUrl, accentColor: accent }),
+   606→      });
+   607→      const d = await res.json();
+   608→      if (!res.ok) {
+   609→        toast.error(d.error || "Failed to save");
+   610→        return;
+   611→      }
+   612→      updateUser(d.user);
+   613→      toast.success("Profile updated ✨");
+   614→      onOpenChange(false);
+   615→      // Refresh profile data
+   616→      fetch(`/api/users/${d.user.username}`)
+   617→        .then((r) => r.json())
+   618→        .then((pd) => pd.profile && onSaved(pd.profile))
+   619→        .catch(() => {});
+   620→    } catch {
+   621→      toast.error("Network error");
+   622→    } finally {
+   623→      setSaving(false);
+   624→    }
+   625→  }
+   626→
+   627→  if (!base) return null;
+   628→
+   629→  return (
+   630→    <Dialog open={open} onOpenChange={(o) => !saving && onOpenChange(o)}>
+   631→      <DialogContent className="sm:max-w-[520px] rounded-2xl max-h-[88vh] overflow-y-auto fancy-scroll">
+   632→        <DialogHeader>
+   633→          <DialogTitle className="flex items-center gap-2">
+   634→            <Pencil className="w-4.5 h-4.5 text-primary" /> Customize Profile
+   635→          </DialogTitle>
+   636→          <DialogDescription>Make it yours — banner, avatar, accent color and bio</DialogDescription>
+   637→        </DialogHeader>
+   638→
+   639→        {/* Live preview */}
+   640→        <div className="rounded-2xl overflow-hidden border">
+   641→          <div className="h-24 relative banner-shine">
+   642→            <SmartImage
+   643→              src={bannerUrl || avatarUrl}
+   644→              alt="banner preview"
+   645→              className="w-full h-full object-cover"
+   646→              accentFrom={accent}
+   647→              accentTo="#1e1b4b"
+   648→            />
+   649→          </div>
+   650→          <div className="px-4 pb-4 -mt-7 relative">
+   651→            <div className="rounded-full p-1 inline-block" style={{ background: "var(--card)" }}>
+   652→              <Avatar src={avatarUrl} name={displayName || base.username} accent={accent} size={56} />
+   653→            </div>
+   654→            <p className="font-black mt-1.5">{displayName || base.username}</p>
+   655→            <div className="flex items-center gap-2 mt-1">
+   656→              <span
+   657→                className="w-3 h-3 rounded-full"
+   658→                style={{ background: accent, boxShadow: `0 0 8px ${accent}` }}
+   659→              />
+   660→              <span className="text-[11px] text-muted-foreground">@{base.username} · {base.role.toLowerCase()}</span>
+   661→            </div>
+   662→          </div>
+   663→        </div>
+   664→
+   665→        {/* Name & bio */}
+   666→        <div className="space-y-3">
+   667→          <div className="space-y-1.5">
+   668→            <Label className="text-xs font-semibold">Display name</Label>
+   669→            <Input
+   670→              value={displayName}
+   671→              onChange={(e) => setDisplayName(e.target.value)}
+   672→              maxLength={32}
+   673→              className="h-10 rounded-xl"
+   674→            />
+   675→          </div>
+   676→          <div className="space-y-1.5">
+   677→            <Label className="text-xs font-semibold">Bio <span className="text-muted-foreground font-normal">({bio.length}/300)</span></Label>
+   678→            <Textarea
+   679→              value={bio}
+   680→              onChange={(e) => setBio(e.target.value)}
+   681→              maxLength={300}
+   682→              placeholder="Tell the world about your anime journey..."
+   683→              className="rounded-xl min-h-16"
+   684→            />
+   685→          </div>
+   686→        </div>
+   687→
+   688→        {/* Asset picker */}
+   689→        <div className="space-y-2.5">
+   690→          <div className="flex gap-1.5">
+   691→            {(["avatar", "banner", "color"] as const).map((t) => (
+   692→              <button
+   693→                key={t}
+   694→                onClick={() => setTab(t)}
+   695→                className={cn(
+   696→                  "px-3 py-1.5 rounded-full text-xs font-bold capitalize transition",
+   697→                  tab === t ? "brand-gradient text-white" : "bg-secondary text-muted-foreground hover:text-foreground"
+   698→                )}
+   699→              >
+   700→                {t === "color" ? "Accent" : t}
+   701→              </button>
+   702→            ))}
+   703→          </div>
+   704→
+   705→          {tab === "avatar" && (
+   706→            <div className="space-y-2">
+   707→              <div className="grid grid-cols-6 gap-2">
+   708→                {AVATAR_PRESETS.map((url) => (
+   709→                  <button
+   710→                    key={url}
+   711→                    onClick={() => setAvatarUrl(url)}
+   712→                    className={cn(
+   713→                      "aspect-square rounded-full overflow-hidden border-2 transition",
+   714→                      avatarUrl === url ? "border-primary scale-105" : "border-transparent hover:scale-105"
+   715→                    )}
+   716→                    aria-label="Avatar preset"
+   717→                  >
+   718→                    { }
+   719→                    <img src={url} alt="" className="w-full h-full object-cover" loading="lazy" />
+   720→                  </button>
+   721→                ))}
+   722→              </div>
+   723→              <div className="relative">
+   724→                <Link2 className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+   725→                <Input
+   726→                  value={avatarUrl}
+   727→                  onChange={(e) => setAvatarUrl(e.target.value)}
+   728→                  placeholder="...or paste a custom image URL"
+   729→                  className="pl-9 h-9 rounded-xl text-xs"
+   730→                />
+   731→              </div>
+   732→            </div>
+   733→          )}
+   734→
+   735→          {tab === "banner" && (
+   736→            <div className="space-y-2">
+   737→              <div className="grid grid-cols-4 gap-2 max-h-36 overflow-y-auto fancy-scroll p-0.5">
+   738→                {BANNER_PRESETS.map((url) => (
+   739→                  <button
+   740→                    key={url}
+   741→                    onClick={() => setBannerUrl(url)}
+   742→                    className={cn(
+   743→                      "aspect-video rounded-lg overflow-hidden border-2 transition",
+   744→                      bannerUrl === url ? "border-primary" : "border-transparent opacity-80 hover:opacity-100"
+   745→                    )}
+   746→                    aria-label="Banner preset"
+   747→                  >
+   748→                    { }
+   749→                    <img src={url} alt="" className="w-full h-full object-cover" loading="lazy" />
+   750→                  </button>
+   751→                ))}
+   752→                {COVER_BANNER_PRESETS.map((c) => (
+   753→                  <button
+   754→                    key={c.url}
+   755→                    onClick={() => setBannerUrl(c.url)}
+   756→                    className={cn(
+   757→                      "aspect-video rounded-lg overflow-hidden border-2 transition",
+   758→                      bannerUrl === c.url ? "border-primary" : "border-transparent opacity-80 hover:opacity-100"
+   759→                    )}
+   760→                    aria-label={`Banner: ${c.title}`}
+   761→                    title={c.title}
+   762→                  >
+   763→                    { }
+   764→                    <img src={c.url} alt="" className="w-full h-full object-cover" loading="lazy" />
+   765→                  </button>
+   766→                ))}
+   767→              </div>
+   768→              <div className="relative">
+   769→                <Link2 className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+   770→                <Input
+   771→                  value={bannerUrl}
+   772→                  onChange={(e) => setBannerUrl(e.target.value)}
+   773→                  placeholder="...or paste a custom image URL"
+   774→                  className="pl-9 h-9 rounded-xl text-xs"
+   775→                />
+   776→              </div>
+   777→              {bannerUrl && (
+   778→                <button
+   779→                  onClick={() => setBannerUrl("")}
+   780→                  className="text-[11px] text-muted-foreground hover:text-destructive transition"
+   781→                >
+   782→                  Remove banner
+   783→                </button>
+   784→              )}
+   785→            </div>
+   786→          )}
+   787→
+   788→          {tab === "color" && (
+   789→            <div className="flex flex-wrap gap-2">
+   790→              {ACCENT_PRESETS.map((c) => (
+   791→                <button
+   792→                  key={c}
+   793→                  onClick={() => setAccent(c)}
+   794→                  className={cn(
+   795→                    "w-9 h-9 rounded-full transition hover:scale-110 border-2",
+   796→                    accent === c ? "border-foreground scale-110" : "border-transparent"
+   797→                  )}
+   798→                  style={{ background: c, boxShadow: accent === c ? `0 0 12px ${c}` : undefined }}
+   799→                  aria-label={`Accent ${c}`}
+   800→                />
+   801→              ))}
+   802→              <label className="w-9 h-9 rounded-full border-2 border-dashed flex items-center justify-center cursor-pointer hover:scale-110 transition" title="Custom color">
+   803→                <input
+   804→                  type="color"
+   805→                  value={accent}
+   806→                  onChange={(e) => setAccent(e.target.value)}
+   807→                  className="sr-only"
+   808→                  aria-label="Custom accent color"
+   809→                />
+   810→                <span className="text-xs font-bold">+</span>
+   811→              </label>
+   812→            </div>
+   813→          )}
+   814→        </div>
+   815→
+   816→        <Button disabled={saving} onClick={save} className="w-full h-11 rounded-xl brand-gradient text-white font-bold">
+   817→          {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />} Save Profile
+   818→        </Button>
+   819→      </DialogContent>
+   820→    </Dialog>
+   821→  );
+   822→}
+   823→
