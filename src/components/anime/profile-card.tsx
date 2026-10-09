@@ -301,19 +301,17 @@ export function ProfilePopupCard({
 export function ProfileModal() {
   const { profileModalOpen, closeProfileCard, profileCardUser, user } = useAppStore();
   const [profile, setProfile] = useState<PublicProfile | null>(null);
-  const [loading, setLoading] = useState(false);
   const cardRef = useRef<HTMLDivElement>(null);
 
   const username = profileCardUser || user?.username || null;
 
   useEffect(() => {
-    if (!profileModalOpen || !username) { setProfile(null); return; }
-    setLoading(true);
+    if (!profileModalOpen || !username) return;
     fetch(`/api/users/${username}`)
       .then((r) => r.json())
       .then((d) => { if (d.profile) setProfile(d.profile); })
-      .catch(() => toast.error("Couldn't load profile"))
-      .finally(() => setLoading(false));
+      .catch(() => toast.error("Couldn't load profile"));
+    return () => { setProfile(null); }; /* clear stale data on close / target change */
   }, [profileModalOpen, username]);
 
   // Esc to close
@@ -369,7 +367,7 @@ export function ProfileModal() {
         )}
         onClick={(e) => e.stopPropagation()}
       >
-        {loading || !profile ? (
+        {!profile ? (
           <div className="w-full sm:max-w-[340px] rounded-3xl border bg-card p-6 flex flex-col items-center gap-3">
             <div className="w-20 h-20 rounded-full skeleton" />
             <div className="h-5 w-36 rounded-lg skeleton" />

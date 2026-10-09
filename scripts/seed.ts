@@ -217,7 +217,7 @@ const ACCENTS = ["#a855f7", "#ec4899", "#f59e0b", "#10b981", "#06b6d4", "#ef4444
 const USERS = [
   {
     username: "sakura_dev", displayName: "Sakura", email: "sakura@aniverse.test", role: "CREATOR",
-    bio: "Anime connoisseur & AniVerse creator. I publish the classics. 10+ years of watching, still crying at Your Name.",
+    bio: "Anime connoisseur & DubAniX creator. I publish the classics. 10+ years of watching, still crying at Your Name.",
     credits: 5000, avatarIdx: 0, bannerIdx: 0, accent: ACCENTS[0],
   },
   {
@@ -253,7 +253,7 @@ const POSTS = [
   { user: 2, content: "Started Cyberpunk Edgerunners because everyone kept telling me to. Episode 6 wrecked me so hard I had to pause. David deserved better. Everyone deserved better. 😭", animeSlug: "cyberpunk-edgerunners" },
   { user: 4, content: "Watch party tonight for Your Name? Grabbing everyone I know. Bring tissues. That's not a suggestion, it's a requirement. 🌠", animeSlug: "your-name" },
   { user: 3, content: "Hot take: Mob Psycho 100 has better animation than most movies. That fight in ep 11? Pure art. Bones went CRAZY.", animeSlug: "mob-psycho-100" },
-  { user: 5, content: "New here! Just discovered AniVerse and the exchange system is genius. Traded my duplicate for something on my wishlist instantly. This community is awesome!", animeSlug: null },
+  { user: 5, content: "New here! Just discovered DubAniX and the exchange system is genius. Traded my duplicate for something on my wishlist instantly. This community is awesome!", animeSlug: null },
   { user: 1, content: "Chainsaw Man opening went hard but the EDs were the real masterpiece. Each one a different vibe. MAPPA understood the assignment.", animeSlug: "chainsaw-man" },
   { user: 2, content: "Violet Evergarden ep 10 made me cry in front of my whole family. No regrets. 'I love you' will never hit the same again. ✉️", animeSlug: "violet-evergarden" },
 ];
@@ -492,7 +492,7 @@ async function main() {
     [2, "senpai_kot", "I'm scared to watch it now 😅"],
     [3, "zenitsu_", "Count me in! What time?"],
     [4, "sakura_dev", "Bones never misses, absolute wizards."],
-    [5, "sakura_dev", "Welcome to AniVerse! Wait till you hit 20 purchases and unlock the exchange market."],
+    [5, "sakura_dev", "Welcome to DubAniX! Wait till you hit 20 purchases and unlock the exchange market."],
     [7, "mikasa_ack", "Ep 10 is peak fiction, I will not elaborate."],
   ];
   for (const [postIdx, username, content] of commentPlan) {

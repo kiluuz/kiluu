@@ -3,12 +3,13 @@
 import { useEffect, useRef, useState } from "react";
 import {
   Home, Compass, Users, Clock, Repeat, Wallet, Video,
-  Search, Bell, Sun, Moon, Sparkles, LogOut,
+  Search, Bell, Sun, Moon, LogOut,
   Settings, Clapperboard, ChevronRight, Plus, Coins, Menu, X,
 } from "lucide-react";
 import { useTheme } from "next-themes";
 import { useAppStore } from "./store";
 import { Avatar, formatCredits } from "./ui-bits";
+import { Logo } from "./logo";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
@@ -31,35 +32,17 @@ const MOBILE_NAV = [
   { id: "community", label: "Community", icon: Users },
 ] as const;
 
-/** Brand lockup — logo mark + wordmark + inline kana (not stacked, properly sized) */
+/** Brand lockup — DubAniX logo (animated mark + wordmark), links home */
 export function BrandLockup({ compact = false }: { compact?: boolean }) {
   const navigate = useAppStore((s) => s.navigate);
   return (
     <button
-      className="flex items-center gap-3 group shrink-0"
+      className="flex items-center group shrink-0 rounded-xl focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-primary"
       onClick={() => navigate("home")}
-      aria-label="AniVerse home"
+      aria-label="DubAniX home"
     >
-      <div className="relative w-9 h-9 rounded-xl brand-gradient flex items-center justify-center shadow-lg shadow-primary/30 group-hover:scale-105 transition-transform">
-        <Sparkles className="w-[18px] h-[18px] text-white" />
-        <span className="absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full bg-background flex items-center justify-center" aria-hidden>
-          <span className="w-1.5 h-1.5 rounded-full bg-primary live-dot" />
-        </span>
-      </div>
-      <div className="flex items-baseline gap-2">
-        <span className={cn("font-black gradient-text tracking-tight", compact ? "text-base" : "text-xl")}>
-          AniVerse
-        </span>
-        <span
-          className={cn(
-            "hidden sm:inline font-medium text-muted-foreground/70 tracking-[0.18em] select-none",
-            compact ? "text-[9px]" : "text-[10px]"
-          )}
-          lang="ja"
-        >
-          アニバース
-        </span>
-      </div>
+      {/* Desktop: full lockup (36–40px mark) · Mobile top bar: mark only */}
+      {compact ? <Logo variant="mark" size={32} /> : <Logo variant="full" size={38} />}
     </button>
   );
 }
@@ -350,7 +333,7 @@ export function MobileNav() {
             onClick={() => setAuthOpen(true)}
             className="flex flex-col items-center gap-0.5 px-3 py-1.5 rounded-xl min-w-[62px] text-primary"
           >
-            <Sparkles className="w-5 h-5" />
+            <Logo variant="mark" size={22} />
             <span className="text-[9.5px] font-semibold">Sign in</span>
           </button>
         )}

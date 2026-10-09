@@ -1,0 +1,119 @@
+/* ============================================================
+   DUBANIX WELCOME LOADER — exact port of the reference (scoped wl-*)
+   White full-screen overlay · 8 languages · per-language serif fonts
+   orange -> violet -> teal gradient words · drifting blobs · progress line
+   ============================================================ */
+
+.wl-root {
+  --wl-ink: #17151f;
+  --wl-mute: #9a96a8;
+  --wl-a: #ff7a59;
+  --wl-b: #7c5cff;
+  --wl-c: #22c1c3;
+  position: fixed;
+  inset: 0;
+  z-index: 99999;
+  background: #fff;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  color: var(--wl-ink);
+  font-family: var(--font-cormorant), "Cormorant Garamond", serif;
+  padding: 0 env(safe-area-inset-right, 0px) env(safe-area-inset-bottom, 0px) env(safe-area-inset-left, 0px);
+  transition: opacity 0.5s ease;
+}
+.wl-root.wl-fading { opacity: 0; pointer-events: none; }
+
+/* ---- soft blurred color blobs drifting slowly ---- */
+.wl-blob {
+  position: absolute;
+  width: 46vmax;
+  height: 46vmax;
+  border-radius: 50%;
+  filter: blur(90px);
+  opacity: 0.16;
+  pointer-events: none;
+  animation: wl-drift 14s ease-in-out infinite alternate;
+}
+.wl-b1 { background: var(--wl-a); top: -18vmax; left: -14vmax; }
+.wl-b2 { background: var(--wl-b); bottom: -20vmax; right: -14vmax; animation-delay: -5s; }
+.wl-b3 { background: var(--wl-c); top: 30%; left: 55%; width: 30vmax; height: 30vmax; opacity: 0.1; animation-delay: -9s; }
+@keyframes wl-drift {
+  to { transform: translate(8vmax, 5vmax) scale(1.2); }
+}
+
+/* ---- center stack: brand intro + cycling word ---- */
+.wl-stack {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: clamp(28px, 5vw, 56px);
+  padding-top: env(safe-area-inset-top, 0px);
+}
+
+.wl-stage {
+  position: relative;
+  text-align: center;
+  width: 100%;
+  padding: 0 5vw;
+}
+.wl-word {
+  height: clamp(90px, 17vw, 190px);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  white-space: nowrap;
+}
+.wl-word span {
+  display: inline-block;
+  font-size: clamp(44px, 10.5vw, 128px);
+  line-height: 1.1;
+  opacity: 0;
+  transform: translateY(60%) rotateX(-70deg);
+  filter: blur(14px);
+  transform-origin: 50% 100%;
+}
+.wl-word.in span {
+  animation: wl-rise 0.6s cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
+  animation-delay: calc(var(--i) * 32ms);
+}
+.wl-word.out span {
+  animation: wl-fall 0.38s cubic-bezier(0.6, 0, 0.8, 0.4) forwards;
+  animation-delay: calc(var(--i) * 14ms);
+}
+@keyframes wl-rise {
+  to { opacity: 1; transform: none; filter: blur(0); }
+}
+@keyframes wl-fall {
+  from { opacity: 1; transform: none; filter: blur(0); }
+  to { opacity: 0; transform: translateY(-50%) rotateX(60deg); filter: blur(12px); }
+}
+.wl-word span.wl-grad {
+  background: linear-gradient(100deg, var(--wl-a), var(--wl-b) 55%, var(--wl-c));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+/* ---- thin gradient progress line at the very bottom ---- */
+.wl-bar {
+  position: absolute;
+  left: 0;
+  bottom: env(safe-area-inset-bottom, 0px);
+  height: 3px;
+  width: 100%;
+  background: #f1eff7;
+}
+.wl-bar b {
+  display: block;
+  height: 100%;
+  width: 0;
+  background: linear-gradient(90deg, var(--wl-a), var(--wl-b), var(--wl-c));
+}
+
+/* ---- keep the reference's reduced-motion behavior ---- */
+@media (prefers-reduced-motion: reduce) {
+  .wl-blob { animation: none; }
+  .wl-word span { transform: none; filter: none; }
+}

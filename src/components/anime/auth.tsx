@@ -1,13 +1,14 @@
 "use client";
 
 import { useState } from "react";
-import { Sparkles, Loader2, Eye, Mail, Lock, User, Clapperboard, Swords, Check } from "lucide-react";
+import { Loader2, Eye, Mail, Lock, User, Clapperboard, Swords, Check } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useAppStore } from "./store";
+import { Logo } from "./logo";
 import type { AuthUser } from "./types";
 import { toast } from "sonner";
 
@@ -44,7 +45,7 @@ export function AuthModal() {
       }
       setUser(data.user as AuthUser);
       setAuthOpen(false);
-      toast.success(mode === "login" ? `Welcome back, ${data.user.displayName || data.user.username}!` : "Account created! Welcome to AniVerse ✦");
+      toast.success(mode === "login" ? `Welcome back, ${data.user.displayName || data.user.username}!` : "Account created! Welcome to DubAniX ✦");
     } catch {
       toast.error("Network error. Please try again.");
     } finally {
@@ -58,12 +59,8 @@ export function AuthModal() {
         <div className="aurora absolute inset-0 pointer-events-none" />
         <div className="relative p-6 pt-8">
           <div className="flex flex-col items-center text-center mb-6">
-            <div className="w-14 h-14 rounded-2xl brand-gradient flex items-center justify-center shadow-xl shadow-primary/30 mb-3">
-              <Sparkles className="w-7 h-7 text-white" />
-            </div>
-            <DialogTitle className="text-2xl font-black">
-              Welcome to <span className="gradient-text">AniVerse</span>
-            </DialogTitle>
+            <Logo variant="full" size={40} tagline className="mb-4" />
+            <DialogTitle className="sr-only">Sign in to DubAniX</DialogTitle>
             <DialogDescription className="text-sm mt-1">
               Stream, collect and exchange premium anime
             </DialogDescription>
@@ -175,15 +172,15 @@ export function Onboarding() {
       <div className="aurora absolute inset-0 pointer-events-none" />
       <div className="relative w-full max-w-lg my-8">
         <div className="text-center mb-6">
-          <div className="w-16 h-16 mx-auto rounded-2xl brand-gradient flex items-center justify-center shadow-2xl shadow-primary/40 mb-4">
-            <Sparkles className="w-8 h-8 text-white" />
+          <div className="w-16 h-16 mx-auto mb-4">
+            <Logo variant="mark" size={64} animated />
           </div>
           <h1 className="text-3xl font-black">
-            Welcome to <span className="gradient-text">AniVerse</span>
+            Welcome to <span className="gradient-text">DubAniX</span>
           </h1>
           {step === "role" ? (
             <p className="text-muted-foreground mt-2 text-sm">
-              One quick thing — how will you use AniVerse?
+              One quick thing — how will you use DubAniX?
               <br />
               <span className="text-xs opacity-70">(You choose this only once)</span>
             </p>
@@ -280,7 +277,7 @@ export function Onboarding() {
                 onClick={() => finish(choice!)}
                 className="flex-1 h-11 rounded-xl font-bold brand-gradient hover:opacity-90 text-white"
               >
-                {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : `Enter AniVerse as ${choice === "CREATOR" ? "Creator" : "Viewer"}`}
+                {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : `Enter DubAniX as ${choice === "CREATOR" ? "Creator" : "Viewer"}`}
               </Button>
             </div>
           </div>

@@ -1,4 +1,4 @@
-/* ============ AniVerse profile asset catalog — Midnight Cinema ============ */
+/* ============ DubAniX profile asset catalog — Midnight Cinema ============ */
 
 /** Scenic anime-style preset banners (free gallery) */
 export const BANNER_PRESETS = [
@@ -70,7 +70,7 @@ export interface AchievementDef {
 }
 
 export const ACHIEVEMENTS: AchievementDef[] = [
-  { id: "join", emoji: "🎬", name: "AniVerse Citizen", desc: "Joined AniVerse", rarity: "common" },
+  { id: "join", emoji: "🎬", name: "DubAniX Citizen", desc: "Joined DubAniX", rarity: "common" },
   { id: "first", emoji: "💎", name: "First Purchase", desc: "Bought your first anime", rarity: "common" },
   { id: "curator", emoji: "📚", name: "Curator", desc: "Favorited 10 animes", rarity: "common" },
   { id: "collector", emoji: "🏆", name: "Collector", desc: "Own 10 animes", rarity: "rare" },

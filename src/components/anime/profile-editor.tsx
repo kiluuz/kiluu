@@ -175,18 +175,16 @@ function BannerCropModal({
   onBuyPremium: () => void;
 }) {
   const containerRef = useRef<HTMLDivElement>(null);
-  const [url, setUrl] = useState<string>("");
+  const [containerW, setContainerW] = useState(0);
   const [natW, setNatW] = useState(0);
   const [natH, setNatH] = useState(0);
   const [zoom, setZoom] = useState(1);
   const [offset, setOffset] = useState({ x: 0, y: 0 });
   const dragging = useRef<{ x: number; y: number; ox: number; oy: number } | null>(null);
 
-  useEffect(() => {
-    const u = URL.createObjectURL(file);
-    setUrl(u);
-    return () => URL.revokeObjectURL(u);
-  }, [file]);
+  /* object URL derived from the file (revoked when it changes / on unmount) */
+  const url = useMemo(() => URL.createObjectURL(file), [file]);
+  useEffect(() => () => URL.revokeObjectURL(url), [url]);
 
   useEffect(() => {
     if (!url) return;
@@ -195,8 +193,17 @@ function BannerCropModal({
     img.src = url;
   }, [url]);
 
-  const baseFit = natW && natH && containerRef.current
-    ? Math.max(containerRef.current.offsetWidth / natW, (containerRef.current.offsetWidth / 3) / natH)
+  /* measure the crop container reactively (no ref reads during render) */
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    const ro = new ResizeObserver(() => setContainerW(el.offsetWidth));
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+
+  const baseFit = natW && natH && containerW
+    ? Math.max(containerW / natW, (containerW / 3) / natH)
     : 1;
   const dispW = natW * baseFit * zoom;
   const dispH = natH * baseFit * zoom;
@@ -340,18 +347,15 @@ function AvatarCropModal({
   onApply: (crop: { x: number; y: number; size: number }) => void;
 }) {
   const boxRef = useRef<HTMLDivElement>(null);
-  const [url, setUrl] = useState("");
   const [natW, setNatW] = useState(0);
   const [natH, setNatH] = useState(0);
   const [zoom, setZoom] = useState(1);
   const [offset, setOffset] = useState({ x: 0, y: 0 });
   const dragging = useRef<{ x: number; y: number; ox: number; oy: number } | null>(null);
 
-  useEffect(() => {
-    const u = URL.createObjectURL(file);
-    setUrl(u);
-    return () => URL.revokeObjectURL(u);
-  }, [file]);
+  /* object URL derived from the file (revoked when it changes / on unmount) */
+  const url = useMemo(() => URL.createObjectURL(file), [file]);
+  useEffect(() => () => URL.revokeObjectURL(url), [url]);
 
   useEffect(() => {
     if (!url) return;

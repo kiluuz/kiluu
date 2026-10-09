@@ -133,7 +133,7 @@ export function DetailView() {
   function share() {
     const url = typeof window !== "undefined" ? window.location.href : "";
     if (typeof navigator !== "undefined" && navigator.share) {
-      navigator.share({ title: anime.title, text: `Watch ${anime.title} on AniVerse!`, url }).catch(() => {});
+      navigator.share({ title: anime.title, text: `Watch ${anime.title} on DubAniX!`, url }).catch(() => {});
     } else if (typeof navigator !== "undefined" && navigator.clipboard) {
       navigator.clipboard.writeText(url);
       toast.success("Link copied to clipboard!");

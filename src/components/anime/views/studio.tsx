@@ -7,6 +7,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Logo } from "../logo";
 import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -293,7 +294,7 @@ export function StudioView() {
             <DialogTitle className="flex items-center gap-2">
               <Sparkles className="w-5 h-5 text-primary" /> Publish New Anime
             </DialogTitle>
-            <DialogDescription>Release it to the AniVerse catalog</DialogDescription>
+            <DialogDescription>Release it to the DubAniX catalog</DialogDescription>
           </DialogHeader>
 
           <div className="space-y-4 pt-1">
@@ -416,8 +417,8 @@ export function StudioView() {
               onClick={publish}
               className="w-full h-11 rounded-xl brand-gradient text-white font-bold"
             >
-              {publishing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
-              Publish to AniVerse
+              {publishing ? <Logo variant="mark" theme="mono" size={20} state="playing" /> : <Sparkles className="w-4 h-4" />}
+              {publishing ? "Publishing…" : "Publish to DubAniX"}
             </Button>
           </div>
         </DialogContent>

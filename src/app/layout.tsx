@@ -1,5 +1,9 @@
 import type { Metadata, Viewport } from "next";
-import { Geist, Geist_Mono, Space_Grotesk } from "next/font/google";
+import {
+  Geist, Geist_Mono, Space_Grotesk,
+  Unbounded, Shippori_Mincho, Fraunces, Cormorant_Garamond,
+  Playfair_Display, Noto_Serif_SC, Amiri, PT_Serif,
+} from "next/font/google";
 import "./globals.css";
 import { Toaster } from "@/components/ui/sonner";
 import { ThemeProvider } from "next-themes";
@@ -20,13 +24,88 @@ const spaceGrotesk = Space_Grotesk({
   weight: ["400", "500", "600", "700"],
 });
 
+/* ============ DUBANIX BRAND FONTS ============ */
+const unbounded = Unbounded({
+  variable: "--font-unbounded",
+  subsets: ["latin", "latin-ext"],
+  weight: ["600", "800"],
+});
+
+const shipporiMincho = Shippori_Mincho({
+  variable: "--font-shippori",
+  subsets: ["latin"],
+  weight: ["500", "600"],
+});
+
+/* ============ WELCOME LOADER FONTS (per-language, exact reference set) ============ */
+const fraunces = Fraunces({
+  variable: "--font-fraunces",
+  subsets: ["latin", "latin-ext"],
+  weight: "300",
+  style: ["normal", "italic"],
+});
+
+const cormorantGaramond = Cormorant_Garamond({
+  variable: "--font-cormorant",
+  subsets: ["latin", "latin-ext", "cyrillic", "cyrillic-ext"],
+  weight: "500",
+  style: "italic",
+});
+
+const playfairDisplay = Playfair_Display({
+  variable: "--font-playfair",
+  subsets: ["latin", "latin-ext"],
+  weight: "500",
+  style: "italic",
+});
+
+const notoSerifSC = Noto_Serif_SC({
+  variable: "--font-noto-sc",
+  subsets: ["latin"],
+  weight: "300",
+});
+
+const amiri = Amiri({
+  variable: "--font-amiri",
+  subsets: ["arabic"],
+  weight: "400",
+  style: "italic",
+});
+
+const ptSerif = PT_Serif({
+  variable: "--font-ptserif",
+  subsets: ["latin", "latin-ext", "cyrillic", "cyrillic-ext"],
+  weight: "400",
+  style: "italic",
+});
+
 export const metadata: Metadata = {
-  title: "AniVerse — Stream, Collect & Exchange Anime",
+  metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000"),
+  title: "DubAniX — Stream, Collect & Exchange Anime",
   description:
-    "Premium anime streaming universe. Watch free and exclusive animes, collect credits, trade with collectors, and host synced watch parties with friends.",
-  keywords: ["anime", "streaming", "watch together", "anime exchange", "AniVerse"],
+    "Premium anime streaming universe. Watch free and exclusive animes, collect credits, trade with collectors, and host synced watch parties with friends. Voice it your way.",
+  keywords: ["anime", "streaming", "watch together", "anime exchange", "DubAniX", "anime dubbing"],
+  manifest: "/manifest.webmanifest",
   icons: {
-    icon: "https://z-cdn.chatglm.cn/z-ai/static/logo.svg",
+    icon: [
+      { url: "/favicon.svg", type: "image/svg+xml" },
+      { url: "/favicon.ico", sizes: "48x48" },
+    ],
+    apple: [{ url: "/apple-touch-icon.png", sizes: "180x180", type: "image/png" }],
+  },
+  openGraph: {
+    title: "DubAniX",
+    siteName: "DubAniX",
+    description: "Stream, collect and exchange premium anime. Voice it your way.",
+    images: [{ url: "/og-image.png", width: 1200, height: 630, type: "image/png" }],
+    locale: "en_US",
+    type: "website",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "DubAniX",
+    description: "Stream, collect and exchange premium anime. Voice it your way.",
+    images: ["/og-image.png"],
   },
 };
 
@@ -48,7 +127,7 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <body
-        className={`${geistSans.variable} ${geistMono.variable} ${spaceGrotesk.variable} antialiased bg-background text-foreground`}
+        className={`${geistSans.variable} ${geistMono.variable} ${spaceGrotesk.variable} ${unbounded.variable} ${shipporiMincho.variable} ${fraunces.variable} ${cormorantGaramond.variable} ${playfairDisplay.variable} ${notoSerifSC.variable} ${amiri.variable} ${ptSerif.variable} antialiased bg-background text-foreground`}
       >
         <ThemeProvider attribute="class" defaultTheme="dark" enableSystem>
           {children}

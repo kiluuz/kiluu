@@ -4,7 +4,7 @@ import path from "path";
 import { randomBytes } from "crypto";
 
 /**
- * AniVerse media pipeline — Midnight Cinema edition.
+ * DubAniX media pipeline — Midnight Cinema edition.
  * Magic-bytes validation, EXIF stripping, responsive variants, LQIP blur.
  */
 

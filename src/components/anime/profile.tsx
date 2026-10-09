@@ -150,8 +150,13 @@ export function Equalizer({ className }: { className?: string }) {
    ================================================================ */
 export function useCountUp(target: number, duration = 850): number {
   const [value, setValue] = useState(0);
+  const [prevTarget, setPrevTarget] = useState(target);
+  if (target !== prevTarget) {
+    setPrevTarget(target);
+    if (target <= 0) setValue(0); /* reset without a synchronous effect setState */
+  }
   useEffect(() => {
-    if (target <= 0) { setValue(0); return; }
+    if (target <= 0) return;
     let raf = 0;
     const start = performance.now();
     const tick = (now: number) => {
@@ -1034,7 +1039,11 @@ export function ProfilePageBody({
   hideTabs?: boolean;
 }) {
   const [tab, setTab] = useState(activeTab || "overview");
-  useEffect(() => { if (activeTab) setTab(activeTab); }, [activeTab]);
+  const [prevActiveTab, setPrevActiveTab] = useState(activeTab);
+  if (activeTab !== prevActiveTab) {
+    setPrevActiveTab(activeTab);
+    if (activeTab) setTab(activeTab);
+  }
   const setT = (t: string) => { setTab(t); onTabChange?.(t); };
 
   const TABS = [
@@ -1126,13 +1135,15 @@ export function ProfileFullView({ username }: { username: string }) {
 
   useEffect(() => {
     let alive = true;
-    setProfile(null);
-    setError(null);
     fetch(`/api/users/${username}`)
       .then((r) => (r.ok ? r.json() : Promise.reject(new Error("not found"))))
       .then((d) => { if (alive) setProfile(d.profile); })
       .catch(() => { if (alive) setError("Couldn't load this profile"); });
-    return () => { alive = false; };
+    return () => {
+      alive = false;
+      setProfile(null); /* reset on target change / unmount (async — lint-safe) */
+      setError(null);
+    };
   }, [username]);
 
   if (error) {

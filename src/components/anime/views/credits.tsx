@@ -84,7 +84,7 @@ export function CreditsView() {
               Get Credits
             </h1>
             <p className="text-sm sm:text-base text-muted-foreground mt-2 max-w-md">
-              Credits are AniVerse currency. Use them to buy premium animes —
+              Credits are DubAniX currency. Use them to buy premium animes —
               and unlock the Exchange at <span className="font-bold text-foreground">20 purchases</span>.
             </p>
           </div>
