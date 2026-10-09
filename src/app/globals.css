@@ -499,9 +499,7 @@ input[type="range"].player-range::-moz-range-thumb {
   from { transform: translateY(100%); }
   to { transform: translateY(0); }
 }
-.bottom-sheet-in {
-  animation: bottom-sheet-in 0.32s cubic-bezier(0.22, 1, 0.36, 1);
-}
+/* (bottom-sheet-in retained for future sheets — profile modal is now a centered popover) */
 
 /* ============ SCHEDULE + DUBBING + LOGIN ============ */
 
@@ -518,21 +516,74 @@ input[type="range"].player-range::-moz-range-thumb {
   .ken-burns { animation: none; }
 }
 
-/* Big rank numeral cards (Trending / Hall of Fame) */
+/* ============ RANKED CARDS — metallic podium numerals ============ */
+
+.rank-card {
+  /* ember tone (Trending Now) */
+  --rank-hi: #ffe3b8;
+  --rank-mid: #f97316;
+  --rank-lo: #9a3412;
+}
+.rank-card.rank-gold {
+  /* gold tone (Hall of Fame) */
+  --rank-hi: #fdf0c0;
+  --rank-mid: #f5b325;
+  --rank-lo: #92610e;
+}
 .rank-card .rank-numeral {
   font-family: var(--font-space-grotesk), var(--font-geist-sans), sans-serif;
   font-weight: 800;
   line-height: 0.78;
-  letter-spacing: -0.06em;
+  letter-spacing: -0.055em;
+  font-variant-numeric: tabular-nums;
+  background: linear-gradient(
+    172deg,
+    var(--rank-hi) 4%,
+    var(--rank-mid) 42%,
+    var(--rank-lo) 58%,
+    color-mix(in srgb, var(--rank-mid) 78%, white) 94%
+  );
+  -webkit-background-clip: text;
+  background-clip: text;
   color: transparent;
-  -webkit-text-stroke: 2px color-mix(in oklch, var(--foreground) 38%, transparent);
-  transition: all 0.4s cubic-bezier(0.2, 0.8, 0.2, 1);
+  filter: drop-shadow(0 8px 22px color-mix(in srgb, var(--rank-mid) 38%, transparent));
+  transition: filter 0.4s ease, transform 0.4s cubic-bezier(0.2, 0.8, 0.2, 1);
   user-select: none;
 }
 .rank-card:hover .rank-numeral {
-  -webkit-text-stroke: 2.5px var(--primary);
-  filter: drop-shadow(0 0 14px var(--glow));
-  transform: translateY(-3px);
+  filter: drop-shadow(0 10px 30px color-mix(in srgb, var(--rank-mid) 62%, transparent));
+  transform: translateY(-4px);
+}
+
+/* Diagonal light sweep across the poster on hover */
+.rank-shine {
+  position: absolute;
+  inset: 0;
+  z-index: 6;
+  overflow: hidden;
+  pointer-events: none;
+}
+.rank-shine::before {
+  content: "";
+  position: absolute;
+  top: -25%;
+  bottom: -25%;
+  left: 0;
+  width: 46%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.18), transparent);
+  transform: translateX(-140%) skewX(-18deg);
+}
+.rank-card:hover .rank-shine::before {
+  animation: rank-shine-sweep 0.85s cubic-bezier(0.3, 0.6, 0.3, 1);
+}
+@keyframes rank-shine-sweep {
+  from { transform: translateX(-140%) skewX(-18deg); }
+  to { transform: translateX(320%) skewX(-18deg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rank-card .rank-numeral { transition: none; }
+  .rank-card:hover .rank-shine::before { animation: none; }
 }
 
 /* Live waveform bars — dubbing studio */

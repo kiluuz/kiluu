@@ -244,7 +244,7 @@ export function HomeView() {
             />
             <ScrollRow>
               {data.topRated.map((a, i) => (
-                <RankedCard key={a.id} anime={a} rank={i + 1} />
+                <RankedCard key={a.id} anime={a} rank={i + 1} tone="gold" />
               ))}
             </ScrollRow>
           </section>

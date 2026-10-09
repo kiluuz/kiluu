@@ -246,50 +246,90 @@ export function AnimeCard({ anime, rank }: { anime: AnimeSummary; rank?: number 
   );
 }
 
-/** Netflix-style ranked card — oversized outline numeral beside a large poster */
-export function RankedCard({ anime, rank }: { anime: AnimeSummary; rank: number }) {
+/** Cinematic ranked card — giant metallic podium numeral + premium poster + title.
+ *  tone "ember" (Trending Now) or "gold" (Hall of Fame) recolors the numeral. */
+export function RankedCard({ anime, rank, tone = "ember" }: { anime: AnimeSummary; rank: number; tone?: "ember" | "gold" }) {
   const navigate = useAppStore((s) => s.navigate);
+  const genres: string[] = typeof anime.genres === "string"
+    ? String(anime.genres).split(",").filter(Boolean)
+    : anime.genres || [];
   return (
     <div
-      className="rank-card group relative flex items-end gap-0 cursor-pointer shrink-0"
+      className={cn(
+        "rank-card group relative shrink-0 cursor-pointer grid grid-cols-[auto_1fr] grid-rows-[1fr_53px]",
+        tone === "gold" && "rank-gold"
+      )}
       onClick={() => navigate("detail", { animeId: anime.slug })}
       role="button"
       tabIndex={0}
       onKeyDown={(e) => e.key === "Enter" && navigate("detail", { animeId: anime.slug })}
       aria-label={`#${rank} ${anime.title}`}
     >
+      {/* metallic podium numeral — grid row 1 keeps it grounded at the POSTER
+          bottom so it never bleeds into the title block below */}
       <span
-        className="rank-numeral relative z-0 text-[104px] sm:text-[122px] xl:text-[136px] -mr-3 sm:-mr-4 select-none translate-y-[8px]"
+        className="rank-numeral col-start-1 row-start-1 self-end z-0 text-[116px] sm:text-[136px] xl:text-[154px] -mr-4 sm:-mr-5 select-none translate-y-[3px]"
         aria-hidden="true"
       >
         {rank}
       </span>
-      <div className="img-zoom relative z-10 w-[152px] sm:w-[168px] xl:w-[184px] aspect-[2/3] rounded-xl overflow-hidden bg-muted shadow-xl border border-white/[0.06]">
-        <SmartImage src={anime.coverImage} alt={anime.title} className="w-full h-full object-cover" />
-        <div className="absolute bottom-0 inset-x-0 bg-gradient-to-t from-black/90 via-black/30 to-transparent p-2.5 pt-8">
-          <div className="flex items-center gap-1.5">
-            <Star className="w-3.5 h-3.5 fill-amber-400 text-amber-400 shrink-0" />
-            <span className="text-[12px] font-bold text-white">{anime.rating.toFixed(1)}</span>
-            {anime.isFree ? (
-              <span className="ml-auto text-[9px] font-black px-1.5 py-0.5 rounded-full bg-emerald-500/90 text-white">FREE</span>
-            ) : anime.owned ? (
-              <span className="ml-auto text-[9px] font-black px-1.5 py-0.5 rounded-full bg-primary/90 text-white">OWNED</span>
-            ) : (
-              <span className="ml-auto text-[9px] font-black px-1.5 py-0.5 rounded-full bg-amber-500/90 text-white">
-                {anime.price} CR
-              </span>
-            )}
+
+      {/* poster column — row-span-2, pulled left so the poster overlaps the numeral */}
+      <div className="relative z-10 col-start-2 row-start-1 row-span-2 -ml-4 sm:-ml-5">
+        <div
+          className={cn(
+            "img-zoom relative w-[168px] sm:w-[188px] xl:w-[206px] aspect-[2/3] rounded-2xl overflow-hidden bg-muted",
+            "border border-white/[0.09] shadow-[0_18px_44px_-16px_rgba(0,0,0,0.75)]",
+            "transition-all duration-500 group-hover:border-primary/50 group-hover:shadow-[0_24px_60px_-14px_var(--glow)] group-hover:-translate-y-1.5"
+          )}
+        >
+          <SmartImage src={anime.coverImage} alt={anime.title} className="w-full h-full object-cover" />
+          {/* premium top sheen */}
+          <div className="absolute inset-x-0 top-0 h-16 bg-gradient-to-b from-white/[0.14] to-transparent pointer-events-none" />
+          {/* light sweep on hover */}
+          <span className="rank-shine" aria-hidden />
+          {/* resting info — rating + access chip */}
+          <div className="absolute bottom-0 inset-x-0 z-10 bg-gradient-to-t from-black/95 via-black/40 to-transparent p-2.5 pt-10">
+            <div className="flex items-center gap-1.5">
+              <Star className="w-3.5 h-3.5 fill-amber-400 text-amber-400 shrink-0" />
+              <span className="text-[12px] font-black text-white tabular-nums">{anime.rating.toFixed(1)}</span>
+              {anime.isFree ? (
+                <span className="ml-auto text-[9px] font-black px-1.5 py-0.5 rounded-full bg-emerald-500/90 text-white tracking-wide">FREE</span>
+              ) : anime.owned ? (
+                <span className="ml-auto text-[9px] font-black px-1.5 py-0.5 rounded-full bg-primary/90 text-white tracking-wide">OWNED</span>
+              ) : (
+                <span className="ml-auto text-[9px] font-black px-1.5 py-0.5 rounded-full bg-amber-500/90 text-white tracking-wide">
+                  {anime.price} CR
+                </span>
+              )}
+            </div>
+          </div>
+          {/* hover veil — play FAB + genres */}
+          <div className="absolute inset-0 z-[5] bg-gradient-to-t from-black/85 via-black/30 to-black/10 opacity-0 group-hover:opacity-100 transition duration-300 flex flex-col items-center justify-end pb-4 gap-2.5">
+            <span className="bg-white/95 text-black rounded-full p-3 shadow-2xl transition-transform duration-300 group-hover:scale-105">
+              <Play className="w-5 h-5 fill-black" />
+            </span>
+            <p className="text-[10.5px] text-white/80 font-semibold tracking-wide px-2 text-center truncate w-full">
+              {genres.slice(0, 2).join(" · ")}
+            </p>
           </div>
         </div>
-        {/* hover preview */}
-        <div className="absolute inset-0 bg-black/55 opacity-0 group-hover:opacity-100 transition flex flex-col justify-end p-3">
-          <h3 className="text-[13px] font-bold text-white line-clamp-2 leading-tight">{anime.title}</h3>
-          <p className="text-[10.5px] text-white/65 mt-1 line-clamp-1">
-            {anime.year} · {anime.type}
+
+        {/* fixed-height title block keeps every poster in the row aligned */}
+        <div className="pt-2 h-[53px]">
+          <h3 className="text-[12.5px] leading-[15px] font-bold line-clamp-2 group-hover:text-primary transition-colors">
+            {anime.title}
+          </h3>
+          <p className="text-[10px] leading-[13px] text-muted-foreground mt-[2px] flex items-center gap-1.5">
+            <span className="font-bold text-foreground/80">{anime.type}</span>
+            <span aria-hidden>·</span>
+            <span>{anime.year}</span>
+            <span aria-hidden>·</span>
+            <span className="inline-flex items-center gap-0.5">
+              <Star className="w-2.5 h-2.5 fill-amber-400 text-amber-400" />
+              <span className="font-bold">{anime.rating.toFixed(1)}</span>
+            </span>
           </p>
-          <span className="mt-2 self-start bg-white/95 text-black rounded-full p-1.5">
-            <Play className="w-3.5 h-3.5 fill-black" />
-          </span>
         </div>
       </div>
     </div>

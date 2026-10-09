@@ -295,8 +295,10 @@ export function ProfilePopupCard({
 }
 
 /* ================================================================
-   GLOBAL MODAL — popover on desktop, bottom sheet on mobile
-   With Esc close, click-outside, focus trap, accent focus ring.
+   GLOBAL MODAL — centered floating card on every breakpoint.
+   Esc close, click-outside, focus trap, accent focus ring.
+   Mobile: centered popover (max-h guard + internal scroll on
+   short viewports) instead of the old left-stuck bottom sheet.
    ================================================================ */
 export function ProfileModal() {
   const { profileModalOpen, closeProfileCard, profileCardUser, user } = useAppStore();
@@ -347,11 +349,9 @@ export function ProfileModal() {
 
   if (!profileModalOpen) return null;
 
-  const isMobile = typeof window !== "undefined" && window.matchMedia("(max-width: 639px)").matches;
-
   return (
     <div
-      className="fixed inset-0 z-[90] flex items-end sm:items-center justify-center sm:p-4"
+      className="fixed inset-0 z-[90] flex items-center justify-center p-3 sm:p-4"
       role="presentation"
       onClick={(e) => { if (e.target === e.currentTarget) closeProfileCard(); }}
     >
@@ -359,16 +359,11 @@ export function ProfileModal() {
       <div className="absolute inset-0 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200" aria-hidden />
       <div
         ref={cardRef}
-        className={cn(
-          "relative animate-in w-full sm:w-auto",
-          isMobile
-            ? "rounded-t-3xl bottom-sheet-in"
-            : "zoom-in-95 fade-in duration-200"
-        )}
+        className="relative animate-in zoom-in-95 fade-in duration-200 max-h-[92dvh] overflow-y-auto no-scrollbar rounded-3xl shadow-2xl"
         onClick={(e) => e.stopPropagation()}
       >
         {!profile ? (
-          <div className="w-full sm:max-w-[340px] rounded-3xl border bg-card p-6 flex flex-col items-center gap-3">
+          <div className="w-[340px] max-w-full rounded-3xl border bg-card p-6 flex flex-col items-center gap-3">
             <div className="w-20 h-20 rounded-full skeleton" />
             <div className="h-5 w-36 rounded-lg skeleton" />
             <div className="h-3.5 w-24 rounded-lg skeleton" />

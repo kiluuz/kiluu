@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import {
   AudioLines, Search, Check, Lock, Play, Coins, Sparkles, Languages,
-  Mic2, Wand2, ArrowRight, BadgeCheck, Clock3, Loader2, Film,
+  Wand2, ArrowRight, BadgeCheck, Clock3, Loader2, Film,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -21,7 +21,7 @@ const LANGUAGES = [
     code: "uz",
     name: "O'zbekcha",
     flag: "🇺🇿",
-    note: "Live now · 5 voice profiles",
+    note: "Live now · 15 credits per episode",
     live: true,
   },
   {
@@ -135,7 +135,6 @@ export function DubbingView() {
   const [episodes, setEpisodes] = useState<EpisodeOpt[] | null>(null);
   const [epLoading, setEpLoading] = useState(false);
   const [episodeId, setEpisodeId] = useState<string | null>(null);
-  const [voice, setVoice] = useState<string>("aziza");
   const [jobs, setJobs] = useState<DubJobItem[]>([]);
 
   // processing
@@ -144,7 +143,8 @@ export function DubbingView() {
 
   const selectedAnime = animes?.find((a) => a.id === animeId) || null;
   const selectedEpisode = episodes?.find((e) => e.id === episodeId) || null;
-  const selectedVoice = VOICES.find((v) => v.id === voice)!;
+  /* Studio voice used for every dub (voice picker removed by request) — API stays unchanged */
+  const selectedVoice = VOICES[0];
 
   // load catalog (ownable: free or owned) + my jobs
   useEffect(() => {
@@ -222,7 +222,7 @@ export function DubbingView() {
       const res = await fetch("/api/dubbing", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ episodeId, voice }),
+        body: JSON.stringify({ episodeId, voice: selectedVoice.id }),
       });
       const data = await res.json();
       if (!res.ok) {
@@ -258,7 +258,7 @@ export function DubbingView() {
               AI Dubbing Studio
             </h1>
             <p className="text-muted-foreground text-sm mt-2 max-w-xl">
-              Replace Japanese voices with Uzbek — pick a series you own, choose a voice profile,
+              Replace Japanese voices with Uzbek — pick a series you own, choose an episode,
               and let the pipeline do the rest. Powered by your credits.
             </p>
           </div>
@@ -464,51 +464,8 @@ export function DubbingView() {
           )}
         </div>
 
-        {/* ===== RIGHT: voice profiles + order ===== */}
+        {/* ===== RIGHT: order summary ===== */}
         <div className="space-y-4">
-          <section aria-label="Voice profiles" className="rounded-2xl border bg-card p-4">
-            <h2 className="text-base font-bold flex items-center gap-2 mb-1">
-              <Mic2 className="w-[18px] h-[18px] text-primary" />
-              3 · Voice profile
-            </h2>
-            <p className="text-[11px] text-muted-foreground mb-3">Uzbek voice cast — per episode pricing</p>
-            <div className="space-y-2">
-              {VOICES.map((v) => (
-                <button
-                  key={v.id}
-                  onClick={() => setVoice(v.id)}
-                  disabled={processing}
-                  className={cn(
-                    "w-full flex items-center gap-3 rounded-xl border p-2.5 text-left transition-all",
-                    voice === v.id
-                      ? "border-primary bg-primary/10"
-                      : "border-transparent hover:border-primary/30 bg-background/50"
-                  )}
-                  aria-pressed={voice === v.id}
-                >
-                  <span
-                    className={cn(
-                      "w-10 h-10 rounded-full bg-gradient-to-br shrink-0 flex items-center justify-center text-white font-black text-sm",
-                      v.gradient
-                    )}
-                  >
-                    {v.name.slice(0, 2)}
-                  </span>
-                  <span className="flex-1 min-w-0">
-                    <span className="block text-[13px] font-bold">{v.name}</span>
-                    <span className="block text-[11px] text-muted-foreground">
-                      {v.style} · {v.gender}
-                    </span>
-                  </span>
-                  <span className="flex items-center gap-1 text-[12px] font-black text-amber-500 shrink-0">
-                    <Coins className="w-3.5 h-3.5" />
-                    {v.price}
-                  </span>
-                </button>
-              ))}
-            </div>
-          </section>
-
           {/* Order summary */}
           <section className="rounded-2xl border aurora relative overflow-hidden p-4" aria-label="Order summary">
             <div className="relative">
@@ -522,7 +479,7 @@ export function DubbingView() {
               </div>
               <div className="flex items-center justify-between text-sm mb-1">
                 <span className="text-muted-foreground">Voice</span>
-                <span className="font-bold text-[13px]">{selectedVoice.name}</span>
+                <span className="font-bold text-[13px]">{selectedVoice.name} · {selectedVoice.style}</span>
               </div>
               <div className="flex items-center justify-between text-sm mb-3">
                 <span className="text-muted-foreground">Duration</span>
