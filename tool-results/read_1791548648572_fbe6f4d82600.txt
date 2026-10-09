@@ -1,0 +1,623 @@
+     1→"use client";
+     2→
+     3→import { useEffect, useMemo, useState } from "react";
+     4→import {
+     5→  AudioLines, Search, Check, Lock, Play, Coins, Sparkles, Languages,
+     6→  Mic2, Wand2, ArrowRight, BadgeCheck, Clock3, Loader2, Film,
+     7→} from "lucide-react";
+     8→import { Button } from "@/components/ui/button";
+     9→import { Input } from "@/components/ui/input";
+    10→import { useAppStore } from "../store";
+    11→import { Logo } from "../logo";
+    12→import { SmartImage, formatCredits, formatDuration } from "../ui-bits";
+    13→import { cn } from "@/lib/utils";
+    14→import { toast } from "sonner";
+    15→import type { AnimeSummary, DubJobItem } from "../types";
+    16→
+    17→/* ---------- catalog data ---------- */
+    18→
+    19→const LANGUAGES = [
+    20→  {
+    21→    code: "uz",
+    22→    name: "O'zbekcha",
+    23→    flag: "🇺🇿",
+    24→    note: "Live now · 5 voice profiles",
+    25→    live: true,
+    26→  },
+    27→  {
+    28→    code: "kk",
+    29→    name: "Қазақша",
+    30→    flag: "🇰🇿",
+    31→    note: "Coming soon",
+    32→    live: false,
+    33→  },
+    34→  {
+    35→    code: "ky",
+    36→    name: "Кыргызча",
+    37→    flag: "🇰🇬",
+    38→    note: "Coming soon",
+    39→    live: false,
+    40→  },
+    41→] as const;
+    42→
+    43→const VOICES = [
+    44→  { id: "aziza", name: "Aziza", style: "Warm narrator", gender: "Female", price: 15, gradient: "from-rose-500/80 to-orange-400/80" },
+    45→  { id: "timur", name: "Timur", style: "Confident lead", gender: "Male", price: 15, gradient: "from-sky-500/80 to-cyan-400/80" },
+    46→  { id: "dilnoza", name: "Dilnoza", style: "Expressive young", gender: "Female", price: 20, gradient: "from-violet-500/80 to-fuchsia-400/80" },
+    47→  { id: "ulugbek", name: "Ulugbek", style: "Deep villain", gender: "Male", price: 20, gradient: "from-emerald-500/80 to-teal-400/80" },
+    48→  { id: "premium_cast", name: "Full Cast", style: "Multi-voice ensemble", gender: "Ensemble", price: 25, gradient: "from-amber-500/80 to-red-400/80" },
+    49→] as const;
+    50→
+    51→const STAGES = [
+    52→  { id: "analyze", label: "Analyzing source", desc: "Isolating vocals from the Japanese mix" },
+    53→  { id: "transcribe", label: "Transcribing JA", desc: "Speech-to-text with speaker diarization" },
+    54→  { id: "translate", label: "Translating → UZ", desc: "Adapting dialogue, timing and nuance" },
+    55→  { id: "synthesize", label: "Voice synthesis", desc: "Cloning tone, emotion and pacing" },
+    56→  { id: "mix", label: "Mix & master", desc: "Re-adding music and sound effects" },
+    57→] as const;
+    58→
+    59→/* ---------- tiny building blocks ---------- */
+    60→
+    61→function Waveform({ active, bars = 28, className }: { active: boolean; bars?: number; className?: string }) {
+    62→  return (
+    63→    <div className={cn("flex items-end justify-center gap-[3px] h-12", className)} aria-hidden="true">
+    64→      {Array.from({ length: bars }).map((_, i) => {
+    65→        const h = 22 + Math.abs(Math.sin(i * 0.9)) * 60 + (i % 4) * 6;
+    66→        return (
+    67→          <span
+    68→            key={i}
+    69→            className={cn("w-[4px] rounded-full brand-gradient", active && "wave-bar")}
+    70→            style={{
+    71→              height: `${Math.min(h, 100)}%`,
+    72→              animationDelay: `${(i % 9) * 0.09}s`,
+    73→              opacity: active ? 1 : 0.25,
+    74→            }}
+    75→          />
+    76→        );
+    77→      })}
+    78→    </div>
+    79→  );
+    80→}
+    81→
+    82→function StageStepper({ current }: { current: number }) {
+    83→  return (
+    84→    <ol className="space-y-0.5" aria-label="Dubbing pipeline">
+    85→      {STAGES.map((s, i) => {
+    86→        const done = i < current;
+    87→        const active = i === current;
+    88→        return (
+    89→          <li key={s.id} className="flex items-start gap-3 py-2">
+    90→            <span
+    91→              className={cn(
+    92→                "mt-0.5 w-6 h-6 rounded-full flex items-center justify-center shrink-0 border-2 transition-all",
+    93→                done && "bg-primary border-primary text-white",
+    94→                active && "border-primary text-primary step-pulse",
+    95→                !done && !active && "border-border text-muted-foreground/50"
+    96→              )}
+    97→            >
+    98→              {done ? <Check className="w-3.5 h-3.5" /> : <span className="text-[10px] font-black">{i + 1}</span>}
+    99→            </span>
+   100→            <span>
+   101→              <span
+   102→                className={cn(
+   103→                  "block text-[13px] font-bold",
+   104→                  done && "text-foreground",
+   105→                  active && "text-primary",
+   106→                  !done && !active && "text-muted-foreground/60"
+   107→                )}
+   108→              >
+   109→                {s.label}
+   110→              </span>
+   111→              <span className="block text-[11px] text-muted-foreground/70">{s.desc}</span>
+   112→            </span>
+   113→          </li>
+   114→        );
+   115→      })}
+   116→    </ol>
+   117→  );
+   118→}
+   119→
+   120→/* ---------- main view ---------- */
+   121→
+   122→interface EpisodeOpt {
+   123→  id: string;
+   124→  number: number;
+   125→  title: string;
+   126→  duration: number;
+   127→}
+   128→
+   129→export function DubbingView() {
+   130→  const { user, navigate, updateUser } = useAppStore();
+   131→
+   132→  const [animes, setAnimes] = useState<AnimeSummary[] | null>(null);
+   133→  const [query, setQuery] = useState("");
+   134→  const [animeId, setAnimeId] = useState<string | null>(null);
+   135→  const [episodes, setEpisodes] = useState<EpisodeOpt[] | null>(null);
+   136→  const [epLoading, setEpLoading] = useState(false);
+   137→  const [episodeId, setEpisodeId] = useState<string | null>(null);
+   138→  const [voice, setVoice] = useState<string>("aziza");
+   139→  const [jobs, setJobs] = useState<DubJobItem[]>([]);
+   140→
+   141→  // processing
+   142→  const [stage, setStage] = useState(-1); // -1 idle, 0..4 stages, 5 done
+   143→  const [submitting, setSubmitting] = useState(false);
+   144→
+   145→  const selectedAnime = animes?.find((a) => a.id === animeId) || null;
+   146→  const selectedEpisode = episodes?.find((e) => e.id === episodeId) || null;
+   147→  const selectedVoice = VOICES.find((v) => v.id === voice)!;
+   148→
+   149→  // load catalog (ownable: free or owned) + my jobs
+   150→  useEffect(() => {
+   151→    let alive = true;
+   152→    fetch("/api/animes")
+   153→      .then((r) => r.json())
+   154→      .then((d) => {
+   155→        if (!alive) return;
+   156→        setAnimes((d.animes || []).filter((a: AnimeSummary) => a.isFree || a.owned));
+   157→      })
+   158→      .catch(() => toast.error("Failed to load animes"));
+   159→    if (user) {
+   160→      fetch("/api/dubbing")
+   161→        .then((r) => r.json())
+   162→        .then((d) => alive && setJobs(d.jobs || []))
+   163→        .catch(() => {});
+   164→    }
+   165→    return () => {
+   166→      alive = false;
+   167→    };
+   168→  }, [user?.id]);
+   169→
+   170→  // load episodes of the selected anime
+   171→  useEffect(() => {
+   172→    if (!animeId || !selectedAnime) {
+   173→      setEpisodes(null);
+   174→      return;
+   175→    }
+   176→    setEpLoading(true);
+   177→    setEpisodeId(null);
+   178→    fetch(`/api/animes/${selectedAnime.slug}`)
+   179→      .then((r) => r.json())
+   180→      .then((d) => setEpisodes(d.episodes || []))
+   181→      .catch(() => toast.error("Failed to load episodes"))
+   182→      .finally(() => setEpLoading(false));
+   183→  }, [animeId, selectedAnime]);
+   184→
+   185→  const dubbedEpNumbers = useMemo(() => {
+   186→    if (!selectedAnime) return new Set<number>();
+   187→    return new Set(
+   188→      jobs.filter((j) => j.animeSlug === selectedAnime.slug && j.targetLang === "uz").map((j) => j.episodeNumber)
+   189→    );
+   190→  }, [jobs, selectedAnime]);
+   191→
+   192→  const filtered = useMemo(() => {
+   193→    const q = query.trim().toLowerCase();
+   194→    if (!q) return animes || [];
+   195→    return (animes || []).filter((a) => a.title.toLowerCase().includes(q) || a.genres.join(" ").toLowerCase().includes(q));
+   196→  }, [animes, query]);
+   197→
+   198→  async function startDub() {
+   199→    if (!user) {
+   200→      navigate("login");
+   201→      return;
+   202→    }
+   203→    if (!episodeId || !selectedAnime || !selectedEpisode) {
+   204→      toast.error("Pick an anime and an episode first");
+   205→      return;
+   206→    }
+   207→    if (user.credits < selectedVoice.price) {
+   208→      toast.error(`Not enough credits — you need ${selectedVoice.price - user.credits} more`);
+   209→      navigate("credits");
+   210→      return;
+   211→    }
+   212→    setSubmitting(true);
+   213→    setStage(0);
+   214→    const startedAt = Date.now();
+   215→
+   216→    // stage choreography (min 4.4s) runs in parallel with the API call
+   217→    const timers = [400, 1300, 2300, 3200, 4100].map((ms, i) =>
+   218→      setTimeout(() => setStage(i + 1), ms)
+   219→    );
+   220→
+   221→    try {
+   222→      const res = await fetch("/api/dubbing", {
+   223→        method: "POST",
+   224→        headers: { "Content-Type": "application/json" },
+   225→        body: JSON.stringify({ episodeId, voice }),
+   226→      });
+   227→      const data = await res.json();
+   228→      if (!res.ok) {
+   229→        toast.error(data.error || "Dubbing failed");
+   230→        setStage(-1);
+   231→        return;
+   232→      }
+   233→      // hold until the stage animation lands
+   234→      const remaining = 4400 - (Date.now() - startedAt);
+   235→      if (remaining > 0) await new Promise((r) => setTimeout(r, remaining));
+   236→      setJobs((prev) => [data.job, ...prev]);
+   237→      if (data.credits !== undefined) updateUser({ credits: data.credits });
+   238→      toast.success(`EP${selectedEpisode.number} dubbed to Uzbek — ovozli tamilga tayyor!`);
+   239→    } catch {
+   240→      toast.error("Network error");
+   241→      setStage(-1);
+   242→    } finally {
+   243→      timers.forEach(clearTimeout);
+   244→      setSubmitting(false);
+   245→    }
+   246→  }
+   247→
+   248→  const processing = stage >= 0 && stage <= 4;
+   249→
+   250→  return (
+   251→    <div className="pb-10">
+   252→      {/* ===== Header ===== */}
+   253→      <div className="max-w-[1280px] mx-auto px-4 sm:px-8 pt-8 pb-6">
+   254→        <div className="flex items-end justify-between gap-4 flex-wrap">
+   255→          <div>
+   256→            <h1 className="font-display text-3xl sm:text-4xl font-black tracking-tight flex items-center gap-3">
+   257→              <Logo variant="mark" size={40} state={processing ? "playing" : "idle"} animated />
+   258→              AI Dubbing Studio
+   259→            </h1>
+   260→            <p className="text-muted-foreground text-sm mt-2 max-w-xl">
+   261→              Replace Japanese voices with Uzbek — pick a series you own, choose a voice profile,
+   262→              and let the pipeline do the rest. Powered by your credits.
+   263→            </p>
+   264→          </div>
+   265→          {user && (
+   266→            <div className="flex items-center gap-2 text-xs bg-card border rounded-full px-3.5 py-2 font-semibold">
+   267→              <Coins className="w-3.5 h-3.5 text-amber-500" />
+   268→              {formatCredits(user.credits)} credits
+   269→            </div>
+   270→          )}
+   271→        </div>
+   272→
+   273→        {/* Language cards */}
+   274→        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mt-6">
+   275→          {LANGUAGES.map((l) => (
+   276→            <div
+   277→              key={l.code}
+   278→              className={cn(
+   279→                "relative rounded-2xl border p-4 flex items-center gap-3.5 transition-all",
+   280→                l.live
+   281→                  ? "border-primary/50 bg-primary/[0.07] shadow-[0_0_24px_-12px_var(--glow)]"
+   282→                  : "border-dashed opacity-60"
+   283→              )}
+   284→            >
+   285→              <span className="text-2xl">{l.flag}</span>
+   286→              <div className="flex-1">
+   287→                <p className="font-bold text-[14px] flex items-center gap-2">
+   288→                  {l.name}
+   289→                  {l.live ? (
+   290→                    <span className="text-[9px] font-black px-1.5 py-0.5 rounded-full bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">
+   291→                      LIVE
+   292→                    </span>
+   293→                  ) : (
+   294→                    <Lock className="w-3 h-3 text-muted-foreground" />
+   295→                  )}
+   296→                </p>
+   297→                <p className="text-[11px] text-muted-foreground mt-0.5">{l.note}</p>
+   298→              </div>
+   299→              {l.live && <AudioLines className="w-4 h-4 text-primary" />}
+   300→            </div>
+   301→          ))}
+   302→        </div>
+   303→      </div>
+   304→
+   305→      <div className="max-w-[1280px] mx-auto px-4 sm:px-8 grid lg:grid-cols-[1fr_360px] gap-6">
+   306→        {/* ===== LEFT: pickers ===== */}
+   307→        <div className="space-y-6">
+   308→          {/* Processing panel replaces pickers while running */}
+   309→          {processing ? (
+   310→            <div className="rounded-2xl border aurora relative overflow-hidden p-6 sm:p-8">
+   311→              <div className="relative flex flex-col sm:flex-row items-center gap-8">
+   312→                <div className="flex-1 w-full">
+   313→                  <p className="text-[11px] font-black uppercase tracking-[0.16em] text-primary mb-1 flex items-center gap-2">
+   314→                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+   315→                    Dubbing in progress
+   316→                  </p>
+   317→                  <h3 className="font-display text-xl font-black mb-4">
+   318→                    {selectedAnime?.title} — EP{selectedEpisode?.number}
+   319→                  </h3>
+   320→                  <StageStepper current={stage} />
+   321→                </div>
+   322→                <div className="w-full sm:w-[300px] shrink-0">
+   323→                  <div className="rounded-xl border bg-card/70 backdrop-blur p-5">
+   324→                    <Waveform active bars={32} />
+   325→                    <p className="text-center text-[11px] text-muted-foreground mt-3">
+   326→                      日本語 → O'zbek · {selectedVoice.name} voice
+   327→                    </p>
+   328→                  </div>
+   329→                </div>
+   330→              </div>
+   331→            </div>
+   332→          ) : (
+   333→            <>
+   334→              {/* Anime picker */}
+   335→              <section aria-label="Pick an anime">
+   336→                <div className="flex items-center justify-between gap-3 mb-3">
+   337→                  <h2 className="text-base font-bold flex items-center gap-2">
+   338→                    <Film className="w-[18px] h-[18px] text-primary" />
+   339→                    1 · Pick an anime
+   340→                    <span className="text-[11px] font-medium text-muted-foreground">(free or owned)</span>
+   341→                  </h2>
+   342→                  <div className="relative w-52 sm:w-64">
+   343→                    <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+   344→                    <Input
+   345→                      value={query}
+   346→                      onChange={(e) => setQuery(e.target.value)}
+   347→                      placeholder="Filter..."
+   348→                      className="pl-9 h-9 rounded-xl text-[13px]"
+   349→                      aria-label="Filter animes"
+   350→                    />
+   351→                  </div>
+   352→                </div>
+   353→
+   354→                {!animes ? (
+   355→                  <div className="grid grid-cols-3 sm:grid-cols-4 xl:grid-cols-6 gap-3">
+   356→                    {Array.from({ length: 6 }).map((_, i) => (
+   357→                      <div key={i} className="aspect-[2/3] rounded-xl skeleton" />
+   358→                    ))}
+   359→                  </div>
+   360→                ) : animes.length === 0 ? (
+   361→                  <div className="rounded-2xl border border-dashed p-10 text-center">
+   362→                    <Film className="w-9 h-9 mx-auto text-muted-foreground/50 mb-3" />
+   363→                    <p className="font-bold">Nothing to dub yet</p>
+   364→                    <p className="text-sm text-muted-foreground mt-1 mb-4">
+   365→                      Dubbing works on free animes and titles in your library.
+   366→                    </p>
+   367→                    <Button size="sm" variant="outline" className="rounded-full" onClick={() => navigate("browse")}>
+   368→                      Discover animes <ArrowRight className="w-4 h-4" />
+   369→                    </Button>
+   370→                  </div>
+   371→                ) : (
+   372→                  <div className="grid grid-cols-3 sm:grid-cols-4 xl:grid-cols-6 gap-3 max-h-[340px] overflow-y-auto pr-1">
+   373→                    {filtered.map((a) => (
+   374→                      <button
+   375→                        key={a.id}
+   376→                        onClick={() => setAnimeId(a.id)}
+   377→                        className={cn(
+   378→                          "group relative aspect-[2/3] rounded-xl overflow-hidden border-2 transition-all",
+   379→                          animeId === a.id
+   380→                            ? "border-primary shadow-[0_0_24px_-8px_var(--glow)]"
+   381→                            : "border-transparent hover:border-primary/40"
+   382→                        )}
+   383→                        aria-pressed={animeId === a.id}
+   384→                        aria-label={`Dub ${a.title}`}
+   385→                      >
+   386→                        <SmartImage src={a.coverImage} alt={a.title} className="w-full h-full object-cover" />
+   387→                        <span className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/90 to-transparent p-1.5 pt-5">
+   388→                          <span className="block text-[10.5px] font-bold text-white line-clamp-2 text-left leading-tight">
+   389→                            {a.title}
+   390→                          </span>
+   391→                        </span>
+   392→                        {animeId === a.id && (
+   393→                          <span className="absolute top-1.5 right-1.5 w-5 h-5 rounded-full brand-gradient flex items-center justify-center">
+   394→                            <Check className="w-3 h-3 text-white" />
+   395→                          </span>
+   396→                        )}
+   397→                      </button>
+   398→                    ))}
+   399→                  </div>
+   400→                )}
+   401→              </section>
+   402→
+   403→              {/* Episode picker */}
+   404→              {selectedAnime && (
+   405→                <section aria-label="Pick an episode">
+   406→                  <h2 className="text-base font-bold flex items-center gap-2 mb-3">
+   407→                    <Play className="w-[18px] h-[18px] text-primary" />
+   408→                    2 · Pick an episode
+   409→                  </h2>
+   410→                  {epLoading ? (
+   411→                    <div className="space-y-2">
+   412→                      {[0, 1, 2].map((i) => (
+   413→                        <div key={i} className="h-12 rounded-xl skeleton" />
+   414→                      ))}
+   415→                    </div>
+   416→                  ) : (
+   417→                    <div className="grid sm:grid-cols-2 gap-2 max-h-[260px] overflow-y-auto pr-1">
+   418→                      {(episodes || []).map((ep) => {
+   419→                        const dubbed = dubbedEpNumbers.has(ep.number);
+   420→                        return (
+   421→                          <button
+   422→                            key={ep.id}
+   423→                            disabled={dubbed}
+   424→                            onClick={() => setEpisodeId(ep.id)}
+   425→                            className={cn(
+   426→                              "flex items-center gap-3 rounded-xl border p-3 text-left transition-all",
+   427→                              dubbed
+   428→                                ? "opacity-50 cursor-not-allowed border-border"
+   429→                                : episodeId === ep.id
+   430→                                  ? "border-primary bg-primary/10"
+   431→                                  : "hover:border-primary/40 bg-card"
+   432→                            )}
+   433→                            aria-pressed={episodeId === ep.id}
+   434→                          >
+   435→                            <span
+   436→                              className={cn(
+   437→                                "w-9 h-9 rounded-lg flex items-center justify-center text-[12px] font-black shrink-0",
+   438→                                episodeId === ep.id ? "brand-gradient text-white" : "bg-accent"
+   439→                              )}
+   440→                            >
+   441→                              {ep.number}
+   442→                            </span>
+   443→                            <span className="flex-1 min-w-0">
+   444→                              <span className="block text-[13px] font-bold truncate">{ep.title}</span>
+   445→                              <span className="block text-[11px] text-muted-foreground">
+   446→                                {formatDuration(ep.duration)}
+   447→                              </span>
+   448→                            </span>
+   449→                            {dubbed ? (
+   450→                              <span className="flex items-center gap-1 text-[10px] font-black text-emerald-400">
+   451→                                <BadgeCheck className="w-3.5 h-3.5" /> UZ
+   452→                              </span>
+   453→                            ) : (
+   454→                              <Languages className="w-4 h-4 text-muted-foreground/50" />
+   455→                            )}
+   456→                          </button>
+   457→                        );
+   458→                      })}
+   459→                    </div>
+   460→                  )}
+   461→                </section>
+   462→              )}
+   463→            </>
+   464→          )}
+   465→        </div>
+   466→
+   467→        {/* ===== RIGHT: voice profiles + order ===== */}
+   468→        <div className="space-y-4">
+   469→          <section aria-label="Voice profiles" className="rounded-2xl border bg-card p-4">
+   470→            <h2 className="text-base font-bold flex items-center gap-2 mb-1">
+   471→              <Mic2 className="w-[18px] h-[18px] text-primary" />
+   472→              3 · Voice profile
+   473→            </h2>
+   474→            <p className="text-[11px] text-muted-foreground mb-3">Uzbek voice cast — per episode pricing</p>
+   475→            <div className="space-y-2">
+   476→              {VOICES.map((v) => (
+   477→                <button
+   478→                  key={v.id}
+   479→                  onClick={() => setVoice(v.id)}
+   480→                  disabled={processing}
+   481→                  className={cn(
+   482→                    "w-full flex items-center gap-3 rounded-xl border p-2.5 text-left transition-all",
+   483→                    voice === v.id
+   484→                      ? "border-primary bg-primary/10"
+   485→                      : "border-transparent hover:border-primary/30 bg-background/50"
+   486→                  )}
+   487→                  aria-pressed={voice === v.id}
+   488→                >
+   489→                  <span
+   490→                    className={cn(
+   491→                      "w-10 h-10 rounded-full bg-gradient-to-br shrink-0 flex items-center justify-center text-white font-black text-sm",
+   492→                      v.gradient
+   493→                    )}
+   494→                  >
+   495→                    {v.name.slice(0, 2)}
+   496→                  </span>
+   497→                  <span className="flex-1 min-w-0">
+   498→                    <span className="block text-[13px] font-bold">{v.name}</span>
+   499→                    <span className="block text-[11px] text-muted-foreground">
+   500→                      {v.style} · {v.gender}
+   501→                    </span>
+   502→                  </span>
+   503→                  <span className="flex items-center gap-1 text-[12px] font-black text-amber-500 shrink-0">
+   504→                    <Coins className="w-3.5 h-3.5" />
+   505→                    {v.price}
+   506→                  </span>
+   507→                </button>
+   508→              ))}
+   509→            </div>
+   510→          </section>
+   511→
+   512→          {/* Order summary */}
+   513→          <section className="rounded-2xl border aurora relative overflow-hidden p-4" aria-label="Order summary">
+   514→            <div className="relative">
+   515→              <div className="flex items-center justify-between text-sm mb-1">
+   516→                <span className="text-muted-foreground">Episode</span>
+   517→                <span className="font-bold text-[13px] truncate max-w-[190px]">
+   518→                  {selectedEpisode
+   519→                    ? `${selectedAnime?.title} · EP${selectedEpisode.number}`
+   520→                    : "— not selected —"}
+   521→                </span>
+   522→              </div>
+   523→              <div className="flex items-center justify-between text-sm mb-1">
+   524→                <span className="text-muted-foreground">Voice</span>
+   525→                <span className="font-bold text-[13px]">{selectedVoice.name}</span>
+   526→              </div>
+   527→              <div className="flex items-center justify-between text-sm mb-3">
+   528→                <span className="text-muted-foreground">Duration</span>
+   529→                <span className="font-bold text-[13px]">
+   530→                  {selectedEpisode ? formatDuration(selectedEpisode.duration) : "—"}
+   531→                </span>
+   532→              </div>
+   533→              <div className="border-t border-border/70 pt-3 flex items-center justify-between">
+   534→                <span className="text-[13px] font-bold flex items-center gap-1.5">
+   535→                  <Wand2 className="w-4 h-4 text-primary" /> Total
+   536→                </span>
+   537→                <span className="text-xl font-black text-amber-500 flex items-center gap-1.5">
+   538→                  <Coins className="w-[18px] h-[18px]" />
+   539→                  {selectedVoice.price}
+   540→                </span>
+   541→              </div>
+   542→              <Button
+   543→                onClick={startDub}
+   544→                disabled={processing || submitting || !episodeId}
+   545→                className="w-full mt-4 h-12 rounded-xl brand-gradient hover:opacity-90 text-white font-bold"
+   546→              >
+   547→                {processing ? (
+   548→                  <>
+   549→                    <Loader2 className="w-4 h-4 animate-spin" /> Dubbing...
+   550→                  </>
+   551→                ) : !user ? (
+   552→                  "Sign in to dub"
+   553→                ) : (
+   554→                  <>
+   555→                    <Sparkles className="w-4 h-4" />
+   556→                    Dub to Uzbek — {selectedVoice.price} credits
+   557→                  </>
+   558→                )}
+   559→              </Button>
+   560→              <p className="text-[10.5px] text-muted-foreground text-center mt-2.5 leading-relaxed">
+   561→                Output replaces the Japanese vocal track in your player.
+   562→                <br />
+   563→                Music and sound effects are preserved.
+   564→              </p>
+   565→            </div>
+   566→          </section>
+   567→        </div>
+   568→      </div>
+   569→
+   570→      {/* ===== My dubs ===== */}
+   571→      {user && (
+   572→        <div className="max-w-[1280px] mx-auto px-4 sm:px-8 mt-8">
+   573→          <h2 className="text-base font-bold flex items-center gap-2 mb-3">
+   574→            <Clock3 className="w-[18px] h-[18px] text-primary" />
+   575→            My dubs
+   576→            <span className="text-[11px] font-medium text-muted-foreground">({jobs.length})</span>
+   577→          </h2>
+   578→          {jobs.length === 0 ? (
+   579→            <div className="rounded-2xl border border-dashed p-8 text-center text-sm text-muted-foreground">
+   580→              No dubs yet — your Uzbek library starts with one episode.
+   581→            </div>
+   582→          ) : (
+   583→            <div className="grid sm:grid-cols-2 xl:grid-cols-3 gap-3">
+   584→              {jobs.map((j) => (
+   585→                <div key={j.id} className="flex items-center gap-3 rounded-2xl border bg-card p-3">
+   586→                  <button
+   587→                    className="w-[52px] aspect-[2/3] rounded-lg overflow-hidden shrink-0"
+   588→                    onClick={() => navigate("detail", { animeId: j.animeSlug })}
+   589→                    aria-label={`Open ${j.animeTitle}`}
+   590→                  >
+   591→                    <SmartImage src={j.coverImage} alt={j.animeTitle} className="w-full h-full object-cover" />
+   592→                  </button>
+   593→                  <div className="flex-1 min-w-0">
+   594→                    <p className="text-[13px] font-bold truncate">{j.animeTitle}</p>
+   595→                    <p className="text-[11px] text-muted-foreground truncate">
+   596→                      EP{j.episodeNumber} · {j.episodeTitle}
+   597→                    </p>
+   598→                    <div className="flex items-center gap-2 mt-1.5">
+   599→                      <span className="text-[9px] font-black px-1.5 py-0.5 rounded-full bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">
+   600→                        UZ READY
+   601→                      </span>
+   602→                      <span className="text-[10px] text-muted-foreground">−{j.pricePaid} credits</span>
+   603→                    </div>
+   604→                  </div>
+   605→                  <Button
+   606→                    size="sm"
+   607→                    variant="ghost"
+   608→                    className="rounded-full shrink-0"
+   609→                    aria-label="Watch dubbed"
+   610→                    onClick={() => navigate("watch", { animeId: j.animeSlug, episodeId: j.id })}
+   611→                  >
+   612→                    <Play className="w-4 h-4" />
+   613→                  </Button>
+   614→                </div>
+   615→              ))}
+   616→            </div>
+   617→          )}
+   618→        </div>
+   619→      )}
+   620→    </div>
+   621→  );
+   622→}
+   623→
