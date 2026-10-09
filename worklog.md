@@ -117,3 +117,19 @@ Stage Summary:
 - Logo + DubAniX name now visible on every surface: desktop sidebar (z-fix), tablet rail + top-bar wordmark, mobile top bar (mark + wordmark with scroll-swap; mark-only <360px).
 - z-order ladder now: TopBar 40 < rail/sidebar/scrim-expands 45-50 < mobile search 60 < profile editor 80 < profile modal 90 < onboarding 100 < dialogs 110.
 - Space budget on phones: bell + credits-plus hidden below sm to fit the wordmark at 360px; both remain reachable (sheet footer notifications / credits page).
+
+---
+Task ID: 6
+Agent: Super Z (main)
+Task: User report "on mobile Home/Discover/AI Dubbing/Library have no background" — dock glass missing.
+
+Work Log:
+- Reproduced at 390px: computed .dock-glass = background rgba(0,0,0,0), backdrop-filter none, box-shadow none. Served-stylesheet walk: dock-glass/dock-cta/dock-wave-bar/nav-sheet rules completely ABSENT while all classes above line ~570 (airing-today etc.) were present.
+- Root cause 1 (stale compile): dev server (started 08:57) served a Turbopack CSS compile from before globals.css's last rewrite (mtime 09:27, workspace sync) — the whole MOBILE NAVIGATION section was missing from output. Appended a probe -> recompile -> section restored (background/border/shadow back).
+- Root cause 2 (Lightning CSS strip): backdrop-filter STILL computed none. Minimal repro classes appended to globals.css proved: `backdrop-filter` alone SURVIVES; any rule also containing `-webkit-backdrop-filter` gets BOTH declarations stripped by @tailwindcss/postcss 4.1.18's Lightning CSS compat pass (other -webkit- props are fine: -webkit-text-stroke survives; -webkit-background-clip:text is lowered into the background shorthand and works — .dbx-x gradient intact).
+- Fix: removed 4 `-webkit-backdrop-filter` lines (.glass, .glass-strong, .dock-glass, .nav-sheet) + removed the probe/test classes. Unprefixed backdrop-filter: Chrome 76+/FF 103+/Safari 18+; older Safari degrades to tint w/o blur.
+- Verified: dock bg oklch(0.155/.88) + blur(24px) saturate(1.6) computed; topbar glass-strong blur(22px); nav-sheet blur(26px); VLM-confirmed frosted glass in dark + light; dock tab navigation (Library active) works; 0 console/page errors. COMMITTED c20e461.
+
+Stage Summary:
+- Mobile dock (Home/Discover/AI Dub/Library/Menu) has its floating glass bar back on all pages; desktop sidebar + tablet rail + topbar blur also restored (glass-strong was affected by the same strip).
+- Lesson recorded: (a) if a CSS section vanishes after workspace sync, compare file mtime vs dev-server start and force a recompile; (b) never hand-write -webkit-backdrop-filter alongside backdrop-filter under Tailwind v4.1 Lightning CSS — it strips both.
