@@ -100,3 +100,20 @@ Stage Summary:
 - All 10 destinations + profile + settings reachable on mobile within 2 taps; badges (UZ, 20+) preserved across dock/sheet/rail/sidebar; active state always visible incl. in-Menu pages.
 - Single nav config drives all 4 surfaces; desktop sidebar behavior/routes untouched (>1100px).
 - Key decisions: (1) Creator Studio visible-locked for viewers w/ one-time-role explanation (desktop hides it — parity kept for creators); (2) language picker persists choice but UI stays EN (no i18n system) w/ honest toast; (3) footer row only visible at full sheet snap (standard half-snap sheet pattern); (4) toast/lift + no prefetch (SPA store navigation, single bundle); (5) tablet hover-expand has 260ms delay + 200ms close.
+
+---
+Task ID: 5
+Agent: Super Z (main)
+Task: User report "navbar hides our logo and DubAniX name" — diagnose + fix.
+
+Work Log:
+- Diagnosed with elementFromPoint probes: sticky TopBar (z-40, rendered after Sidebar in DOM, equal z-index) painted its 94%-opaque glass background full-viewport-width (pl-[264px] is padding, not offset) — covering the top 64px of the desktop Sidebar where the Logo + DubAniX wordmark + tagline sit. Same stacking bug covered the tablet rail's logo mark. Mobile top bar used mark-only compact lockup, so the name was never rendered on phones.
+- shell.tsx: fixed Sidebar raised z-40 -> z-50 (desktop sidebar now paints above the TopBar seam at x=264). TopBar mobile brand slot rebuilt: full <Logo variant full size 28> with onClick home + scoped .dbx-navbrand class; wordmark collapses on scroll while the existing page title fades in (YouTube-style swap). BrandLockup compact prop removed (dead code). Bell hidden <sm (notifications remain in Menu sheet footer). Credits + icon hidden <sm (pill still links to credits page).
+- tablet-rail.tsx: collapsed rail z-40 -> z-50 (logo mark no longer covered); expand-overlay scrim z-40 -> z-[45] — now correctly covers the TopBar when expanded (secondary bug: topbar used to float above the dark scrim).
+- logo.css: .dbx-navbrand rules — wordmark max-width 120px -> 0 + opacity transition on .dbx-collapse (scroll), media (max-width:359.98px) wordmark hidden entirely (320px = mark-only, no overflow), media (768–1099.98px) mark display:none (tablet rail carries the mark, top bar shows wordmark only — no duplicate mark); reduced-motion kills the transition.
+- Verified via agent-browser + VLM: desktop 1366 logo+wordmark topmost element & VLM-confirmed fully visible; tablet 900 rail logo visible + wordmark at x=105 + no duplicate mark + light mode + expanded overlay (scrim covers topbar, overlay brand visible); mobile 390 top = mark+wordmark 124px lockup, scrolled = wordmark collapsed (opacity 0/max-width 0) + title "Home" visible, 320 = brand 34px mark-only, rightmost action (avatar) ends x=307 < 320, docOverflowX false at all sizes; console/page errors 0. tsc: 0 src errors; lint clean. COMMITTED 0785c15.
+
+Stage Summary:
+- Logo + DubAniX name now visible on every surface: desktop sidebar (z-fix), tablet rail + top-bar wordmark, mobile top bar (mark + wordmark with scroll-swap; mark-only <360px).
+- z-order ladder now: TopBar 40 < rail/sidebar/scrim-expands 45-50 < mobile search 60 < profile editor 80 < profile modal 90 < onboarding 100 < dialogs 110.
+- Space budget on phones: bell + credits-plus hidden below sm to fit the wordmark at 360px; both remain reachable (sheet footer notifications / credits page).
