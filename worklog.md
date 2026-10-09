@@ -51,3 +51,28 @@ Stage Summary:
 - 11 pre-existing + new React Compiler lint errors resolved to 0.
 - Not renamed (internal, per spec): aniverse_session cookie name; *.aniverse.test seed emails; DB schema/tables unchanged.
 - KNOWN GAP: AI Dubbing Studio view does not exist in current codebase (lost in the earlier workspace rollback, not rebuilt in v2) — logo "playing" state is wired to Creator Studio publish flow instead. Rebuilding the dubbing studio (JA->UZ pipeline, pricing, waveform UI) needs its own task.
+
+---
+Task ID: 3
+Agent: Super Z (main)
+Task: User reported missing features (AI dubbing, schedule, sidebar links, split login page, small home cards, profile). Diagnose + rebuild all.
+
+Work Log:
+- Diagnosed: those features were part of the Oct 8 uncommitted work lost in the workspace rollback (git had no trace); v2/v3 rebuilds covered theme/profile/brand only. Also discovered dev server had a stale Prisma client after schema changes and that processes started in tool calls die at call end (sandbox cgroup cleanup).
+- Schema: Anime +airDay Int? / +airTime String?; new DubJob model (userId, animeId, episodeId, targetLang, voice, status, pricePaid, @@unique [userId,episodeId,targetLang]); relations wired on User/Anime/Episode; prisma db push + generate; seeded 12 ONGOING animes with weekly prime-time slots (scripts/seed-schedule.ts) and patched scripts/seed.ts so fresh DBs match.
+- APIs: GET /api/schedule (ONGOING animes w/ airDay, ownership-aware); GET/POST /api/dubbing (voice profile pricing 15/15/20/20/25 credits, ownership or free gate, duplicate-dub guard, credit transaction + decrement in $transaction, job history).
+- Store/types: ViewName + login/schedule/dubbing; setAuthOpen(true) now navigates to the full-page login view (all 26 existing call sites inherited new behavior); +ScheduleItem/DubJobItem/EpisodeOption types.
+- shell.tsx REWRITTEN: desktop fixed left sidebar (264px, glass-strong, grain) with brand lockup, Browse section (Home, Discover, Schedule, AI Dubbing w/ UZ badge, Community, Watch Together), My Stuff (My Library, Exchange w/ 20+ badge, Get Credits, Creator Studio for creators), footer user area (avatar row -> full profile, Theme/Settings/Sign out, guest sign-in CTA); slim sticky TopBar (search + credits + bell + theme + avatar) with lg:pl-[264px]; mobile keeps mark top bar + bottom tabs now Home/Discover/Schedule/AI Dub/Library(or Sign in); CSS-only dark: icon swap (fixed react-hooks/set-state-in-effect lint).
+- views/login.tsx NEW: full-screen split — left 55% cinematic panel (random featured banner, ken-burns zoom, grain, gradient legibility stack, Logo+tagline, rotating quote + 3 perk chips), right auth card (tabs Sign In/Create Account, mobile top-banner variant, back-to-browse); AuthModal deleted from auth.tsx (Onboarding kept).
+- views/schedule.tsx NEW: Broadcast Schedule — weekday tab bar (counts + today dot + live-today default), "Still to come today" strip with live countdowns (30s tick), day cards (time block, poster, title/rating/genres/eps, FREE/OWNED/CREDITS badge, Watch + reminder), airing-today glow, empty state, skeletons.
+- views/dubbing.tsx NEW: AI Dubbing Studio — language cards (O'zbekcha LIVE / Қазақша + Кыргызча coming soon), 3-step flow (anime picker grid w/ filter from free+owned, episode list w/ UZ-ready badges, 5 Uzbek voice profiles w/ per-episode credit pricing), order summary + big Dub button, 5-stage pipeline stepper (analyze/transcribe JA/translate UZ/synthesize/mix) choreographed 4.4s in parallel with the API call, live waveform (wave-bar CSS), Logo state="playing" during processing, My dubs history grid.
+- ui-bits.tsx: AnimeCard upgraded 150->176/196/210px w/ description hover preview; NEW RankedCard (Netflix-style 110-140px outline numerals, z-layered behind poster, hover glow) for Trending Now + Hall of Fame; NEW WideCard (16:9 banner, FRESH DROP/NEW EPISODES tags) for Fresh Drops. globals.css: +ken-burns, rank-numeral, wave-bar, step-pulse, airing-today utilities.
+- app.tsx: sidebar layout (main + footer lg:ml-[264px]), login renders standalone chrome-less, 3 new views wired.
+- Infra: dev server relaunched via start-stop-daemon --background (.zscripts/dev-server.sh + next-dev.pid) so it survives tool-call cleanup — plain nohup/setsid do NOT survive in this sandbox.
+- Verified via agent-browser + VLM: home (sidebar all links, hero, big ranked cards "polished Netflix-style"), login (full-page split confirmed, mobile variant clean), schedule (tabs+counts, today strip, cards w/ times), dubbing (end-to-end: login -> pick Death Note EP1 -> Aziza voice -> 15 credits charged 2400->2385, job in history, credits tx recorded), profile card + full profile via sidebar row (Discord layout intact), mobile bottom tabs. tsc: 0 src errors; lint: 0; dev.log: 0 500s. Screenshots shots/v4-*.png.
+- COMMITTED 6adc148.
+
+Stage Summary:
+- All user-reported missing features rebuilt and verified: sidebar nav (all links), full-page split login, Broadcast Schedule w/ countdowns, AI Dubbing Studio (JA->UZ, credit economy, waveform pipeline), professional big home cards (ranked + wide), easy profile access.
+- New backend: /api/schedule, /api/dubbing, DubJob table, anime airDay/airTime (+seed).
+- Key infra lesson: persistent processes must be launched via start-stop-daemon in this sandbox; dev server PID file at .zscripts/next-dev.pid.
