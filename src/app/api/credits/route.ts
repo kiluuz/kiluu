@@ -1,18 +1,15 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { getCurrentUser } from "@/lib/auth";
-
-// Credit packages (in-app purchases simulated)
-const CREDIT_PACKAGES = [
-  { id: "starter", credits: 200, priceUsd: 1.99, bonus: 0, popular: false },
-  { id: "basic", credits: 550, priceUsd: 4.99, bonus: 50, popular: true },
-  { id: "plus", credits: 1200, priceUsd: 9.99, bonus: 200, popular: false },
-  { id: "pro", credits: 2600, priceUsd: 19.99, bonus: 600, popular: false },
-  { id: "mega", credits: 7000, priceUsd: 49.99, bonus: 2000, popular: false },
-];
+import { ensureRuntimeSeed } from "@/lib/seed-runtime";
 
 export async function GET() {
+  await ensureRuntimeSeed();
   const user = await getCurrentUser();
+  const packages = await db.creditPackage.findMany({
+    where: { active: true },
+    orderBy: { sortOrder: "asc" },
+  });
   let transactions: Array<{
     id: string;
     amount: number;
@@ -24,7 +21,7 @@ export async function GET() {
     const tx = await db.creditTransaction.findMany({
       where: { userId: user.id },
       orderBy: { createdAt: "desc" },
-      take: 30,
+      take: 50,
     });
     transactions = tx.map((t) => ({
       id: t.id,
@@ -35,45 +32,15 @@ export async function GET() {
     }));
   }
   return NextResponse.json({
-    packages: CREDIT_PACKAGES,
+    packages: packages.map((p) => ({
+      id: p.id,
+      name: p.name,
+      credits: p.credits,
+      starsPrice: p.starsPrice,
+      bonus: p.bonus,
+      popular: p.popular,
+    })),
     balance: user?.credits ?? 0,
     transactions,
   });
-}
-
-// POST /api/credits - buy a credit package (simulated payment)
-export async function POST(req: NextRequest) {
-  const user = await getCurrentUser();
-  if (!user) return NextResponse.json({ error: "Please sign in to buy credits" }, { status: 401 });
-
-  try {
-    const { packageId, paymentMethod } = await req.json();
-    const pkg = CREDIT_PACKAGES.find((p) => p.id === packageId);
-    if (!pkg) return NextResponse.json({ error: "Invalid package" }, { status: 400 });
-    if (!["card", "paypal", "crypto"].includes(paymentMethod)) {
-      return NextResponse.json({ error: "Invalid payment method" }, { status: 400 });
-    }
-
-    const totalCredits = pkg.credits + pkg.bonus;
-
-    const result = await db.$transaction(async (tx) => {
-      await tx.creditTransaction.create({
-        data: {
-          userId: user.id,
-          amount: totalCredits,
-          type: "TOPUP",
-          description: `${pkg.credits} credits${pkg.bonus ? ` + ${pkg.bonus} bonus` : ""} via ${paymentMethod}`,
-        },
-      });
-      return tx.user.update({
-        where: { id: user.id },
-        data: { credits: { increment: totalCredits } },
-      });
-    });
-
-    return NextResponse.json({ success: true, credits: result.credits, added: totalCredits });
-  } catch (e) {
-    console.error("credits purchase error", e);
-    return NextResponse.json({ error: "Payment failed" }, { status: 500 });
-  }
 }

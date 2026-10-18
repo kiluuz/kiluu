@@ -16,7 +16,7 @@ import { Slider } from "@/components/ui/slider";
 import { useAppStore } from "./store";
 import type { PublicProfile, AnimeSummary, ShowcaseConfig, PrivacyConfig, SocialLinks } from "./types";
 import { Avatar, SmartImage } from "./ui-bits";
-import { BANNER_PRESETS, AVATAR_PRESETS, ACCENT_PRESETS, AVATAR_FRAMES, ACHIEVEMENTS } from "./profile-assets";
+import { BANNER_PRESETS, AVATAR_PRESETS, ACCENT_PRESETS, AVATAR_FRAMES } from "./profile-assets";
 import { ProfilePageBody, getAchievementStates, userAccentVars } from "./profile";
 import { ProfilePopupCard } from "./profile-card";
 import { toast } from "sonner";
@@ -78,6 +78,7 @@ function initialDraft(p: PublicProfile): Draft {
     },
     privacy: p.privacy ?? {
       showWatchTime: true, showFavorites: true, showActivity: true,
+      showCollection: true, showFollowers: true,
       allowFollows: true, profileVisibility: "everyone" as const,
     },
     unlocked: (p.showcase as unknown as { unlocked?: string[] })?.unlocked ?? [],
@@ -163,6 +164,7 @@ function BannerCropModal({
   file,
   onClose,
   onApply,
+  uploading,
   isGif,
   premiumUnlocked,
   onBuyPremium,
@@ -170,6 +172,7 @@ function BannerCropModal({
   file: File;
   onClose: () => void;
   onApply: (crop: { x: number; y: number; width: number; height: number }) => void;
+  uploading: boolean;
   isGif: boolean;
   premiumUnlocked: boolean;
   onBuyPremium: () => void;
@@ -320,13 +323,14 @@ function BannerCropModal({
         )}
 
         <div className="flex items-center justify-end gap-2">
-          <Button variant="ghost" onClick={onClose} className="rounded-full">Cancel</Button>
+          <Button variant="ghost" onClick={onClose} disabled={uploading} className="rounded-full">Cancel</Button>
           <Button
             onClick={apply}
-            disabled={!natW || animatedBlocked}
+            disabled={!natW || animatedBlocked || uploading}
             className="rounded-full brand-gradient text-white"
           >
-            <Check className="w-4 h-4" /> Apply crop
+            {uploading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
+            {uploading ? "Uploading…" : "Apply crop"}
           </Button>
         </div>
       </div>
@@ -341,10 +345,12 @@ function AvatarCropModal({
   file,
   onClose,
   onApply,
+  uploading,
 }: {
   file: File;
   onClose: () => void;
   onApply: (crop: { x: number; y: number; size: number }) => void;
+  uploading: boolean;
 }) {
   const boxRef = useRef<HTMLDivElement>(null);
   const [natW, setNatW] = useState(0);
@@ -436,9 +442,10 @@ function AvatarCropModal({
           <span className="text-xs font-bold tabular-nums w-10 text-right">{zoom.toFixed(2)}×</span>
         </div>
         <div className="flex justify-end gap-2">
-          <Button variant="ghost" onClick={onClose} className="rounded-full">Cancel</Button>
-          <Button onClick={apply} disabled={!natW} className="rounded-full brand-gradient text-white">
-            <Check className="w-4 h-4" /> Apply
+          <Button variant="ghost" onClick={onClose} disabled={uploading} className="rounded-full">Cancel</Button>
+          <Button onClick={apply} disabled={!natW || uploading} className="rounded-full brand-gradient text-white">
+            {uploading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
+            {uploading ? "Uploading…" : "Apply"}
           </Button>
         </div>
       </div>
@@ -493,6 +500,7 @@ export function ProfileEditor({
   const [saving, setSaving] = useState(false);
   const [bannerFile, setBannerFile] = useState<File | null>(null);
   const [avatarFile, setAvatarFile] = useState<File | null>(null);
+  const mediaUploadLock = useRef(false);
   const [topFiveOpen, setTopFiveOpen] = useState(false);
   const [previewMode, setPreviewMode] = useState<"page" | "card">("page");
   const fileBannerRef = useRef<HTMLInputElement>(null);
@@ -532,7 +540,8 @@ export function ProfileEditor({
   }
 
   async function uploadBanner(crop: { x: number; y: number; width: number; height: number }) {
-    if (!bannerFile) return;
+    if (!bannerFile || mediaUploadLock.current) return;
+    mediaUploadLock.current = true;
     const fd = new FormData();
     fd.append("file", bannerFile);
     fd.append("crop", JSON.stringify(crop));
@@ -549,12 +558,14 @@ export function ProfileEditor({
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Banner upload failed");
     } finally {
+      mediaUploadLock.current = false;
       setSaving(false);
     }
   }
 
   async function uploadAvatar(crop: { x: number; y: number; size: number }) {
-    if (!avatarFile) return;
+    if (!avatarFile || mediaUploadLock.current) return;
+    mediaUploadLock.current = true;
     const fd = new FormData();
     fd.append("file", avatarFile);
     fd.append("crop", JSON.stringify(crop));
@@ -569,6 +580,7 @@ export function ProfileEditor({
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Avatar upload failed");
     } finally {
+      mediaUploadLock.current = false;
       setSaving(false);
     }
   }
@@ -1090,6 +1102,8 @@ export function ProfileEditor({
               ["showWatchTime", "Show watch time", "Display total hours watched on your profile"],
               ["showFavorites", "Show favorites", "Let others see your favorite anime list"],
               ["showActivity", "Show activity", "Show your posts on the profile page"],
+              ["showCollection", "Show collection", "Let others see anime you own"],
+              ["showFollowers", "Show followers", "Display your follower and following lists and counts"],
               ["allowFollows", "Allow follows", "Let other users follow you"],
             ] as const).map(([key, label, hint]) => (
               <div key={key} className="flex items-center justify-between gap-3 rounded-xl border bg-background/50 p-3">
@@ -1104,6 +1118,21 @@ export function ProfileEditor({
                 />
               </div>
             ))}
+            <label className="block rounded-xl border bg-background/50 p-3">
+              <span className="block text-xs font-bold mb-1">Profile visibility</span>
+              <select
+                value={draft.privacy.profileVisibility}
+                onChange={(event) => set("privacy", {
+                  ...draft.privacy,
+                  profileVisibility: event.target.value as PrivacyConfig["profileVisibility"],
+                })}
+                className="w-full h-9 rounded-lg border bg-card px-2 text-xs"
+              >
+                <option value="everyone">Everyone</option>
+                <option value="followers">Followers only</option>
+                <option value="private">Only me</option>
+              </select>
+            </label>
           </EditorSection>
         </div>
 
@@ -1150,6 +1179,7 @@ export function ProfileEditor({
             file={bannerFile}
             onClose={() => setBannerFile(null)}
             onApply={uploadBanner}
+            uploading={saving}
             isGif={bannerFile.type === "image/gif"}
             premiumUnlocked={premiumBannerUnlocked}
             onBuyPremium={() => unlockPremiumItem("animatedBanner", 500, "Animated banners")}
@@ -1158,7 +1188,7 @@ export function ProfileEditor({
       )}
       {avatarFile && (
         <Dialog open onOpenChange={(o) => !o && setAvatarFile(null)}>
-          <AvatarCropModal file={avatarFile} onClose={() => setAvatarFile(null)} onApply={uploadAvatar} />
+          <AvatarCropModal file={avatarFile} onClose={() => setAvatarFile(null)} onApply={uploadAvatar} uploading={saving} />
         </Dialog>
       )}
 

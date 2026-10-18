@@ -12,10 +12,11 @@ import { Button } from "@/components/ui/button";
 import { useAppStore, useOpenProfile } from "./store";
 import type { PublicProfile, AnimeSummary, ShowcaseConfig } from "./types";
 import { Avatar, SmartImage, formatDuration, timeAgo, formatCredits } from "./ui-bits";
-import { ACHIEVEMENTS, RARITY_LABEL, type Rarity } from "./profile-assets";
+import { RARITY_LABEL, type AchievementDef, type Rarity } from "./profile-assets";
 import { ProfileEditor } from "./profile-editor";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import { useI18n } from "@/components/i18n-provider";
 
 /* ================================================================
    ACCENT HELPERS — Discord-style profile colors w/ WCAG AA contrast
@@ -175,7 +176,7 @@ export function useCountUp(target: number, duration = 850): number {
    ACHIEVEMENTS — merge catalog with live progress
    ================================================================ */
 export interface AchievementState {
-  def: (typeof ACHIEVEMENTS)[number];
+  def: AchievementDef;
   current: number;
   target: number;
   earned: boolean;
@@ -183,15 +184,21 @@ export interface AchievementState {
 }
 
 export function getAchievementStates(p: PublicProfile): AchievementState[] {
-  return ACHIEVEMENTS.map((def) => {
-    const live = p.achievements.find((a) => a.id === def.id);
-    const current = live?.current ?? 0;
-    const target = live?.target ?? def.id === "join" ? 1 : 1;
+  return p.achievements.map((live) => {
+    const def: AchievementDef = {
+      id: live.id,
+      emoji: live.emoji,
+      name: live.name,
+      desc: live.desc,
+      rarity: live.rarity as Rarity,
+    };
+    const current = live.current;
+    const target = live.target;
     return {
       def,
       current,
       target,
-      earned: current >= target,
+      earned: live.earned,
       pct: target > 0 ? Math.min(100, Math.round((current / target) * 100)) : 0,
     };
   });
@@ -200,11 +207,9 @@ export function getAchievementStates(p: PublicProfile): AchievementState[] {
 export function AchievementTile({
   a,
   size = "md",
-  unlockLabel,
 }: {
   a: AchievementState;
   size?: "sm" | "md" | "lg";
-  unlockLabel?: string;
 }) {
   const rarity = a.def.rarity;
   return (
@@ -228,7 +233,7 @@ export function AchievementTile({
           )}
         >
           {a.earned ? a.def.emoji : <Lock className="w-4 h-4 text-muted-foreground" />}
-          {a.earned && rarity === "legendary" && (
+          {a.earned && (rarity === "legendary" || rarity === "mythic") && (
             <span className="absolute -top-1 -right-1 text-[9px]">✨</span>
           )}
         </div>
@@ -243,7 +248,8 @@ export function AchievementTile({
                 rarity === "common" && "border-border text-muted-foreground",
                 rarity === "rare" && "border-blue-400/40 text-blue-400",
                 rarity === "epic" && "border-purple-400/40 text-purple-400",
-                rarity === "legendary" && "border-amber-400/50 text-amber-400"
+                rarity === "legendary" && "border-amber-400/50 text-amber-400",
+                rarity === "mythic" && "border-fuchsia-400/60 text-fuchsia-300"
               )}
             >
               {RARITY_LABEL[rarity as Rarity]}
@@ -265,8 +271,8 @@ export function AchievementTile({
               {a.current}/{a.target}
             </span>
           </div>
-          {a.earned && unlockLabel && size === "lg" && (
-            <p className="text-[10px] text-muted-foreground mt-1.5">Unlocked {unlockLabel}</p>
+          {a.earned && size === "lg" && (
+            <p className="text-[10px] text-muted-foreground mt-1.5">Unlocked</p>
           )}
         </div>
       </div>
@@ -445,6 +451,8 @@ function IdentityActions({ profile, onEdit }: { profile: PublicProfile; onEdit?:
         setFollowing(!following);
         toast.success(following ? "Unfollowed" : `Following @${profile.username}`);
       } else toast.error("Failed to update follow");
+    } catch {
+      toast.error("Failed to update follow");
     } finally {
       setBusy(false);
     }
@@ -471,7 +479,7 @@ function IdentityActions({ profile, onEdit }: { profile: PublicProfile; onEdit?:
 
   return (
     <div className="flex items-center gap-2">
-      <Button
+      {(profile.canFollow || following) && <Button
         size="sm"
         className={cn(
           "rounded-full h-9 gap-1.5 font-semibold",
@@ -483,7 +491,7 @@ function IdentityActions({ profile, onEdit }: { profile: PublicProfile; onEdit?:
       >
         {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : following ? <Check className="w-4 h-4" /> : <Users className="w-4 h-4" />}
         {following ? "Following" : "Follow"}
-      </Button>
+      </Button>}
       <Button
         variant="outline"
         size="sm"
@@ -542,6 +550,16 @@ function ProfileIdentity({ profile, onEdit }: { profile: PublicProfile; onEdit?:
             {profile.pronouns && (
               <span className="text-xs px-2 py-0.5 rounded-full bg-accent text-muted-foreground">{profile.pronouns}</span>
             )}
+            {profile.stats.level && (
+              <span className="text-[10px] font-bold bg-secondary/80 px-1.5 py-0.5 rounded text-muted-foreground shrink-0 uppercase tracking-wide">
+                Level {profile.stats.level}
+              </span>
+            )}
+            {profile.stats.badges?.map(b => (
+              <span key={b.id} className={cn("text-[10px] font-bold px-2 py-0.5 rounded-full shrink-0 uppercase tracking-wide shadow-sm", b.color, b.glow && "animate-pulse shadow-[0_0_8px_currentColor]")}>
+                {b.label}
+              </span>
+            ))}
           </div>
           {profile.tagline && (
             <p className="text-sm mt-1.5 font-medium text-foreground/80">{profile.tagline}</p>
@@ -677,9 +695,9 @@ function IdentityColumn({ profile }: { profile: PublicProfile }) {
             <Clapperboard className="w-3.5 h-3.5" /> Creator
           </span>
         )}
-        {profile.stats.exchangeUnlocked && (
+        {(profile.stats.giftsSent ?? 0) > 0 && (
           <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-bold border border-emerald-500/40 text-emerald-500 bg-emerald-500/10">
-            <Sparkles className="w-3.5 h-3.5" /> Exchange Unlocked
+            <Sparkles className="w-3.5 h-3.5" /> Gift sender
           </span>
         )}
         <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-bold border border-border bg-accent text-muted-foreground">
@@ -991,7 +1009,7 @@ function ActivityTab({ profile }: { profile: PublicProfile }) {
 function AchievementsTab({ profile }: { profile: PublicProfile }) {
   const states = getAchievementStates(profile);
   const earned = states.filter((s) => s.earned);
-  const byRarity = { common: 0, rare: 0, epic: 0, legendary: 0 } as Record<Rarity, number>;
+  const byRarity = { common: 0, rare: 0, epic: 0, legendary: 0, mythic: 0 } as Record<Rarity, number>;
   earned.forEach((s) => { byRarity[s.def.rarity]++; });
   return (
     <div className="space-y-5">
@@ -1004,7 +1022,8 @@ function AchievementsTab({ profile }: { profile: PublicProfile }) {
             r === "common" && "border-border text-muted-foreground",
             r === "rare" && "border-blue-400/40 text-blue-400",
             r === "epic" && "border-purple-400/40 text-purple-400",
-            r === "legendary" && "border-amber-400/50 text-amber-400"
+            r === "legendary" && "border-amber-400/50 text-amber-400",
+            r === "mythic" && "border-fuchsia-400/60 text-fuchsia-300"
           )}>
             {byRarity[r]} {RARITY_LABEL[r]}
           </span>
@@ -1014,9 +1033,7 @@ function AchievementsTab({ profile }: { profile: PublicProfile }) {
         {states
           .slice()
           .sort((a, b) => (Number(b.earned) - Number(a.earned)) || (b.pct - a.pct))
-          .map((a) => (
-            <AchievementTile key={a.def.id} a={a} size="lg" unlockLabel="unlocked" />
-          ))}
+          .map((a) => <AchievementTile key={a.def.id} a={a} size="lg" />)}
       </div>
     </div>
   );
@@ -1038,6 +1055,7 @@ export function ProfilePageBody({
   onTabChange?: (t: string) => void;
   hideTabs?: boolean;
 }) {
+  const { t } = useI18n();
   const [tab, setTab] = useState(activeTab || "overview");
   const [prevActiveTab, setPrevActiveTab] = useState(activeTab);
   if (activeTab !== prevActiveTab) {
@@ -1047,11 +1065,11 @@ export function ProfilePageBody({
   const setT = (t: string) => { setTab(t); onTabChange?.(t); };
 
   const TABS = [
-    { id: "overview", label: "Overview" },
-    { id: "collection", label: "Collection", count: profile.ownedAnimes.length },
-    { id: "favorites", label: "Favorites", count: profile.favoriteAnimes.length },
-    { id: "activity", label: "Activity & Posts", count: profile.posts.length },
-    { id: "achievements", label: "Achievements", count: getAchievementStates(profile).filter((a) => a.earned).length },
+    { id: "overview", label: t("profile.overview") },
+    { id: "collection", label: t("profile.collection"), count: profile.ownedAnimes.length },
+    { id: "favorites", label: t("profile.favorites"), count: profile.favoriteAnimes.length },
+    { id: "activity", label: t("profile.activity"), count: profile.posts.length },
+    { id: "achievements", label: t("profile.achievements"), count: getAchievementStates(profile).filter((a) => a.earned).length },
   ];
 
   const stats = profile.stats;
@@ -1071,12 +1089,12 @@ export function ProfilePageBody({
       {/* Stats strip */}
       <div className="max-w-[1280px] mx-auto px-4 sm:px-8 mt-6">
         <div className="flex flex-wrap gap-3">
-          <StatChip icon={<Package className="w-4 h-4" />} label="Owned" value={stats.purchaseCount} />
+          {stats.purchaseCount != null && <StatChip icon={<Package className="w-4 h-4" />} label={t("profile.owned")} value={stats.purchaseCount} />}
           {stats.watchSeconds != null && (
-            <StatChip icon={<Timer className="w-4 h-4" />} label="Watch time" value={Math.round(stats.watchSeconds / 3600)} suffix="h" />
+            <StatChip icon={<Timer className="w-4 h-4" />} label={t("profile.watchTime")} value={Math.round(stats.watchSeconds / 3600)} suffix={t("profile.hours")} />
           )}
-          <StatChip icon={<Users className="w-4 h-4" />} label="Followers" value={stats.followers} accent accentHex={profile.accentColor} />
-          <StatChip icon={<MessageSquare className="w-4 h-4" />} label="Posts" value={stats.postCount} />
+          {stats.followers != null && <StatChip icon={<Users className="w-4 h-4" />} label={t("profile.followers")} value={stats.followers} accent accentHex={profile.accentColor} />}
+          {stats.postCount != null && <StatChip icon={<MessageSquare className="w-4 h-4" />} label={t("profile.posts")} value={stats.postCount} />}
         </div>
       </div>
 
@@ -1135,12 +1153,25 @@ export function ProfileFullView({ username }: { username: string }) {
 
   useEffect(() => {
     let alive = true;
-    fetch(`/api/users/${username}`)
-      .then((r) => (r.ok ? r.json() : Promise.reject(new Error("not found"))))
+    const controller = new AbortController();
+    fetch(`/api/users/${encodeURIComponent(username)}`, {
+      cache: "no-store",
+      signal: controller.signal,
+    })
+      .then(async (response) => {
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.error || "Couldn't load this profile");
+        return data;
+      })
       .then((d) => { if (alive) setProfile(d.profile); })
-      .catch(() => { if (alive) setError("Couldn't load this profile"); });
+      .catch((cause: unknown) => {
+        if (alive && !controller.signal.aborted) {
+          setError(cause instanceof Error ? cause.message : "Couldn't load this profile");
+        }
+      });
     return () => {
       alive = false;
+      controller.abort();
       setProfile(null); /* reset on target change / unmount (async — lint-safe) */
       setError(null);
     };

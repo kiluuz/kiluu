@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import type { AnimeSummary, ContinueWatchingItem } from "./types";
 import { useAppStore } from "./store";
+import { useBotCatalog } from "./bot-hooks";
 
 export function formatDuration(seconds: number): string {
   if (!seconds || seconds < 0) return "0m";
@@ -159,8 +160,11 @@ export function SmartImage({
 }
 
 /** Standard anime poster card — cinematic size */
-export function AnimeCard({ anime, rank }: { anime: AnimeSummary; rank?: number }) {
+export function AnimeCard({ anime, rank, compactTitle = false }: { anime: AnimeSummary; rank?: number; compactTitle?: boolean }) {
   const navigate = useAppStore((s) => s.navigate);
+  const { map: botMap, loading: botLoading, botError } = useBotCatalog();
+  const isAvailable = botLoading || botError || (botMap && botMap[anime.slug]);
+
   const genres: string[] = typeof anime.genres === "string"
     ? String(anime.genres).split(",").filter(Boolean)
     : anime.genres || [];
@@ -235,7 +239,13 @@ export function AnimeCard({ anime, rank }: { anime: AnimeSummary; rank?: number 
         )}
       </div>
       <div className="pt-2.5 px-0.5">
-        <h3 className="text-[14px] font-bold leading-tight line-clamp-2 group-hover:text-primary transition-colors">
+        <h3
+          title={anime.title}
+          className={cn(
+            "text-[14px] font-bold leading-tight group-hover:text-primary transition-colors",
+            compactTitle ? "truncate" : "line-clamp-2"
+          )}
+        >
           {anime.title}
         </h3>
         <p className="text-[11.5px] text-muted-foreground mt-1 line-clamp-1">
@@ -256,7 +266,7 @@ export function RankedCard({ anime, rank, tone = "ember" }: { anime: AnimeSummar
   return (
     <div
       className={cn(
-        "rank-card group relative shrink-0 cursor-pointer grid grid-cols-[auto_1fr] grid-rows-[1fr_53px]",
+        "rank-card group relative w-[224px] sm:w-[240px] xl:w-[258px] shrink-0 cursor-pointer grid grid-cols-[72px_minmax(0,1fr)] grid-rows-[1fr_53px]",
         tone === "gold" && "rank-gold"
       )}
       onClick={() => navigate("detail", { animeId: anime.slug })}
@@ -275,7 +285,7 @@ export function RankedCard({ anime, rank, tone = "ember" }: { anime: AnimeSummar
       </span>
 
       {/* poster column — row-span-2, pulled left so the poster overlaps the numeral */}
-      <div className="relative z-10 col-start-2 row-start-1 row-span-2 -ml-4 sm:-ml-5">
+      <div className="relative z-10 col-start-2 row-start-1 row-span-2 -ml-4 sm:-ml-5 min-w-0">
         <div
           className={cn(
             "img-zoom relative w-[168px] sm:w-[188px] xl:w-[206px] aspect-[2/3] rounded-2xl overflow-hidden bg-muted",
@@ -316,8 +326,8 @@ export function RankedCard({ anime, rank, tone = "ember" }: { anime: AnimeSummar
         </div>
 
         {/* fixed-height title block keeps every poster in the row aligned */}
-        <div className="pt-2 h-[53px]">
-          <h3 className="text-[12.5px] leading-[15px] font-bold line-clamp-2 group-hover:text-primary transition-colors">
+        <div className="pt-2 h-[53px] min-w-0">
+          <h3 title={anime.title} className="w-full min-w-0 text-[12.5px] leading-[15px] font-bold truncate group-hover:text-primary transition-colors">
             {anime.title}
           </h3>
           <p className="text-[10px] leading-[13px] text-muted-foreground mt-[2px] flex items-center gap-1.5">

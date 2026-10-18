@@ -22,38 +22,40 @@ export async function POST(req: NextRequest) {
     }
     const price = PRICES[item];
 
-    // current unlocked list lives inside showcase JSON
-    let showcase: Record<string, unknown> = {};
-    try { showcase = user.showcase ? JSON.parse(user.showcase) : {}; } catch { /* ignore */ }
-    const unlocked = new Set<string>(Array.isArray(showcase.unlocked) ? (showcase.unlocked as string[]) : []);
-    if (unlocked.has(item)) {
-      return NextResponse.json({ error: "Already unlocked" }, { status: 400 });
-    }
-
-    if (user.credits < price) {
-      return NextResponse.json({ error: `Not enough credits — need ${price}` }, { status: 400 });
-    }
-
     const updated = await db.$transaction(async (tx) => {
+      const current = await tx.user.findUnique({ where: { id: user.id }, select: { showcase: true } });
+      let showcase: Record<string, unknown> = {};
+      try { showcase = current?.showcase ? JSON.parse(current.showcase) : {}; } catch { /* ignore invalid saved config */ }
+      const unlocked = new Set<string>(Array.isArray(showcase.unlocked) ? showcase.unlocked.filter((entry): entry is string => typeof entry === "string") : []);
+      if (unlocked.has(item)) return { error: "ALREADY_UNLOCKED" as const };
+
+      const debit = await tx.user.updateMany({
+        where: { id: user.id, credits: { gte: price } },
+        data: { credits: { decrement: price } },
+      });
+      if (debit.count !== 1) return { error: "INSUFFICIENT_CREDITS" as const };
       await tx.creditTransaction.create({
         data: {
           userId: user.id,
           amount: -price,
           type: "PURCHASE",
           description: `Unlocked premium profile item: ${item}`,
+          idempotencyKey: `profile-premium:${user.id}:${item}`,
         },
       });
+      unlocked.add(item);
       const u = await tx.user.update({
         where: { id: user.id },
-        data: {
-          credits: { decrement: price },
-          showcase: JSON.stringify({ ...showcase, unlocked: [...unlocked, item] }),
-        },
+        data: { showcase: JSON.stringify({ ...showcase, unlocked: [...unlocked] }) },
       });
-      return u;
+      return { user: u, unlocked: [...unlocked] };
     });
 
-    return NextResponse.json({ user: toPublicUser(updated), unlocked: [...unlocked, item] });
+    if ("error" in updated) {
+      const message = updated.error === "ALREADY_UNLOCKED" ? "Already unlocked" : `Not enough credits — need ${price}`;
+      return NextResponse.json({ error: message }, { status: 400 });
+    }
+    return NextResponse.json({ user: toPublicUser(updated.user), unlocked: updated.unlocked });
   } catch (e) {
     console.error("premium unlock error", e);
     return NextResponse.json({ error: "Unlock failed" }, { status: 500 });

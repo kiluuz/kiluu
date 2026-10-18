@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { X, Crown, BadgeCheck, CalendarDays, Loader2, Check, Users, Send, Trophy, Heart } from "lucide-react";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -14,7 +15,7 @@ import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 
 /* ================================================================
-   PROFILE POPUP CARD — 340px Discord-style
+   PROFILE POPUP CARD — responsive Discord-style
    Used by the global modal AND the editor live preview.
    ================================================================ */
 export function ProfilePopupCard({
@@ -67,7 +68,7 @@ export function ProfilePopupCard({
   return (
     <div
       className={cn(
-        "relative w-full max-w-[340px] overflow-hidden rounded-3xl border bg-card text-card-foreground shadow-2xl",
+        "relative w-full max-w-[420px] overflow-hidden rounded-3xl border bg-card text-card-foreground shadow-2xl",
         "border-[color-mix(in_srgb,var(--user-accent)_35%,transparent)]"
       )}
       style={userAccentVars(profile.accentColor, profile.accentTo)}
@@ -88,7 +89,7 @@ export function ProfilePopupCard({
       {/* Banner — 5:2 compact crop of the user banner */}
       <div
         className={cn(
-          "relative h-[120px] overflow-hidden grain",
+          "relative h-[152px] overflow-hidden grain",
           "bg-gradient-to-br from-[color-mix(in_srgb,var(--user-accent)_45%,var(--card))] to-[color-mix(in_srgb,var(--user-accent-to)_30%,var(--card))]"
         )}
       >
@@ -107,8 +108,8 @@ export function ProfilePopupCard({
       </div>
 
       {/* Avatar + identity */}
-      <div className="px-5 pb-5">
-        <div className="flex items-end justify-between -mt-10 relative z-10">
+      <div className="px-6 pb-6">
+        <div className="flex items-end justify-between -mt-14 relative z-10">
           <div className="rounded-full bg-card p-1 shadow-xl">
             <Avatar
               src={profile.avatarUrl}
@@ -116,7 +117,7 @@ export function ProfilePopupCard({
               accent={profile.accentColor}
               accentTo={profile.accentTo}
               frame={profile.avatarFrame}
-              size={72}
+              size={88}
             />
           </div>
           {/* online dot */}
@@ -143,7 +144,10 @@ export function ProfilePopupCard({
               </span>
             )}
           </div>
-          <p className="text-xs text-muted-foreground">@{profile.username}{profile.pronouns ? ` · ${profile.pronouns}` : ""}</p>
+          <p className="text-xs text-muted-foreground">
+            @{profile.username}{profile.pronouns ? ` · ${profile.pronouns}` : ""}
+            {profile.stats.level !== undefined && <span className="ml-1.5 rounded bg-secondary px-1.5 py-0.5 font-bold">Lv.{profile.stats.level}</span>}
+          </p>
 
           {/* status line */}
           <div className="mt-2 min-h-[24px]">
@@ -163,13 +167,13 @@ export function ProfilePopupCard({
           </div>
 
           {profile.tagline && (
-            <p className="text-[11px] font-medium text-foreground/75 mt-1.5 line-clamp-1">{profile.tagline}</p>
+            <p className="text-[12px] font-medium text-foreground/75 mt-1.5 line-clamp-1">{profile.tagline}</p>
           )}
         </div>
 
         {/* Bio snippet */}
         {profile.bio && (
-          <p className="text-xs text-foreground/80 mt-2.5 line-clamp-3 whitespace-pre-wrap break-words">
+          <p className="text-sm text-foreground/80 mt-2.5 line-clamp-3 whitespace-pre-wrap break-words">
             {profile.bio}
           </p>
         )}
@@ -184,9 +188,9 @@ export function ProfilePopupCard({
         </div>
 
         {/* Top 3 anime */}
-        {top3Animes.length > 0 && (
-          <div className="mt-3.5">
-            <p className="text-[10px] font-black uppercase tracking-wider text-muted-foreground mb-1.5 flex items-center gap-1">
+        {!compact && top3Animes.length > 0 && (
+          <div className="mt-4">
+            <p className="text-[10px] font-black uppercase tracking-wider text-muted-foreground mb-2 flex items-center gap-1">
               <Trophy className="w-3 h-3 text-[var(--user-accent)]" /> Top Anime
             </p>
             <div className="grid grid-cols-3 gap-2">
@@ -206,9 +210,8 @@ export function ProfilePopupCard({
             </div>
           </div>
         )}
-
         {/* 3 achievements */}
-        {topAch.length > 0 && (
+        {!compact && topAch.length > 0 && (
           <div className="mt-3.5">
             <p className="text-[10px] font-black uppercase tracking-wider text-muted-foreground mb-1.5 flex items-center gap-1">
               <Heart className="w-3 h-3 text-[var(--user-accent)]" /> Achievements
@@ -232,14 +235,14 @@ export function ProfilePopupCard({
         )}
 
         {/* Stats mini-row */}
-        <div className="mt-3.5 grid grid-cols-3 gap-2 text-center">
+        <div className="mt-4 grid grid-cols-3 gap-2 text-center">
           {[
             { label: "Owned", value: profile.stats.purchaseCount },
             { label: "Followers", value: profile.stats.followers },
             { label: "Posts", value: profile.stats.postCount },
-          ].map((s) => (
-            <div key={s.label} className="rounded-xl bg-accent/60 py-1.5">
-              <p className="stat-numeral text-sm leading-none">{s.value.toLocaleString()}</p>
+          ].filter((s) => s.value !== null).map((s) => (
+          <div key={s.label} className="rounded-xl bg-accent/60 py-2">
+              <p className="stat-numeral text-sm leading-none">{s.value?.toLocaleString()}</p>
               <p className="text-[9px] uppercase tracking-wider text-muted-foreground font-semibold mt-0.5">{s.label}</p>
             </div>
           ))}
@@ -249,7 +252,7 @@ export function ProfilePopupCard({
         <div className="mt-4 flex items-center gap-2">
           {!profile.isMe ? (
             <>
-              <Button
+              {(profile.canFollow || following) && <Button
                 size="sm"
                 className="flex-1 h-9 rounded-full font-semibold"
                 style={following
@@ -260,7 +263,7 @@ export function ProfilePopupCard({
               >
                 {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : following ? <Check className="w-4 h-4" /> : <Users className="w-4 h-4" />}
                 {following ? "Following" : "Follow"}
-              </Button>
+              </Button>}
               <Button
                 size="sm"
                 variant="outline"
@@ -302,19 +305,32 @@ export function ProfilePopupCard({
    ================================================================ */
 export function ProfileModal() {
   const { profileModalOpen, closeProfileCard, profileCardUser, user } = useAppStore();
-  const [profile, setProfile] = useState<PublicProfile | null>(null);
   const cardRef = useRef<HTMLDivElement>(null);
 
   const username = profileCardUser || user?.username || null;
+  const profileQuery = useQuery<PublicProfile>({
+    queryKey: ["profile-card", username, user?.id ?? "anonymous"],
+    enabled: profileModalOpen && Boolean(username),
+    queryFn: async () => {
+      const response = await fetch(`/api/users/${encodeURIComponent(username!)}?view=card`, {
+        cache: "no-store",
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "Couldn't load profile");
+      if (!data.profile) throw new Error("Profile response was empty");
+      return data.profile as PublicProfile;
+    },
+    staleTime: 30_000,
+    gcTime: 10 * 60_000,
+    refetchOnWindowFocus: false,
+  });
+  const profile = profileQuery.data;
 
   useEffect(() => {
-    if (!profileModalOpen || !username) return;
-    fetch(`/api/users/${username}`)
-      .then((r) => r.json())
-      .then((d) => { if (d.profile) setProfile(d.profile); })
-      .catch(() => toast.error("Couldn't load profile"));
-    return () => { setProfile(null); }; /* clear stale data on close / target change */
-  }, [profileModalOpen, username]);
+    if (profileQuery.error) {
+      toast.error(profileQuery.error instanceof Error ? profileQuery.error.message : "Couldn't load profile");
+    }
+  }, [profileQuery.error]);
 
   // Esc to close
   useEffect(() => {
@@ -359,17 +375,21 @@ export function ProfileModal() {
       <div className="absolute inset-0 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200" aria-hidden />
       <div
         ref={cardRef}
-        className="relative animate-in zoom-in-95 fade-in duration-200 max-h-[92dvh] overflow-y-auto no-scrollbar rounded-3xl shadow-2xl"
+        className="relative w-[min(420px,calc(100vw-1.5rem))] sm:w-[420px] animate-in zoom-in-95 fade-in duration-200 max-h-[92dvh] overflow-y-auto no-scrollbar rounded-3xl shadow-2xl"
         onClick={(e) => e.stopPropagation()}
       >
-        {!profile ? (
-          <div className="w-[340px] max-w-full rounded-3xl border bg-card p-6 flex flex-col items-center gap-3">
+        {profileQuery.isPending ? (
+          <div className="w-full rounded-3xl border bg-card p-7 flex flex-col items-center gap-3">
             <div className="w-20 h-20 rounded-full skeleton" />
             <div className="h-5 w-36 rounded-lg skeleton" />
             <div className="h-3.5 w-24 rounded-lg skeleton" />
           </div>
+        ) : profile ? (
+          <ProfilePopupCard profile={profile} onClose={closeProfileCard} compact />
         ) : (
-          <ProfilePopupCard profile={profile} onClose={closeProfileCard} />
+          <div className="w-[min(420px,calc(100vw-1.5rem))] rounded-3xl border bg-card p-6 text-center text-sm text-muted-foreground">
+            Couldn’t load profile. Close and try again.
+          </div>
         )}
       </div>
     </div>

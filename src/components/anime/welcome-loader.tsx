@@ -44,20 +44,23 @@ const MIN_DISPLAY = 1200;                /* never hide before the first word fin
 const FADE_MS = 500;
 
 export function WelcomeLoader({ appReady }: { appReady: boolean }) {
-  /* Session gate: the flag is set when the loader starts and cleared on
-     pagehide — so on every fresh page load it is unset (SSR renders the
-     overlay; hydration always matches), while in-app remounts skip it. */
-  const [visible, setVisible] = useState(() => {
-    try {
-      return sessionStorage.getItem(WL_FLAG) !== "1";
-    } catch {
-      return true;
-    }
-  });
+  const [mounted, setMounted] = useState(false);
+  const [visible, setVisible] = useState(false);
   const [fading, setFading] = useState(false);
   const wordRef = useRef<HTMLDivElement>(null);
   const fillRef = useRef<HTMLElement>(null);
   const readyRef = useRef(appReady);
+
+  useEffect(() => {
+    setMounted(true);
+    try {
+      if (sessionStorage.getItem(WL_FLAG) !== "1") {
+        setVisible(true);
+      }
+    } catch {
+      setVisible(true);
+    }
+  }, []);
 
   useEffect(() => {
     readyRef.current = appReady;
@@ -80,21 +83,23 @@ export function WelcomeLoader({ appReady }: { appReady: boolean }) {
     document.body.style.overflow = "hidden";
 
     let idx = 0;
-    let startAt = 0;
+    let startAt = performance.now();
     let cycleTimer: ReturnType<typeof setInterval> | undefined;
     let swapTimer: ReturnType<typeof setTimeout> | undefined;
     let raf = 0;
     let pollTimer: ReturnType<typeof setInterval> | undefined;
     let fadeTimer: ReturnType<typeof setTimeout> | undefined;
+    let hardTimeout: ReturnType<typeof setTimeout> | undefined;
     let dismissed = false;
 
     /* ---- reference show(): build the word, animate letters in ---- */
     function show(i: number) {
+      if (!word) return;
       const d = WL_LANGS[i];
-      word!.className = "wl-word";
-      word!.innerHTML = "";
-      word!.style.fontFamily = d.f;
-      word!.style.fontWeight = String(d.w ?? 500);
+      word.className = "wl-word";
+      word.innerHTML = "";
+      word.style.fontFamily = d.f;
+      word.style.fontWeight = String(d.w ?? 500);
       const parts = d.whole ? [d.t] : Array.from(d.t);
       for (let k = 0; k < parts.length; k++) {
         const s = document.createElement("span");
@@ -103,16 +108,17 @@ export function WelcomeLoader({ appReady }: { appReady: boolean }) {
         s.style.fontSize = `calc(clamp(44px, 10.5vw, 128px) * ${d.s})`;
         s.textContent = parts[k] === " " ? "\u00a0" : parts[k];
         if (d.whole) s.style.animationDuration = ".8s";
-        word!.appendChild(s);
+        word.appendChild(s);
       }
-      void word!.offsetWidth; /* restart animations */
-      word!.classList.add("in");
+      void word.offsetWidth; /* restart animations */
+      word.classList.add("in");
     }
 
     /* ---- reference next(): animate out, then swap ---- */
     function next() {
-      word!.classList.remove("in");
-      word!.classList.add("out");
+      if (!word) return;
+      word.classList.remove("in");
+      word.classList.add("out");
       swapTimer = setTimeout(() => {
         idx = (idx + 1) % WL_LANGS.length;
         show(idx);
@@ -121,9 +127,10 @@ export function WelcomeLoader({ appReady }: { appReady: boolean }) {
 
     /* ---- reference tick(): eased progress line ---- */
     function tick() {
+      if (!fill) return;
       const p = Math.min(1, (performance.now() - startAt) / TOTAL);
       const e = 1 - Math.pow(1 - p, 2.2);
-      fill!.style.width = (e * 100) + "%";
+      fill.style.width = (e * 100) + "%";
       if (p < 1) raf = requestAnimationFrame(tick);
     }
 
@@ -131,6 +138,7 @@ export function WelcomeLoader({ appReady }: { appReady: boolean }) {
     function dismiss() {
       if (dismissed) return;
       dismissed = true;
+      if (hardTimeout) clearTimeout(hardTimeout);
       if (cycleTimer) clearInterval(cycleTimer);
       if (swapTimer) clearTimeout(swapTimer);
       if (pollTimer) clearInterval(pollTimer);
@@ -142,24 +150,24 @@ export function WelcomeLoader({ appReady }: { appReady: boolean }) {
       }, FADE_MS);
     }
 
-    /* start only once fonts are ready (no flash of wrong type) */
-    let alive = true;
-    document.fonts.ready.then(() => {
-      if (!alive || dismissed) return;
-      show(0);
-      startAt = performance.now();
-      cycleTimer = setInterval(next, HOLD);
-      tick();
-    });
+    /* Start the first word immediately so stage is never empty */
+    show(0);
+    cycleTimer = setInterval(next, HOLD);
+    tick();
 
-    /* hide when the app is ready — but never before MIN_DISPLAY after the first word */
+    /* Hard safety timeout: dismiss after 3.5s no matter what */
+    hardTimeout = setTimeout(dismiss, 3500);
+
+    /* Poll: dismiss when app is ready and minimum display has elapsed */
     pollTimer = setInterval(() => {
-      if (!readyRef.current || !startAt) return;
-      if (performance.now() - startAt >= MIN_DISPLAY) dismiss();
+      const elapsed = performance.now() - startAt;
+      if (elapsed >= 3500 || (readyRef.current && elapsed >= MIN_DISPLAY)) {
+        dismiss();
+      }
     }, 100);
 
     return () => {
-      alive = false;
+      if (hardTimeout) clearTimeout(hardTimeout);
       if (cycleTimer) clearInterval(cycleTimer);
       if (swapTimer) clearTimeout(swapTimer);
       if (pollTimer) clearInterval(pollTimer);
@@ -167,7 +175,7 @@ export function WelcomeLoader({ appReady }: { appReady: boolean }) {
       cancelAnimationFrame(raf);
       document.body.style.overflow = prevOverflow;
     };
-  }, []);
+  }, [visible]);
 
   /* hard refresh re-shows the loader: clear the session flag when the page unloads */
   useEffect(() => {
@@ -182,14 +190,18 @@ export function WelcomeLoader({ appReady }: { appReady: boolean }) {
     return () => window.removeEventListener("pagehide", onPageHide);
   }, []);
 
-  if (!visible) return null;
+  if (!mounted || !visible) return null;
 
   return (
     <div
       className={`wl-root${fading ? " wl-fading" : ""}`}
       role="status"
-      aria-label="Loading DubAniX"
+      aria-label="Loading DubAniX (bosib o'tkazib yuborish mumkin)"
       aria-live="polite"
+      onClick={() => {
+        setFading(true);
+        setTimeout(() => setVisible(false), FADE_MS);
+      }}
     >
       <div className="wl-blob wl-b1" aria-hidden="true" />
       <div className="wl-blob wl-b2" aria-hidden="true" />

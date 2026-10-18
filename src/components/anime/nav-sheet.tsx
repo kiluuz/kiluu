@@ -97,7 +97,7 @@ function NavTile({ item, index, onGo }: { item: ResolvedNavItem; index: number; 
         def.id === "exchange"
           ? `Exchange${locked ? ` — locked, ${ownedCount} of ${EXCHANGE_REQUIRED} animes owned` : ""}`
           : def.id === "dubbing"
-            ? "AI Dubbing — Japanese to Uzbek"
+            ? "AI Dubbing — coming soon"
             : def.label
       }
     >
@@ -139,7 +139,7 @@ function NavTile({ item, index, onGo }: { item: ResolvedNavItem; index: number; 
       )}
       {def.id === "dubbing" && (
         <span className="flex items-center gap-1 -mt-1.5 text-[10px] text-muted-foreground font-semibold">
-          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 live-dot" /> JA → UZ · live
+          AI dubbing is coming soon
         </span>
       )}
     </motion.button>

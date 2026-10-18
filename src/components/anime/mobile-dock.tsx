@@ -208,7 +208,7 @@ export function MobileDock() {
                 "dock-cta transition-transform active:scale-[0.94] outline-none",
                 "focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
               )}
-              aria-label="Open AI Dubbing Studio (Japanese to Uzbek)"
+              aria-label="Open AI Dubbing — coming soon"
               aria-current={dubbing.active ? "page" : undefined}
             >
               <WaveformBars />
@@ -216,9 +216,9 @@ export function MobileDock() {
                 className="absolute -top-1 -right-1 text-[8px] font-black tracking-wide px-[5px] py-[1px] rounded-full bg-background text-primary border border-primary/40 shadow-sm"
                 aria-hidden="true"
               >
-                UZ
+                SOON
               </span>
-              <span className="sr-only">Uzbek dubbing available</span>
+              <span className="sr-only">AI dubbing coming soon</span>
             </button>
           </div>
 

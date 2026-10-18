@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { getCurrentUser } from "@/lib/auth";
+import { evaluateAchievements } from "@/lib/achievements";
 
 // POST /api/animes/[id]/favorite - toggle favorite anime
 export async function POST(
@@ -20,9 +21,11 @@ export async function POST(
 
   if (existing) {
     await db.favoriteAnime.delete({ where: { id: existing.id } });
+    await evaluateAchievements(user.id);
     return NextResponse.json({ favorited: false });
   } else {
     await db.favoriteAnime.create({ data: { userId: user.id, animeId: anime.id } });
+    await evaluateAchievements(user.id);
     return NextResponse.json({ favorited: true });
   }
 }

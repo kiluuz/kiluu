@@ -1,4 +1,4 @@
-export type Role = "CREATOR" | "VIEWER";
+export type Role = "CREATOR" | "VIEWER" | "ADMIN";
 
 export interface SocialLinks {
   telegram?: string;
@@ -20,6 +20,8 @@ export interface PrivacyConfig {
   showWatchTime: boolean;
   showFavorites: boolean;
   showActivity: boolean;
+  showCollection: boolean;
+  showFollowers: boolean;
   allowFollows: boolean;
   profileVisibility: "everyone" | "followers" | "private";
 }
@@ -37,6 +39,7 @@ export interface AuthUser {
   credits: number;
   onboardingDone: boolean;
   createdAt: string;
+  telegramLinked?: boolean;
   // customization
   pronouns: string | null;
   tagline: string | null;
@@ -52,6 +55,11 @@ export interface AuthUser {
   privacy: string | null;
   /** owned animes count — powers the Exchange "20+" badge + lock (may lag after purchases) */
   ownedCount?: number;
+  level?: number;
+  xp?: number;
+  xpToNext?: number;
+  dailyStreak?: number;
+  badges?: { id: string; label: string; color: string; glow?: boolean }[];
 }
 
 export interface AnimeSummary {
@@ -72,11 +80,24 @@ export interface AnimeSummary {
   studio?: string | null;
   status?: string;
   trending?: number;
+  featured?: boolean;
   creator?: {
     username: string;
     displayName: string | null;
     avatarUrl: string | null;
   } | null;
+  source?: string;
+}
+
+export interface AnimeVersionCard {
+  id: string;
+  kind: string;
+  price: number;
+  status: string;
+  episodeCount: number;
+  sales: number;
+  label: string;
+  owned: boolean;
 }
 
 export interface EpisodeItem {
@@ -86,6 +107,8 @@ export interface EpisodeItem {
   title: string;
   description: string | null;
   videoUrl: string;
+  streamId?: string | null;
+  hlsKey?: string | null;
   duration: number;
   progress: { position: number; duration: number; completed: boolean } | null;
 }
@@ -93,9 +116,15 @@ export interface EpisodeItem {
 export interface AnimeDetail extends AnimeSummary {
   altTitle: string | null;
   purchaseCount: number;
+  collectorCount: number;
   favoriteCount: number;
+  catalogRating: number;
+  communityRating: number | null;
+  ratingCount: number;
+  myRating: number | null;
   favorited: boolean;
   owned: boolean;
+  releaseDate: string | null;
   creator: {
     id: string;
     username: string;
@@ -104,6 +133,7 @@ export interface AnimeDetail extends AnimeSummary {
     accentColor: string;
     role: string;
   } | null;
+  versions?: AnimeVersionCard[];
 }
 
 export interface HomeData {
@@ -128,11 +158,22 @@ export interface ContinueWatchingItem {
   duration: number;
 }
 
+export type PostType =
+  | "Theories"
+  | "Reviews"
+  | "Discussions"
+  | "Memes"
+  | "Fan Art"
+  | "Recommendations"
+  | "UZ Dubbing"
+  | "Watch Parties";
+
 export interface CommunityPost {
   id: string;
   content: string;
   imageUrl: string | null;
   createdAt: string;
+  updatedAt?: string;
   user: {
     id: string;
     username: string;
@@ -140,15 +181,40 @@ export interface CommunityPost {
     avatarUrl: string | null;
     accentColor: string;
     role: string;
+    level?: number;
+    following?: boolean;
+    badges?: { id: string; label: string; color: string; glow?: boolean }[];
   };
-  anime: { id: string; slug: string; title: string; coverImage: string } | null;
+  anime: { id: string; slug: string; title: string; coverImage: string; genres?: string[]; rating?: number; episodeCount?: number } | null;
   likeCount: number;
   commentCount: number;
+  awardCount: number;
   liked: boolean;
+  bookmarked: boolean;
+  category: PostType;
+  spoiler: boolean;
+  rating: number | null;
+  type?: PostType;
+  isSpoiler?: boolean;
+  poll?: {
+    options: { id: string; text: string; votes: number }[];
+    totalVotes: number;
+    userVotedId?: string;
+  };
+  reactions?: {
+    fire: number;
+    heart: number;
+    laugh: number;
+    mindBlown: number;
+    sad: number;
+    userReaction?: "fire" | "heart" | "laugh" | "mindBlown" | "sad" | null;
+  };
+  hashtags?: string[];
 }
 
 export interface CommentItem {
   id: string;
+  parentId: string | null;
   content: string;
   createdAt: string;
   user: {
@@ -158,7 +224,29 @@ export interface CommentItem {
     avatarUrl: string | null;
     accentColor: string;
     role: string;
+    level?: number;
+    badge?: string;
   };
+  likeCount?: number;
+  liked?: boolean;
+  replyCount?: number;
+}
+
+export interface CommunityStats {
+  online: number;
+  postsToday: number;
+  trending: { id: string; slug: string; title: string; coverImage: string; posts: number; likes: number }[];
+  contributors: {
+    id: string;
+    username: string;
+    displayName: string | null;
+    avatarUrl: string | null;
+    accentColor: string;
+    postCount: number;
+    likeCount: number;
+    level: number;
+  }[];
+  watchParties: { id: string; code: string; name: string; title: string; coverImage: string; watching: number }[];
 }
 
 export interface PublicProfile {
@@ -184,15 +272,31 @@ export interface PublicProfile {
   showcase: ShowcaseConfig;
   privacy?: PrivacyConfig;
   stats: {
-    purchaseCount: number;
-    postCount: number;
+    purchaseCount: number | null;
+    postCount: number | null;
     watchSeconds: number | null;
-    followers: number;
-    following: number;
-    favoriteCount: number;
-    exchangeUnlocked: boolean;
+    followers: number | null;
+    following: number | null;
+    favoriteCount: number | null;
+    exchangeUnlocked?: boolean;
+    giftsSent?: number;
+    level?: number;
+    xp?: number;
+    xpToNext?: number;
+    badges?: { id: string; label: string; color: string; glow?: boolean }[];
   };
-  achievements: { id: string; current: number; target: number }[];
+  achievements: {
+    id: string;
+    emoji: string;
+    name: string;
+    desc: string;
+    rarity: "common" | "rare" | "epic" | "legendary" | "mythic";
+    current: number;
+    target: number;
+    earned: boolean;
+    secret: boolean;
+    unlockedAt: string | null;
+  }[];
   currentlyWatching: {
     anime: AnimeSummary;
     episode: { id: string; number: number; title: string };
@@ -209,12 +313,14 @@ export interface PublicProfile {
     content: string;
     imageUrl: string | null;
     createdAt: string;
+    updatedAt?: string;
     anime: { id: string; slug: string; title: string; coverImage: string } | null;
     likeCount: number;
     commentCount: number;
     liked: boolean;
   }[];
   isFollowing: boolean;
+  canFollow: boolean;
   isMe: boolean;
 }
 
@@ -265,8 +371,10 @@ export interface ExchangeProposalItem {
 
 export interface CreditPackage {
   id: string;
+  name?: string;
   credits: number;
-  priceUsd: number;
+  starsPrice?: number;
+  priceUsd?: number;
   bonus: number;
   popular: boolean;
 }
@@ -317,13 +425,15 @@ export type ViewName =
   | "community"
   | "watch-together"
   | "credits"
+  | "gifts"
   | "exchange"
   | "user-profile"
   | "studio"
   | "settings"
   | "login"
   | "schedule"
-  | "dubbing";
+  | "dubbing"
+  | "bot-admin";
 
 export interface View {
   name: ViewName;

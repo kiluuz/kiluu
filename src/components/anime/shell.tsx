@@ -148,18 +148,27 @@ function NavButton({ item, onClick }: { item: ResolvedNavItem; onClick: () => vo
   const Icon = def.icon;
   return (
     <button
-      onClick={onClick}
+      onClick={() => {
+        if (locked && def.lockHint) {
+          toast.info(def.lockHint, { duration: 5000, id: `lock-${def.id}` });
+          return;
+        }
+        onClick();
+      }}
       className={cn(
         "relative w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-[14px] font-semibold transition-all group",
         active
           ? "bg-primary/15 text-primary"
-          : "text-muted-foreground hover:text-foreground hover:bg-accent/60"
+          : "text-muted-foreground hover:text-foreground hover:bg-accent/60",
+        locked && "opacity-60"
       )}
       aria-current={active ? "page" : undefined}
       aria-label={
         def.id === "exchange" && locked
           ? `Exchange — locked, ${item.ownedCount} of ${EXCHANGE_REQUIRED} animes owned`
-          : def.label
+          : locked
+            ? `${def.label} — locked`
+            : def.label
       }
     >
       {active && (
@@ -167,9 +176,9 @@ function NavButton({ item, onClick }: { item: ResolvedNavItem; onClick: () => vo
       )}
       <Icon className={cn("w-[18px] h-[18px] shrink-0", active && "drop-shadow-[0_0_6px_var(--glow)]")} />
       <span className="truncate">{def.label}</span>
+      {locked && <Lock className="ml-auto w-3 h-3 shrink-0 text-muted-foreground" aria-label="locked" />}
       {badgeText && (
         <span className="ml-auto flex items-center gap-1 text-[9px] font-black px-1.5 py-0.5 rounded-full bg-primary/15 text-primary border border-primary/30 tracking-wide">
-          {locked && <Lock className="w-2.5 h-2.5" aria-label="locked" />}
           {badgeText}
         </span>
       )}
@@ -182,7 +191,13 @@ function NavButton({ item, onClick }: { item: ResolvedNavItem; onClick: () => vo
  * `variant="overlay"` renders the same sidebar as an expanding overlay for
  * the tablet icon rail (768–1100px).
  */
-export function Sidebar({ variant = "fixed" }: { variant?: "fixed" | "overlay" }) {
+export function Sidebar({
+  variant = "fixed",
+  onNavigate,
+}: {
+  variant?: "fixed" | "overlay";
+  onNavigate?: () => void;
+}) {
   const { user, view, navigate } = useAppStore();
   const { theme, setTheme } = useTheme();
   const items = useResolvedNav();
@@ -207,7 +222,7 @@ export function Sidebar({ variant = "fixed" }: { variant?: "fixed" | "overlay" }
       <div className="px-5 py-5 border-b border-border/70">
         <BrandLockup />
         <p className="mt-2.5 pl-0.5 text-[10px] uppercase tracking-[0.18em] text-muted-foreground/70">
-          Stream · Collect · Exchange
+          Stream · Collect · Gift
         </p>
       </div>
 
@@ -223,7 +238,10 @@ export function Sidebar({ variant = "fixed" }: { variant?: "fixed" | "overlay" }
                 <NavButton
                   key={item.def.id}
                   item={item}
-                  onClick={() => navigate(item.def.id as never)}
+                  onClick={() => {
+                    navigate(item.def.id as never);
+                    onNavigate?.();
+                  }}
                 />
               ))}
             </div>
@@ -236,7 +254,10 @@ export function Sidebar({ variant = "fixed" }: { variant?: "fixed" | "overlay" }
         {user ? (
           <>
             <button
-              onClick={() => navigate("user-profile", { username: user.username })}
+              onClick={() => {
+                navigate("user-profile", { username: user.username });
+                onNavigate?.();
+              }}
               className={cn(
                 "w-full flex items-center gap-3 px-2.5 py-2 rounded-xl transition-all group",
                 view.name === "user-profile" ? "bg-primary/15" : "hover:bg-accent/60"
@@ -271,7 +292,10 @@ export function Sidebar({ variant = "fixed" }: { variant?: "fixed" | "overlay" }
                 Theme
               </button>
               <button
-                onClick={() => navigate("settings")}
+                onClick={() => {
+                  navigate("settings");
+                  onNavigate?.();
+                }}
                 className={cn(
                   "flex-1 flex items-center justify-center gap-2 py-2 rounded-lg text-[12px] font-semibold transition",
                   view.name === "settings"
@@ -295,7 +319,10 @@ export function Sidebar({ variant = "fixed" }: { variant?: "fixed" | "overlay" }
           </>
         ) : (
           <button
-            onClick={() => navigate("login")}
+            onClick={() => {
+              navigate("login");
+              onNavigate?.();
+            }}
             className="w-full flex items-center gap-3 px-3 py-3 rounded-xl brand-gradient text-white font-bold text-sm hover:opacity-90 transition shadow-lg shadow-primary/25"
           >
             <UserRound className="w-4 h-4" />
@@ -338,7 +365,8 @@ const VIEW_TITLES: Partial<Record<ViewName, string>> = {
   community: "Community",
   "watch-together": "Watch Together",
   library: "My Library",
-  exchange: "Exchange",
+  gifts: "Gifts",
+  exchange: "Gifts",
   credits: "Get Credits",
   studio: "Creator Studio",
   settings: "Settings",

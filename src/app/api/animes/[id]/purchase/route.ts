@@ -1,68 +1,82 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { getCurrentUser } from "@/lib/auth";
+import { purchaseAnimeAtomic } from "@/lib/economy";
+import { officialVersionId } from "@/lib/owns";
+import { rateLimit } from "@/lib/rate-limit";
+import { rateKey } from "@/lib/client-ip";
+import { randomBytes } from "crypto";
+import { log } from "@/lib/logger";
 
-// POST /api/animes/[id]/purchase - buy anime with credits
 export async function POST(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: "Please sign in to purchase" }, { status: 401 });
+  if (!rateLimit(rateKey(req, "buy") + user.id, 20, 60_000)) {
+    return NextResponse.json({ error: "Too many attempts" }, { status: 429 });
+  }
 
   const { id } = await params;
+  const body = await req.json().catch(() => ({}));
+  const episodeNumber = typeof body.episodeNumber === "number" && body.episodeNumber > 0 ? body.episodeNumber : 0;
+  const versionIdIn = typeof body.versionId === "string" ? body.versionId : null;
+  const clientKey = typeof body.idempotencyKey === "string" ? body.idempotencyKey : randomBytes(12).toString("hex");
+
+  const anime = await db.anime.findFirst({ where: { OR: [{ id }, { slug: id }] } });
+  if (!anime) return NextResponse.json({ error: "Anime not found" }, { status: 404 });
+  if (anime.hidden) return NextResponse.json({ error: "Not available" }, { status: 404 });
+
+  const versionId = versionIdIn || (await officialVersionId(anime.id));
+  if (!versionId) return NextResponse.json({ error: "No version for sale" }, { status: 400 });
+  const version = await db.animeVersion.findUnique({ where: { id: versionId } });
+  if (!version || version.status !== "published") {
+    return NextResponse.json({ error: "Version not for sale" }, { status: 400 });
+  }
+
+  const price = episodeNumber > 0
+    ? (typeof body.episodePrice === "number" ? body.episodePrice : version.price)
+    : version.price;
+
+  if (anime.isFree || version.price === 0) {
+    return NextResponse.json({ error: "This version is free" }, { status: 400 });
+  }
 
   try {
-    const anime = await db.anime.findFirst({ where: { OR: [{ id }, { slug: id }] } });
-    if (!anime) return NextResponse.json({ error: "Anime not found" }, { status: 404 });
-
-    if (anime.isFree) {
-      return NextResponse.json({ error: "This anime is free to watch" }, { status: 400 });
-    }
-
-    const existing = await db.purchase.findUnique({
-      where: { userId_animeId: { userId: user.id, animeId: anime.id } },
+    const result = await purchaseAnimeAtomic({
+      userId: user.id,
+      animeId: anime.id,
+      versionId,
+      slug: anime.slug,
+      episodeNumber,
+      price,
+      title: anime.title,
+      idempotencyKey: `buy-${user.id}-${versionId}-${episodeNumber}-${clientKey}`,
     });
-    if (existing) {
-      return NextResponse.json({ error: "You already own this anime" }, { status: 409 });
-    }
-
-    if (user.credits < anime.price) {
-      return NextResponse.json(
-        { error: `Not enough credits. You need ${anime.price - user.credits} more.`, needMore: anime.price - user.credits },
-        { status: 400 }
-      );
-    }
-
-    const result = await db.$transaction(async (tx) => {
-      await tx.purchase.create({
-        data: { userId: user.id, animeId: anime.id, pricePaid: anime.price },
-      });
-      await tx.creditTransaction.create({
-        data: {
-          userId: user.id,
-          amount: -anime.price,
-          type: "PURCHASE",
-          description: `Purchased "${anime.title}"`,
-        },
-      });
-      const updated = await tx.user.update({
-        where: { id: user.id },
-        data: { credits: { decrement: anime.price } },
-      });
-      return updated;
-    });
-
-    const purchaseCount = await db.purchase.count({ where: { userId: user.id } });
-
     return NextResponse.json({
       success: true,
       credits: result.credits,
-      purchaseCount,
-      unlockedExchange: purchaseCount >= 20,
+      versionId,
+      episodeNumber,
+      pricePaid: price,
     });
-  } catch (e) {
-    console.error("purchase error", e);
+  } catch (e: unknown) {
+    const code = (e as { code?: string }).code;
+    if (code === "ALREADY_OWNED") {
+      return NextResponse.json({ error: "Already owned", alreadyOwned: true }, { status: 409 });
+    }
+    if (code === "INSUFFICIENT") {
+      return NextResponse.json({ error: "Not enough credits", needMore: (e as { need?: number }).need }, { status: 400 });
+    }
+    if (code === "PRICE_MISMATCH") {
+      return NextResponse.json({ error: "Price changed, refresh" }, { status: 409 });
+    }
+    log.error("Anime credit purchase failed", {
+      anime: id,
+      code: typeof code === "string" ? code : undefined,
+      error: e instanceof Error ? e.message : String(e),
+    });
     return NextResponse.json({ error: "Purchase failed" }, { status: 500 });
   }
 }

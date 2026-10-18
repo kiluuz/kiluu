@@ -1,0 +1,23 @@
+{
+  "episodes": "Qismlar",
+  "pickEpisodes": "Qismlarni tanlash",
+  "notifyMe": "Xabardor qiling",
+  "notifyCancel": "Bekor qilish",
+  "globalSchedule": "Global Jadval",
+  "scheduleSubtitle": "Keyingi 7 kundagi barcha anime chiqishlari",
+  "episodesEmpty": "Hozircha qismlar yuklanmagan — tez kunda!",
+  "total": "jami",
+  "signIn": "Kirish",
+  "createAccount": "Akkount ochish",
+  "language": "Til",
+  "profile.overview": "Umumiy",
+  "profile.collection": "Kolleksiya",
+  "profile.favorites": "Sevimlilar",
+  "profile.activity": "Faollik va postlar",
+  "profile.achievements": "Yutuqlar",
+  "profile.owned": "Egalikda",
+  "profile.watchTime": "Ko‘rish vaqti",
+  "profile.followers": "Kuzatuvchilar",
+  "profile.posts": "Postlar",
+  "profile.hours": "soat"
+}

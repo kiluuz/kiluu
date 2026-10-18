@@ -471,7 +471,7 @@ async function main() {
 
   // Community posts
   console.log("Creating community posts...");
-  const posts = [];
+  const posts: Array<{ id: string }> = [];
   for (const p of POSTS) {
     const post = await db.post.create({
       data: {

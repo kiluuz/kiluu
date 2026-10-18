@@ -1,0 +1,7 @@
+name = "dubanix-r2-media"
+main = "r2-media-worker.mjs"
+compatibility_date = "2026-10-17"
+
+[[r2_buckets]]
+binding = "MEDIA_BUCKET"
+bucket_name = "kiluu"

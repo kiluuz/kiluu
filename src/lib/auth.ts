@@ -1,4 +1,5 @@
 import { db } from "@/lib/db";
+import { clientRole } from "@/lib/rbac";
 import { randomBytes, scryptSync, timingSafeEqual } from "crypto";
 import { cookies } from "next/headers";
 
@@ -29,6 +30,7 @@ export async function createSession(userId: string) {
   cookieStore.set(SESSION_COOKIE, token, {
     httpOnly: true,
     sameSite: "lax",
+    secure: process.env.NODE_ENV === "production",
     expires: expiresAt,
     path: "/",
   });
@@ -45,23 +47,19 @@ export async function destroySession() {
 }
 
 export async function getCurrentUser() {
-  try {
-    const cookieStore = await cookies();
-    const token = cookieStore.get(SESSION_COOKIE)?.value;
-    if (!token) return null;
-    const session = await db.session.findUnique({
-      where: { token },
-      include: { user: true },
-    });
-    if (!session) return null;
-    if (session.expiresAt < new Date()) {
-      await db.session.delete({ where: { id: session.id } }).catch(() => {});
-      return null;
-    }
-    return session.user;
-  } catch {
+  const cookieStore = await cookies();
+  const token = cookieStore.get(SESSION_COOKIE)?.value;
+  if (!token) return null;
+  const session = await db.session.findUnique({
+    where: { token },
+    include: { user: true },
+  });
+  if (!session) return null;
+  if (session.expiresAt < new Date()) {
+    await db.session.delete({ where: { id: session.id } });
     return null;
   }
+  return session.user;
 }
 
 export interface PublicUser {
@@ -77,11 +75,14 @@ export interface PublicUser {
   credits: number;
   onboardingDone: boolean;
   createdAt: string;
-  // customization
+  telegramId: string | null;
+  telegramUsername: string | null;
+  telegramLinked: boolean;
+  locale: string;
+  timezone: string | null;
   pronouns: string | null;
   tagline: string | null;
   country: string | null;
-  timezone: string | null;
   socialLinks: string | null;
   statusEmoji: string | null;
   statusText: string | null;
@@ -105,6 +106,9 @@ export function toPublicUser(user: {
   credits: number;
   onboardingDone: boolean;
   createdAt: Date;
+  telegramId?: string | null;
+  telegramUsername?: string | null;
+  locale?: string | null;
   pronouns?: string | null;
   tagline?: string | null;
   country?: string | null;
@@ -123,7 +127,7 @@ export function toPublicUser(user: {
     email: user.email,
     username: user.username,
     displayName: user.displayName,
-    role: user.role,
+    role: clientRole(user.role),
     avatarUrl: user.avatarUrl,
     bannerUrl: user.bannerUrl,
     bio: user.bio,
@@ -131,6 +135,10 @@ export function toPublicUser(user: {
     credits: user.credits,
     onboardingDone: user.onboardingDone,
     createdAt: user.createdAt.toISOString(),
+    telegramId: user.telegramId ?? null,
+    telegramUsername: user.telegramUsername ?? null,
+    telegramLinked: Boolean(user.telegramId),
+    locale: user.locale || "uz",
     pronouns: user.pronouns ?? null,
     tagline: user.tagline ?? null,
     country: user.country ?? null,

@@ -58,8 +58,8 @@ export const AVATAR_FRAMES: AvatarFrameDef[] = [
   { id: "sakura", label: "Sakura Dream", css: "conic-gradient(from 90deg, #fda4af, #f472b6, #c084fc, #fda4af)", price: 500, premium: true },
 ];
 
-/* ============ ACHIEVEMENTS CATALOG ============ */
-export type Rarity = "common" | "rare" | "epic" | "legendary";
+/* Achievement definitions are served from the database-backed catalog. */
+export type Rarity = "common" | "rare" | "epic" | "legendary" | "mythic";
 
 export interface AchievementDef {
   id: string;
@@ -69,29 +69,12 @@ export interface AchievementDef {
   rarity: Rarity;
 }
 
-export const ACHIEVEMENTS: AchievementDef[] = [
-  { id: "join", emoji: "🎬", name: "DubAniX Citizen", desc: "Joined DubAniX", rarity: "common" },
-  { id: "first", emoji: "💎", name: "First Purchase", desc: "Bought your first anime", rarity: "common" },
-  { id: "curator", emoji: "📚", name: "Curator", desc: "Favorited 10 animes", rarity: "common" },
-  { id: "collector", emoji: "🏆", name: "Collector", desc: "Own 10 animes", rarity: "rare" },
-  { id: "critic", emoji: "🍿", name: "Couch Critic", desc: "Watched 10 hours", rarity: "rare" },
-  { id: "voice", emoji: "📣", name: "Voice of Community", desc: "Published 5 posts", rarity: "rare" },
-  { id: "social", emoji: "🤝", name: "Social Butterfly", desc: "Got 5 followers", rarity: "rare" },
-  { id: "exchange", emoji: "🔄", name: "Exchange Master", desc: "Own 20 animes & unlock trading", rarity: "epic" },
-  { id: "marathon", emoji: "🌠", name: "Marathon Otaku", desc: "Watched 50 hours", rarity: "epic" },
-  { id: "creator", emoji: "🎥", name: "Creator", desc: "Became a Creator", rarity: "epic" },
-  { id: "trendsetter", emoji: "👑", name: "Trendsetter", desc: "Got 20 followers", rarity: "legendary" },
-];
-
-export function achievementById(id: string): AchievementDef | undefined {
-  return ACHIEVEMENTS.find((a) => a.id === id);
-}
-
 export const RARITY_LABEL: Record<Rarity, string> = {
   common: "Common",
   rare: "Rare",
   epic: "Epic",
   legendary: "Legendary",
+  mythic: "Mythic",
 };
 
 /** Creator Studio — cover banner gallery for episode/anime uploads */

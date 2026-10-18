@@ -109,11 +109,11 @@ export function SettingsView() {
         <div className="space-y-2 text-xs text-muted-foreground leading-relaxed">
           <p>
             DubAniX is a premium anime streaming universe — watch free and purchased animes,
-            collect credits, trade with other collectors, and host synced watch parties.
+            collect credits, send gifts, and host synced watch parties.
           </p>
           <p className="flex items-center gap-1.5">
             <Repeat className="w-3.5 h-3.5" />
-            Exchange unlocks after 20 anime purchases
+            Gifts pay even if you already own the version (14-day claim)
           </p>
           <p>Version 1.0 · Made with 💜 for anime fans</p>
         </div>

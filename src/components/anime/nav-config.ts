@@ -1,8 +1,8 @@
 "use client";
 
 import {
-  Home, Compass, Users, Clock, Repeat, Wallet, Video, AudioLines,
-  CalendarDays, Clapperboard, type LucideIcon,
+  Home, Compass, Users, Clock, Gift, Wallet, Video, AudioLines,
+  CalendarDays, Clapperboard, Settings2, type LucideIcon,
 } from "lucide-react";
 import { useAppStore } from "./store";
 import type { ViewName } from "./types";
@@ -29,11 +29,11 @@ export interface NavItemDef {
   /** the raised center action in the mobile dock */
   mobileCenter?: boolean;
   /** badge kind — resolved at render time from live store data */
-  badge?: "uz" | "exchange";
-  /** lock rule — locked items explain instead of navigating */
-  lock?: "exchange";
+  badge?: "soon";
+  lock?: string;
   /** only rendered for CREATOR accounts (parity with desktop sidebar) */
   creatorOnly?: boolean;
+  adminOnly?: boolean;
   /** friendly explanation when the item is locked */
   lockHint?: string;
 }
@@ -44,15 +44,16 @@ export const NAV_ITEMS: readonly NavItemDef[] = [
   { id: "home",           label: "Home",          shortLabel: "Home",     icon: Home,         group: "browse", mobilePrimary: true },
   { id: "browse",         label: "Discover",      shortLabel: "Discover", icon: Compass,      group: "browse", mobilePrimary: true },
   { id: "schedule",       label: "Schedule",      shortLabel: "Schedule", icon: CalendarDays, group: "browse" },
-  { id: "dubbing",        label: "AI Dubbing",    shortLabel: "AI Dub",   icon: AudioLines,   group: "browse", mobileCenter: true, badge: "uz" },
+  { id: "dubbing",        label: "AI Dubbing",    shortLabel: "AI Dub",   icon: AudioLines,   group: "browse", mobileCenter: true, badge: "soon" },
   { id: "community",      label: "Community",     shortLabel: "Community",icon: Users,        group: "browse" },
   { id: "watch-together", label: "Watch Together",shortLabel: "Together", icon: Video,        group: "browse" },
   { id: "library",        label: "My Library",    shortLabel: "Library",  icon: Clock,        group: "my",    mobilePrimary: true },
-  { id: "exchange",       label: "Exchange",      shortLabel: "Exchange", icon: Repeat,       group: "my",    badge: "exchange", lock: "exchange",
-    lockHint: `The Exchange unlocks once you own ${EXCHANGE_REQUIRED} animes. Keep collecting to open the market!` },
+  { id: "gifts",          label: "Gifts",         shortLabel: "Gifts",    icon: Gift,         group: "my" },
   { id: "credits",        label: "Get Credits",   shortLabel: "Credits",  icon: Wallet,       group: "my" },
   { id: "studio",         label: "Creator Studio",shortLabel: "Studio",   icon: Clapperboard, group: "creator", creatorOnly: true,
     lockHint: "You picked the Viewer path at sign-up — Creator Studio is for Creator accounts." },
+  { id: "bot-admin",      label: "Bot Admin",      shortLabel: "Admin",    icon: Settings2,    group: "creator", adminOnly: true,
+    lockHint: "Admin panel is for admin accounts only." },
 ] as const;
 
 export const NAV_GROUP_LABELS: Record<NavGroup, string> = {
@@ -67,8 +68,12 @@ export function itemsForGroup(group: NavGroup): NavItemDef[] {
 
 /** Everything reachable in the sheet. Creator Studio is hidden only for
  *  guests (no role yet); logged-in viewers see it locked with an explanation. */
-export function visibleItems(isCreator: boolean, isGuest: boolean): NavItemDef[] {
-  return NAV_ITEMS.filter((i) => !i.creatorOnly || isCreator || !isGuest);
+export function visibleItems(isCreator: boolean, isGuest: boolean, isAdmin = false): NavItemDef[] {
+  return NAV_ITEMS.filter((i) => {
+    if (i.adminOnly) return isAdmin;
+    if (i.creatorOnly) return isCreator || isAdmin || !isGuest;
+    return true;
+  });
 }
 
 /* ---------------- resolved state per item ---------------- */
@@ -89,15 +94,16 @@ export function useResolvedNav(): ResolvedNavItem[] {
   const view = useAppStore((s) => s.view);
   const user = useAppStore((s) => s.user);
   const scheduleAirsToday = useAppStore((s) => s.scheduleAirsToday);
-  const isCreator = user?.role === "CREATOR";
+  const isCreator = user?.role === "CREATOR" || user?.role === "ADMIN";
+  const isAdmin = user?.role === "ADMIN";
   const owned = user?.ownedCount ?? 0;
 
-  return visibleItems(isCreator, !user).map((def) => {
+  return visibleItems(isCreator, !user, isAdmin).map((def) => {
     const active = view.name === def.id;
     const locked =
-      (def.lock === "exchange" && (!user || owned < EXCHANGE_REQUIRED)) ||
-      (!!def.creatorOnly && !!user && !isCreator);
-    const badgeText = def.badge === "uz" ? "UZ" : def.badge === "exchange" && user ? `${EXCHANGE_REQUIRED}+` : undefined;
+      (!!def.creatorOnly && !!user && !isCreator) ||
+      (!!def.adminOnly && !!user && !isAdmin);
+    const badgeText = def.badge === "soon" ? "Soon" : undefined;
     const dot = def.id === "schedule" ? scheduleAirsToday : undefined;
     return { def, active, badgeText, locked, ownedCount: owned, dot };
   });

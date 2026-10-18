@@ -1,7 +1,8 @@
 import sharp from "sharp";
-import { mkdir, writeFile, unlink } from "fs/promises";
+import { unlink } from "fs/promises";
 import path from "path";
 import { randomBytes } from "crypto";
+import { deleteR2Object, putR2Object, r2KeyFromPublicUrl } from "@/lib/r2";
 
 /**
  * DubAniX media pipeline — Midnight Cinema edition.
@@ -44,7 +45,6 @@ export async function isAnimated(buf: Buffer): Promise<boolean> {
 export interface MediaVariant {
   width: number;
   url: string; // public URL
-  file: string; // absolute path
 }
 
 export interface ProcessedMedia {
@@ -54,10 +54,7 @@ export interface ProcessedMedia {
   lqip: string; // tiny base64 blur-up data-uri
   width: number;
   height: number;
-  files: string[]; // all written files (for cleanup)
 }
-
-const UPLOAD_ROOT = path.join(process.cwd(), "public", "uploads");
 
 export interface BannerCrop {
   x: number; // in natural image px
@@ -72,53 +69,48 @@ export interface AvatarCrop {
   size: number; // square side in natural px
 }
 
-async function safeUnlink(file: string) {
-  try { await unlink(file); } catch { /* ignore */ }
-}
-
 /** Delete every file of a previous upload (URLs like /uploads/xxx) */
 export async function deleteUploadedByUrl(urls: (string | null | undefined)[]) {
-  await Promise.all(
-    urls
-      .filter((u): u is string => !!u && u.startsWith("/uploads/"))
-      .map((u) => safeUnlink(path.join(process.cwd(), "public", u.replace(/^\//, ""))))
-  );
+  await Promise.all(urls.filter((url): url is string => Boolean(url)).map(async (url) => {
+    if (url.startsWith("/uploads/")) {
+      await unlink(path.join(process.cwd(), "public", url.replace(/^\//, ""))).catch((error: NodeJS.ErrnoException) => {
+        if (error.code !== "ENOENT") throw error;
+      });
+      return;
+    }
+    const key = r2KeyFromPublicUrl(url);
+    if (key) await deleteR2Object(key);
+  }));
 }
 
 async function writeVariants(
-  pipeline: sharp.Sharp,
+  pipeline: ReturnType<typeof sharp>,
   userId: string,
   kind: "banner" | "avatar",
   widths: number[],
   aspect: number | null // w/h; null = keep natural (avatar square)
-): Promise<{ variants: MediaVariant[]; lqip: string; files: string[] }> {
-  const dir = path.join(UPLOAD_ROOT, userId);
-  await mkdir(dir, { recursive: true });
+): Promise<{ variants: MediaVariant[]; lqip: string }> {
   const stamp = Date.now().toString(36) + randomBytes(3).toString("hex");
 
   const variants: MediaVariant[] = [];
-  const files: string[] = [];
-  let lqip = "";
 
   for (const w of widths) {
     const name = `${kind}-${stamp}-${w}.webp`;
-    const file = path.join(dir, name);
-    let p = pipeline.clone().resize(
+    const key = `images/${kind}/${userId}/${name}`;
+    const { data, info } = await pipeline.clone().resize(
       aspect ? { width: w, height: Math.round(w / aspect), fit: "cover" } : { width: w, height: w, fit: "cover" }
-    );
-    const info = await p.webp({ quality: 82 }).toFile(file);
-    variants.push({ width: info.width, url: `/uploads/${userId}/${name}`, file });
-    files.push(file);
+    ).webp({ quality: 82 }).toBuffer({ resolveWithObject: true });
+    const url = await putR2Object(key, data, "image/webp");
+    variants.push({ width: info.width, url });
   }
 
-  // LQIP: 16px wide blur jpeg -> data-uri
+  // LQIP: 16px wide blur webp -> data-uri
   const lqipBuf = await pipeline.clone()
     .resize({ width: 16, height: aspect ? Math.max(1, Math.round(16 / aspect)) : 16, fit: "cover" })
     .webp({ quality: 30 })
     .toBuffer();
-  lqip = `data:image/webp;base64,${lqipBuf.toString("base64")}`;
 
-  return { variants, lqip, files };
+  return { variants, lqip: `data:image/webp;base64,${lqipBuf.toString("base64")}` };
 }
 
 /** Process an uploaded banner: validate, strip EXIF, crop 3:1, build variants. */
@@ -166,22 +158,18 @@ export async function processBanner(
 
   const cropped = sharp(buf, { animated: false }).extract({ left: cx, top: cy, width: cw, height: ch });
 
-  const { variants, lqip, files } = await writeVariants(cropped, userId, "banner", [1500, 750, 400], 3);
+  const { variants, lqip } = await writeVariants(cropped, userId, "banner", [1500, 750, 400], 3);
 
   // Keep the animation as a separate original-quality file when allowed
   let animatedUrl: string | null = null;
   if (animated && keepAnimated) {
-    const dir = path.join(UPLOAD_ROOT, userId);
-    await mkdir(dir, { recursive: true });
-    const name = `banner-anim-${Date.now().toString(36)}.gif`;
-    const file = path.join(dir, name);
-    // resize animation to max 1500 wide, keep looping
-    await sharp(buf, { animated: true })
+    const name = `banner-anim-${Date.now().toString(36)}-${randomBytes(3).toString("hex")}.gif`;
+    const key = `images/banner/${userId}/${name}`;
+    const animatedBuffer = await sharp(buf, { animated: true })
       .resize({ width: Math.min(1500, meta.width), withoutEnlargement: true })
       .gif({ loop: 0 })
-      .toFile(file);
-    animatedUrl = `/uploads/${userId}/${name}`;
-    files.push(file);
+      .toBuffer();
+    animatedUrl = await putR2Object(key, animatedBuffer, "image/gif");
   }
 
   const main = variants[0];
@@ -192,7 +180,6 @@ export async function processBanner(
     lqip,
     width: main.width,
     height: Math.round(main.width / 3),
-    files,
   };
 }
 
@@ -219,7 +206,7 @@ export async function processAvatar(buf: Buffer, userId: string, crop: AvatarCro
   }
 
   const cropped = sharp(buf, { animated: false }).extract({ left: sx, top: sy, width: ssize, height: ssize });
-  const { variants, lqip, files } = await writeVariants(cropped, userId, "avatar", [512, 256, 128], null);
+  const { variants, lqip } = await writeVariants(cropped, userId, "avatar", [512, 256, 128], null);
 
   const main = variants[0];
   return {
@@ -229,6 +216,5 @@ export async function processAvatar(buf: Buffer, userId: string, crop: AvatarCro
     lqip,
     width: main.width,
     height: main.width,
-    files,
   };
 }

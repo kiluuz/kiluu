@@ -9,9 +9,34 @@ import type { AnimeSummary, HomeData } from "../types";
 import { AnimeCard, ContinueCard, SectionHeader, ScrollRow, SmartImage, RankedCard, WideCard, formatCredits } from "../ui-bits";
 import { toast } from "sonner";
 
+const HOME_CACHE_KEY = "dubanix:home:v2";
+const HOME_CACHE_TTL = 5 * 60 * 1000; // 5 min
+
+function readHomeCache(): HomeData | null {
+  try {
+    const raw = localStorage.getItem(HOME_CACHE_KEY);
+    if (!raw) return null;
+    const { data, ts } = JSON.parse(raw) as { data: HomeData; ts: number };
+    if (Date.now() - ts > HOME_CACHE_TTL) return null;
+    return data;
+  } catch {
+    return null;
+  }
+}
+
+function writeHomeCache(d: HomeData) {
+  try {
+    localStorage.setItem(HOME_CACHE_KEY, JSON.stringify({ data: d, ts: Date.now() }));
+  } catch {}
+}
+
 export function HomeView() {
   const { navigate, user, setAuthOpen } = useAppStore();
-  const [data, setData] = useState<HomeData | null>(null);
+  const [data, setData] = useState<HomeData | null>(() => {
+    // Instantly show cached data on mount (no skeleton flash for returning users)
+    if (typeof window !== "undefined") return readHomeCache();
+    return null;
+  });
   const [heroIdx, setHeroIdx] = useState(0);
 
   useEffect(() => {
@@ -19,7 +44,10 @@ export function HomeView() {
     fetch("/api/home")
       .then((r) => r.json())
       .then((d) => {
-        if (alive && d) setData(d);
+        if (alive && d) {
+          setData(d);
+          writeHomeCache(d);
+        }
       })
       .catch(() => toast.error("Failed to load home data"));
     return () => {
@@ -85,15 +113,16 @@ export function HomeView() {
                 </div>
               );
             })}
-            <div className="absolute inset-0 bg-gradient-to-t from-background via-background/60 to-background/20" />
-            <div className="absolute inset-0 bg-gradient-to-r from-background/80 via-transparent to-transparent" />
+            <div className="absolute inset-0 bg-gradient-to-t from-background via-background/45 to-transparent" />
+            <div className="absolute inset-0 bg-gradient-to-r from-background/75 via-background/20 to-transparent" />
           </div>
 
           <div className="relative h-full max-w-[1280px] mx-auto px-4 sm:px-8 flex flex-col justify-end pb-10 sm:pb-14 pt-24">
             <div key={hero.id} className="fade-in-up max-w-2xl">
               <div className="flex items-center gap-2 mb-3 flex-wrap">
                 <Badge className="brand-gradient text-white border-0 gap-1 font-bold">
-                  <Sparkles className="w-3 h-3" /> #{heroIdx + 1} Featured
+                  <Sparkles className="w-3 h-3" />
+                  {hero.featured ? `#${heroIdx + 1} Featured` : "From the catalog"}
                 </Badge>
                 {hero.isFree ? (
                   <Badge className="bg-emerald-500/90 border-0 font-bold">FREE</Badge>
@@ -104,7 +133,7 @@ export function HomeView() {
                 )}
                 <Badge variant="secondary" className="font-semibold">{hero.type}</Badge>
               </div>
-              <h1 className="text-3xl sm:text-5xl lg:text-6xl font-black leading-[1.05] mb-3 drop-shadow-lg">
+              <h1 className="max-w-xl line-clamp-2 text-3xl sm:text-5xl lg:text-6xl font-black leading-[1.05] mb-3 drop-shadow-lg">
                 {hero.title}
               </h1>
               <div className="flex items-center gap-3 text-sm mb-4 flex-wrap">
@@ -212,7 +241,7 @@ export function HomeView() {
             </div>
             <ScrollRow>
               {data.freeAnimes.map((a) => (
-                <AnimeCard key={a.id} anime={a} />
+                <AnimeCard key={a.id} anime={a} compactTitle />
               ))}
             </ScrollRow>
           </section>

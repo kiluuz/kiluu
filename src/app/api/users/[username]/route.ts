@@ -1,6 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { getCurrentUser } from "@/lib/auth";
+import { canViewProfile, parseProfilePrivacy } from "@/lib/profile-privacy";
+import { getUserAchievementStates } from "@/lib/achievements";
+import { getXpTotal, levelFromXp } from "@/lib/xp";
+import { Prisma } from "@prisma/client";
+import { sqlTable } from "@/lib/sql-table";
 
 const ANIME_CARD = {
   id: true, slug: true, title: true, coverImage: true, bannerImage: true,
@@ -29,10 +34,106 @@ export async function GET(
 
   const isMe = me ? me.id === user.id : false;
 
-  const privacy = safeParse(user.privacy, {
-    showWatchTime: true, showFavorites: true, showActivity: true,
-    allowFollows: true, profileVisibility: "everyone",
-  } as { showWatchTime: boolean; showFavorites: boolean; showActivity: boolean; allowFollows: boolean; profileVisibility: string });
+  const privacy = parseProfilePrivacy(user.privacy);
+  const existingFollow = me && !isMe
+    ? await db.follow.findUnique({
+        where: { followerId_followedId: { followerId: me.id, followedId: user.id } },
+        select: { id: true },
+      })
+    : null;
+  const isFollowing = Boolean(existingFollow);
+  if (!canViewProfile(privacy, isMe, isFollowing)) {
+    return NextResponse.json({ error: "Profile is private" }, { status: 404 });
+  }
+
+  if (req.nextUrl.searchParams.get("view") === "card") {
+    const [stats] = await db.$queryRaw<Array<{
+      purchaseCount: bigint | number;
+      postCount: bigint | number;
+      watchSeconds: bigint | number | null;
+      followers: bigint | number;
+      following: bigint | number;
+      favoriteCount: bigint | number;
+      xp: bigint | number | null;
+    }>>(Prisma.sql`
+      SELECT
+        (
+          SELECT COUNT(*) FROM (
+            SELECT "animeId" FROM ${sqlTable("Purchase")} WHERE "userId" = ${user.id}
+            UNION
+            SELECT a."id"
+            FROM ${sqlTable("Order")} o
+            JOIN ${sqlTable("Anime")} a ON a."slug" = o."anime_slug"
+            WHERE o."site_user_id" = ${user.id}
+              AND o."status" IN ('COMPLETED', 'PAID_PENDING_GRANT')
+          ) owned_anime
+        ) AS "purchaseCount",
+        (SELECT COUNT(*) FROM ${sqlTable("Post")} WHERE "userId" = ${user.id} AND "hidden" = false) AS "postCount",
+        (SELECT COALESCE(SUM("seconds"), 0) FROM ${sqlTable("watch_events")} WHERE "userId" = ${user.id}) AS "watchSeconds",
+        (SELECT COUNT(*) FROM ${sqlTable("Follow")} WHERE "followedId" = ${user.id}) AS "followers",
+        (SELECT COUNT(*) FROM ${sqlTable("Follow")} WHERE "followerId" = ${user.id}) AS "following",
+        (SELECT COUNT(*) FROM ${sqlTable("FavoriteAnime")} WHERE "userId" = ${user.id}) AS "favoriteCount",
+        (SELECT COALESCE(SUM("amount"), 0) FROM ${sqlTable("XpEvent")} WHERE "userId" = ${user.id}) AS "xp"
+    `);
+    const xpTotal = Number(stats.xp ?? 0);
+    const levelInfo = levelFromXp(xpTotal);
+    const count = (value: bigint | number) => Number(value);
+
+    return NextResponse.json({
+      profile: {
+        id: user.id,
+        username: user.username,
+        displayName: user.displayName,
+        role: user.role,
+        avatarUrl: user.avatarUrl || null,
+        bannerUrl: user.bannerUrl || null,
+        bio: user.bio,
+        accentColor: user.accentColor,
+        accentTo: user.accentTo || null,
+        avatarFrame: user.avatarFrame || null,
+        createdAt: user.createdAt,
+        pronouns: user.pronouns || null,
+        tagline: user.tagline || null,
+        country: user.country || null,
+        timezone: user.timezone || null,
+        socialLinks: safeParse<Record<string, string>>(user.socialLinks, {}),
+        statusEmoji: user.statusEmoji || null,
+        statusText: user.statusText || null,
+        showcase: {
+          topFive: [],
+          pinnedPostId: null,
+          genres: [],
+          achievementIds: [],
+          order: [],
+          hidden: {},
+        },
+        privacy: isMe ? privacy : undefined,
+        canFollow: privacy.allowFollows,
+        stats: {
+          purchaseCount: privacy.showCollection || isMe ? count(stats.purchaseCount) : null,
+          postCount: privacy.showActivity || isMe ? count(stats.postCount) : null,
+          watchSeconds: privacy.showWatchTime || isMe ? count(stats.watchSeconds ?? 0) : null,
+          followers: privacy.showFollowers || isMe ? count(stats.followers) : null,
+          following: privacy.showFollowers || isMe ? count(stats.following) : null,
+          favoriteCount: privacy.showFavorites || isMe ? count(stats.favoriteCount) : null,
+          level: levelInfo.level,
+          xp: xpTotal,
+          xpToNext: Math.max(0, levelInfo.nextLevelXp - xpTotal),
+        },
+        achievements: [],
+        currentlyWatching: null,
+        favoriteAnimes: [],
+        favoriteUsers: [],
+        followersList: [],
+        ownedAnimes: [],
+        posts: [],
+        isFollowing,
+        isMe,
+      },
+    }, {
+      headers: { "Cache-Control": "private, no-store" },
+    });
+  }
 
   const showcase = safeParse(user.showcase, {
     topFive: [] as string[], pinnedPostId: null as string | null,
@@ -42,23 +143,22 @@ export async function GET(
   });
 
   const [
-    purchaseCount, favoriteAnimesRows, favoriteUsersRows, followersRows,
-    ownedRows, postCount, postsRows, progressRows, latestProgress, favoriteUserCount, followerCount,
+    favoriteAnimesRows, favoriteUsersRows, followersRows,
+    ownedRows, orderRows, postCount, postsRows, latestProgress, favoriteUserCount, followerCount,
   ] = await Promise.all([
-    db.purchase.count({ where: { userId: user.id } }),
     db.favoriteAnime.findMany({
       where: { userId: user.id },
       orderBy: { createdAt: "desc" },
       include: { anime: { select: ANIME_CARD } },
     }),
-    db.favoriteUser.findMany({
+    db.follow.findMany({
       where: { followerId: user.id },
       take: 8,
       orderBy: { createdAt: "desc" },
-      include: { following: { select: USER_MINI } },
+      include: { followed: { select: USER_MINI } },
     }),
-    db.favoriteUser.findMany({
-      where: { followingId: user.id },
+    db.follow.findMany({
+      where: { followedId: user.id },
       take: 8,
       orderBy: { createdAt: "desc" },
       include: { follower: { select: USER_MINI } },
@@ -68,19 +168,19 @@ export async function GET(
       orderBy: { createdAt: "desc" },
       include: { anime: { select: ANIME_CARD } },
     }),
-    db.post.count({ where: { userId: user.id } }),
+    db.order.findMany({
+      where: { site_user_id: user.id, status: { in: ["COMPLETED", "PAID_PENDING_GRANT"] } },
+      select: { anime_slug: true },
+    }),
+    db.post.count({ where: { userId: user.id, hidden: false } }),
     db.post.findMany({
-      where: { userId: user.id },
+      where: { userId: user.id, hidden: false },
       orderBy: { createdAt: "desc" },
       take: 10,
       include: {
         anime: { select: { id: true, slug: true, title: true, coverImage: true } },
         _count: { select: { likes: true, comments: true } },
       },
-    }),
-    db.watchProgress.findMany({
-      where: { userId: user.id },
-      select: { position: true, duration: true },
     }),
     // currently watching = most recent uncompleted progress
     db.watchProgress.findFirst({
@@ -91,8 +191,8 @@ export async function GET(
         episode: { select: { id: true, number: true, title: true } },
       },
     }),
-    db.favoriteUser.count({ where: { followerId: user.id } }),
-    db.favoriteUser.count({ where: { followingId: user.id } }),
+    db.follow.count({ where: { followerId: user.id } }),
+    db.follow.count({ where: { followedId: user.id } }),
   ]);
 
   // my like state on their posts
@@ -105,41 +205,49 @@ export async function GET(
     myLikedPostIds = likes.map((l) => l.postId);
   }
 
-  const watchSeconds = progressRows.reduce(
-    (acc, p) => acc + Math.min(p.position, p.duration || p.position), 0
-  );
-
-  let isFollowing = false;
-  if (me) {
-    const rel = await db.favoriteUser.findUnique({
-      where: { followerId_followingId: { followerId: me.id, followingId: user.id } },
-    });
-    isFollowing = !!rel;
-  }
+  const watchEventStats = await db.watchEvent.aggregate({
+    where: { userId: user.id },
+    _sum: { seconds: true },
+  });
+  const watchSeconds = watchEventStats._sum.seconds ?? 0;
 
   const favoriteAnimes = favoriteAnimesRows.map((f) => f.anime);
-  const ownedAnimes = ownedRows.map((p) => p.anime);
+  const orderedAnimes = orderRows.length
+    ? await db.anime.findMany({
+        where: { slug: { in: orderRows.map((order) => order.anime_slug) } },
+        select: ANIME_CARD,
+      })
+    : [];
+  const ownedAnimes = [...new Map(
+    [...ownedRows.map((purchase) => purchase.anime), ...orderedAnimes].map((anime) => [anime.id, anime])
+  ).values()];
+  const purchaseCount = ownedAnimes.length;
 
-  // ---- Achievements (computed from real stats) ----
+  const { calculateBadges } = await import("@/lib/level-utils");
+  const createdAnimesCount = await db.anime.count({ where: { creatorId: user.id } });
+  const totalPurchases = purchaseCount;
+  const [xpTotal, achievements] = await Promise.all([
+    getXpTotal(user.id),
+    getUserAchievementStates(user.id),
+  ]);
+  const levelInfo = levelFromXp(xpTotal);
+  const badges = calculateBadges({
+    isCreator: user.role === "CREATOR",
+    createdAnimes: createdAnimesCount,
+    purchasedAnimes: totalPurchases,
+    levelInfo: { ...levelInfo, titleJa: "", titleUz: "" },
+  });
+
   const stats = {
-    purchaseCount, postCount, watchSeconds,
+    purchaseCount: totalPurchases, postCount, watchSeconds,
     followers: followerCount, following: favoriteUserCount,
     favoriteCount: favoriteAnimes.length,
-    exchangeUnlocked: purchaseCount >= 20,
+    giftsSent: await db.gift.count({ where: { senderId: user.id, status: { in: ["PENDING", "CLAIMED"] } } }),
+    level: levelInfo.level,
+    xp: xpTotal,
+    xpToNext: Math.max(0, levelInfo.nextLevelXp - xpTotal),
+    badges,
   };
-  const achievements = [
-    { id: "join", current: 1, target: 1 },
-    { id: "first", current: Math.min(purchaseCount, 1), target: 1 },
-    { id: "collector", current: Math.min(purchaseCount, 10), target: 10 },
-    { id: "exchange", current: Math.min(purchaseCount, 20), target: 20 },
-    { id: "critic", current: Math.min(Math.floor(watchSeconds / 36000), 10), target: 10 },
-    { id: "marathon", current: Math.min(Math.floor(watchSeconds / 180000), 50), target: 50 },
-    { id: "voice", current: Math.min(postCount, 5), target: 5 },
-    { id: "social", current: Math.min(followerCount, 5), target: 5 },
-    { id: "trendsetter", current: Math.min(followerCount, 20), target: 20 },
-    { id: "curator", current: Math.min(favoriteAnimes.length, 10), target: 10 },
-    { id: "creator", current: user.role === "CREATOR" ? 1 : 0, target: 1 },
-  ];
 
   const currentlyWatching = latestProgress && latestProgress.anime && latestProgress.episode ? {
     anime: latestProgress.anime,
@@ -172,13 +280,22 @@ export async function GET(
       statusText: user.statusText || null,
       showcase,
       privacy: isMe ? privacy : undefined,
-      stats,
+      canFollow: privacy.allowFollows,
+      stats: {
+        ...stats,
+        purchaseCount: privacy.showCollection || isMe ? stats.purchaseCount : null,
+        postCount: privacy.showActivity || isMe ? stats.postCount : null,
+        watchSeconds: privacy.showWatchTime || isMe ? stats.watchSeconds : null,
+        followers: privacy.showFollowers || isMe ? stats.followers : null,
+        following: privacy.showFollowers || isMe ? stats.following : null,
+        favoriteCount: privacy.showFavorites || isMe ? stats.favoriteCount : null,
+      },
       achievements,
-      currentlyWatching,
+      currentlyWatching: privacy.showWatchTime || isMe ? currentlyWatching : null,
       favoriteAnimes: privacy.showFavorites || isMe ? favoriteAnimes : [],
-      favoriteUsers: favoriteUsersRows.map((f) => f.following),
-      followersList: followersRows.map((f) => f.follower),
-      ownedAnimes,
+      favoriteUsers: privacy.showFollowers || isMe ? favoriteUsersRows.map((f) => f.followed) : [],
+      followersList: privacy.showFollowers || isMe ? followersRows.map((f) => f.follower) : [],
+      ownedAnimes: privacy.showCollection || isMe ? ownedAnimes : [],
       posts: privacy.showActivity || isMe ? postsRows.map((p) => ({
         id: p.id,
         content: p.content,

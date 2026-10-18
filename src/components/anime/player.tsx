@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import Hls from "hls.js";
 import {
   Play, Pause, Volume2, VolumeX, Maximize, Minimize, SkipBack, SkipForward,
   Gauge, Loader2, List, ChevronRight, Users, Check,
@@ -14,6 +15,8 @@ export interface PlayerControls {
   seek: (pos: number) => void;
   setRate: (rate: number) => void;
   setVolume: (v: number, muted?: boolean) => void;
+  getCurrentTime: () => number;
+  enableAudio: () => void;
 }
 
 export interface PlayerEpisode {
@@ -21,6 +24,8 @@ export interface PlayerEpisode {
   number: number;
   title: string;
   videoUrl: string;
+  streamId?: string | null;
+  hlsKey?: string | null;
   duration: number;
   progress: { position: number; duration: number; completed: boolean } | null;
 }
@@ -48,6 +53,7 @@ export function VideoPlayer({
   onLocalPause,
   onLocalSeek,
   onLocalRate,
+  onAutoplayBlocked,
   onEnded,
   controlsRef,
 }: {
@@ -63,6 +69,7 @@ export function VideoPlayer({
   onLocalPause?: (pos: number) => void;
   onLocalSeek?: (pos: number) => void;
   onLocalRate?: (rate: number) => void;
+  onAutoplayBlocked?: () => void;
   onEnded?: () => void;
   controlsRef?: React.MutableRefObject<PlayerControls | null>;
 }) {
@@ -83,6 +90,8 @@ export function VideoPlayer({
   const [speedOpen, setSpeedOpen] = useState(false);
   const [listOpen, setListOpen] = useState(false);
   const [resumeAt, setResumeAt] = useState<number | null>(episode.progress?.position || null);
+  const [playbackUrl, setPlaybackUrl] = useState<string | null>(null);
+  const [sourceError, setSourceError] = useState<string | null>(null);
   // Note: parent remounts this component via key={episode.id}, so all state resets naturally
 
   // Save progress (debounced)
@@ -108,6 +117,84 @@ export function VideoPlayer({
       if (saveTimer.current) clearTimeout(saveTimer.current);
     };
   }, [current, duration, saveProgress]);
+
+  useEffect(() => {
+    let cancelled = false;
+    queueMicrotask(() => {
+      if (!cancelled) {
+        setSourceError(null);
+        setPlaybackUrl(null);
+      }
+    });
+    if (!episode.streamId && !episode.hlsKey) {
+      if (episode.videoUrl && episode.videoUrl !== "telegram" && episode.videoUrl !== "cloudflare") {
+        queueMicrotask(() => { if (!cancelled) setPlaybackUrl(episode.videoUrl); });
+      } else {
+        queueMicrotask(() => { if (!cancelled) setSourceError("This episode is not available in browser playback yet."); });
+      }
+      return () => { cancelled = true; };
+    }
+    fetch(`/api/episodes/${encodeURIComponent(episode.id)}/stream`, { cache: "no-store" })
+      .then(async (response) => {
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.error || "Unable to authorize episode playback");
+        if (!cancelled) setPlaybackUrl(data.streamUrl);
+      })
+      .catch((error: unknown) => {
+        if (!cancelled) setSourceError(error instanceof Error ? error.message : "Unable to load episode stream");
+      });
+    return () => { cancelled = true; };
+  }, [episode.id, episode.streamId, episode.hlsKey, episode.videoUrl]);
+
+  useEffect(() => {
+    const video = videoRef.current;
+    if (!video || !playbackUrl || !/\.m3u8(?:$|\?)/i.test(playbackUrl)) return;
+    if (video.canPlayType("application/vnd.apple.mpegurl")) {
+      video.src = playbackUrl;
+      return;
+    }
+    if (!Hls.isSupported()) {
+      queueMicrotask(() => setSourceError("This browser does not support HLS playback."));
+      return;
+    }
+    const hls = new Hls({ maxBufferLength: 30, maxMaxBufferLength: 60 });
+    hls.loadSource(playbackUrl);
+    hls.attachMedia(video);
+    hls.on(Hls.Events.ERROR, (_event, data) => {
+      if (data.fatal) setSourceError("The HLS stream could not be played.");
+    });
+    return () => hls.destroy();
+  }, [playbackUrl]);
+
+  useEffect(() => {
+    let cancelled = false;
+    try {
+      const saved = JSON.parse(localStorage.getItem("dubanix.player.audio") || "null");
+      if (saved && typeof saved.volume === "number" && typeof saved.muted === "boolean") {
+        const safeVolume = Math.max(0, Math.min(1, saved.volume));
+        queueMicrotask(() => {
+          if (cancelled) return;
+          setVolume(safeVolume);
+          setMuted(saved.muted);
+          if (videoRef.current) {
+            videoRef.current.volume = safeVolume;
+            videoRef.current.muted = saved.muted;
+          }
+        });
+      }
+    } catch {
+      try { localStorage.removeItem("dubanix.player.audio"); } catch { /* storage unavailable */ }
+    }
+    return () => { cancelled = true; };
+  }, []);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem("dubanix.player.audio", JSON.stringify({ volume, muted }));
+    } catch {
+      toast.warning("Your browser could not save the audio preference.");
+    }
+  }, [volume, muted]);
 
   // Save on unmount
   useEffect(() => {
@@ -247,7 +334,10 @@ export function VideoPlayer({
         const v = videoRef.current;
         if (!v) return;
         if (typeof pos === "number" && isFinite(pos)) v.currentTime = pos;
-        v.play().then(() => setPlaying(true)).catch(() => {});
+        v.play().then(() => setPlaying(true)).catch(() => {
+          toast.info("Tap the video once to allow playback audio in this browser.", { id: "party-autoplay" });
+          onAutoplayBlocked?.();
+        });
       },
       pause: (pos?: number) => {
         const v = videoRef.current;
@@ -276,6 +366,21 @@ export function VideoPlayer({
         setVolume(vol);
         setMuted(Boolean(mut));
       },
+      getCurrentTime: () => videoRef.current?.currentTime || 0,
+      enableAudio: () => {
+        const v = videoRef.current;
+        if (!v) return;
+        const wasMuted = v.muted;
+        v.muted = true;
+        v.play().then(() => {
+          v.pause();
+          v.muted = wasMuted;
+          setPlaying(false);
+        }).catch(() => {
+          v.muted = wasMuted;
+          toast.error("This browser did not allow playback. Use the video Play control once.");
+        });
+      },
     };
     return () => {
       controlsRef.current = null;
@@ -296,10 +401,10 @@ export function VideoPlayer({
     >
       <video
         ref={videoRef}
-        src={episode.videoUrl}
+        src={playbackUrl && !/\.m3u8(?:$|\?)/i.test(playbackUrl) ? playbackUrl : undefined}
         className="w-full aspect-video max-h-[82vh] object-contain bg-black"
         playsInline
-        preload="metadata"
+        preload={syncMode ? "auto" : "metadata"}
         onLoadedMetadata={(e) => {
           const v = e.currentTarget;
           setDuration(v.duration || episode.duration || 0);
@@ -323,6 +428,12 @@ export function VideoPlayer({
         }}
         onClick={togglePlay}
       />
+
+      {sourceError && (
+        <div className="absolute inset-x-4 top-16 z-10 rounded-xl bg-black/80 px-4 py-3 text-center text-sm text-white">
+          {sourceError}
+        </div>
+      )}
 
       {/* Loading spinner */}
       {waiting && (

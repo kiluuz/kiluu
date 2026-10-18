@@ -1,0 +1,109 @@
+services:
+  db-migrate:
+    build:
+      context: .
+      args:
+        NEXT_PUBLIC_SENTRY_DSN: ${NEXT_PUBLIC_SENTRY_DSN:-}
+        NEXT_PUBLIC_WATCH_PARTY_URL: ${NEXT_PUBLIC_WATCH_PARTY_URL:?Set public WebSocket URL}
+    command: ["npx", "prisma", "migrate", "deploy"]
+    environment:
+      DATABASE_URL: ${DATABASE_URL:?Set pooled Neon DATABASE_URL}
+      DIRECT_URL: ${DIRECT_URL:?Set direct Neon DIRECT_URL}
+
+  web:
+    build:
+      context: .
+      args:
+        NEXT_PUBLIC_SENTRY_DSN: ${NEXT_PUBLIC_SENTRY_DSN:-}
+        NEXT_PUBLIC_WATCH_PARTY_URL: ${NEXT_PUBLIC_WATCH_PARTY_URL:?Set public WebSocket URL}
+    ports:
+      - "3000:3000"
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: ${DATABASE_URL:?Set pooled Neon DATABASE_URL}
+      DIRECT_URL: ${DIRECT_URL:?Set direct Neon DIRECT_URL}
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:?Set TELEGRAM_BOT_TOKEN}
+      ANIME_BOT_API_KEY: ${ANIME_BOT_API_KEY:?Set a separate shared site-bot API key}
+      ANIME_BOT_API_URL: ${ANIME_BOT_API_URL:-http://bot:8000}
+      ADMIN_USER_IDS: ${ADMIN_USER_IDS:-}
+      ADMIN_TELEGRAM_IDS: ${ADMIN_TELEGRAM_IDS:-}
+      CREATOR_SHARE_PERCENT: ${CREATOR_SHARE_PERCENT:-70}
+      PLATFORM_SHARE_PERCENT: ${PLATFORM_SHARE_PERCENT:-30}
+      GIFT_EXPIRY_DAYS: ${GIFT_EXPIRY_DAYS:-14}
+      DEFAULT_LOCALE: ${DEFAULT_LOCALE:-uz}
+      WATCH_PARTY_SECRET: ${WATCH_PARTY_SECRET:?Set a random secret of at least 32 characters}
+      WATCH_PARTY_PORT: 3003
+      WATCH_PARTY_ALLOWED_ORIGINS: ${PUBLIC_APP_ORIGIN:-http://localhost:3000}
+      CF_STREAM_ACCOUNT_ID: ${CF_STREAM_ACCOUNT_ID:?Set CF_STREAM_ACCOUNT_ID}
+      CF_STREAM_API_TOKEN: ${CF_STREAM_API_TOKEN:?Set CF_STREAM_API_TOKEN}
+      CF_STREAM_CUSTOMER_SUBDOMAIN: ${CF_STREAM_CUSTOMER_SUBDOMAIN:-videodelivery.net}
+      CRON_SECRET: ${CRON_SECRET:?Set a random cron secret}
+      TELEGRAM_STARS_WEBHOOK_SECRET: ${TELEGRAM_STARS_WEBHOOK_SECRET:-}
+      SENTRY_DSN: ${SENTRY_DSN:-}
+    volumes:
+      - web-uploads:/app/public/uploads
+    depends_on:
+      db-migrate:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/api/health').then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 40s
+
+  watch-party:
+    build:
+      context: .
+      args:
+        NEXT_PUBLIC_SENTRY_DSN: ${NEXT_PUBLIC_SENTRY_DSN:-}
+        NEXT_PUBLIC_WATCH_PARTY_URL: ${NEXT_PUBLIC_WATCH_PARTY_URL:?Set public WebSocket URL}
+    command: ["npm", "--prefix", "mini-services/watch-party", "run", "start"]
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: ${DATABASE_URL:?Set pooled Neon DATABASE_URL}
+      DIRECT_URL: ${DIRECT_URL:?Set direct Neon DIRECT_URL}
+      WATCH_PARTY_SECRET: ${WATCH_PARTY_SECRET:?Set a random secret of at least 32 characters}
+      WATCH_PARTY_PORT: 3003
+      WATCH_PARTY_ALLOWED_ORIGINS: ${PUBLIC_APP_ORIGIN:-http://localhost:3000}
+      REDIS_URL: redis://redis:6379
+    ports:
+      - "3003:3003"
+    depends_on:
+      web:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  bot:
+    image: python:3.12-slim
+    working_dir: /app
+    volumes:
+      - ${BOT_DIR:?Set BOT_DIR to the Telegram bot source directory}:/app:ro
+    command: sh -c "pip install --no-cache-dir aiogram fastapi uvicorn asyncpg httpx python-dotenv && uvicorn bot:app --host 0.0.0.0 --port 8000 --workers 1"
+    environment:
+      BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:?Set TELEGRAM_BOT_TOKEN}
+      API_KEY: ${ANIME_BOT_API_KEY:?Set a separate shared site-bot API key}
+      BOT_USERNAME: ${ANIME_BOT_USERNAME:-DubAniXbot}
+      DATABASE_URL: ${BOT_DATABASE_URL:?Set BOT_DATABASE_URL}
+      CHANNEL_ID: ${CHANNEL_ID:?Set CHANNEL_ID}
+      SITE_API_URL: http://web:3000
+      SITE_API_KEY: ${ANIME_BOT_API_KEY:?Set a separate shared site-bot API key}
+    depends_on:
+      web:
+        condition: service_healthy
+
+  redis:
+    image: redis:7-alpine
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+volumes:
+  web-uploads:
+  redis-data:

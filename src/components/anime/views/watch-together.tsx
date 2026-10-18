@@ -16,6 +16,7 @@ import { VideoPlayer, PlayerControls } from "../player";
 import { Avatar, SmartImage, timeAgo } from "../ui-bits";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import { expectedPlaybackPosition, playbackCorrection } from "@/lib/watch-party-sync";
 
 interface PartyRoom {
   id: string;
@@ -27,10 +28,14 @@ interface PartyRoom {
   episodeNumber: number;
   episodeTitle: string;
   videoUrl: string;
+  streamId?: string | null;
+  hlsKey?: string | null;
+  duration?: number;
   coverImage: string | null;
   createdAt: number;
   hostName: string;
   participantCount: number;
+  capacity?: number;
 }
 
 interface Participant {
@@ -50,6 +55,22 @@ interface FloatingReaction {
   left: number;
 }
 
+interface PartyPlaybackState {
+  video_id: string;
+  position: number;
+  is_playing: boolean;
+  playback_rate: number;
+  server_ts: number;
+}
+
+interface PartyChatMessage {
+  id: string;
+  body: string;
+  createdAt: string;
+  userId: string;
+  username: string;
+}
+
 const REACTIONS = [
   { emoji: "❤️", icon: Heart },
   { emoji: "😂", icon: Laugh },
@@ -63,6 +84,7 @@ export function WatchTogetherView() {
   const { user, setAuthOpen, navigate } = useAppStore();
   const [rooms, setRooms] = useState<PartyRoom[]>([]);
   const [loading, setLoading] = useState(true);
+  const [entryCostCredits, setEntryCostCredits] = useState<number | null>(null);
   const [joinCode, setJoinCode] = useState("");
   const [createOpen, setCreateOpen] = useState(false);
   const [joinOpen, setJoinOpen] = useState(false);
@@ -82,7 +104,16 @@ export function WatchTogetherView() {
   const [participants, setParticipants] = useState<Participant[]>([]);
   const [isHost, setIsHost] = useState(false);
   const [reactions, setReactions] = useState<FloatingReaction[]>([]);
+  const [chatMessages, setChatMessages] = useState<PartyChatMessage[]>([]);
+  const [chatText, setChatText] = useState("");
+  const [latencyMs, setLatencyMs] = useState<number | null>(null);
+  const [autoplayBlocked, setAutoplayBlocked] = useState(false);
   const controlsRef = useRef<PlayerControls | null>(null);
+  const clockOffsetRef = useRef(0);
+  const playbackStateRef = useRef<PartyPlaybackState | null>(null);
+  const pingIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const heartbeatIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const driftIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   // Inside a watch-party room the mobile dock hides (immersive mode)
   useEffect(() => {
@@ -90,86 +121,50 @@ export function WatchTogetherView() {
     return () => useAppStore.getState().setImmersive(false);
   }, [activeRoom]);
 
-  const refreshRooms = useCallback(() => {
-    const s = socketRef.current;
-    if (!s) return;
-    s.emit("room:list", (data: { rooms: PartyRoom[] }) => {
-      setRooms(data.rooms || []);
-    });
+  const refreshRooms = useCallback(async () => {
+    try {
+      const response = await fetch("/api/watch-parties", { cache: "no-store" });
+      if (!response.ok) throw new Error("Unable to load live parties");
+      const data = await response.json();
+      if (!Number.isSafeInteger(data.entryCostCredits) || data.entryCostCredits < 1) {
+        throw new Error("Watch Together price is unavailable");
+      }
+      setEntryCostCredits(data.entryCostCredits);
+      setRooms(data.parties || []);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Unable to load live parties");
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
   useEffect(() => {
-    const socket = io("/?XTransformPort=3003", {
-      transports: ["websocket", "polling"],
-      forceNew: true,
-      reconnection: true,
-      reconnectionAttempts: 5,
-      timeout: 10000,
-    });
-    socketRef.current = socket;
-
-    socket.on("connect", () => {
-      setLoading(false);
-      refreshRooms();
-    });
-    socket.on("connect_error", () => setLoading(false));
-    socket.on("rooms:updated", refreshRooms);
-
-    // party events
-    socket.on("playback:play", (d: { position: number }) => {
-      controlsRef.current?.play(d.position);
-    });
-    socket.on("playback:pause", (d: { position: number }) => {
-      controlsRef.current?.pause(d.position);
-    });
-    socket.on("playback:seek", (d: { position: number }) => {
-      controlsRef.current?.seek(d.position);
-    });
-    socket.on("playback:rate", (d: { rate: number; position: number }) => {
-      controlsRef.current?.seek(d.position);
-      controlsRef.current?.setRate(d.rate);
-    });
-    socket.on("party:user-joined", ({ participant }: { participant: Participant }) => {
-      setParticipants((prev) => [...prev.filter((p) => p.socketId !== participant.socketId), participant]);
-      toast.info(`${participant.displayName} joined the party 👋`);
-    });
-    socket.on("party:user-left", ({ socketId, username }: { socketId: string; username: string }) => {
-      setParticipants((prev) => prev.filter((p) => p.socketId !== socketId));
-      if (username) toast.info(`${username} left the party`);
-    });
-    socket.on("party:host-changed", ({ hostId, hostName }: { hostId: string; hostName: string }) => {
-      setParticipants((prev) => prev.map((p) => ({ ...p, isHost: p.socketId === hostId })));
-      toast.info(`${hostName} is now the host 👑`);
-    });
-    socket.on("reaction", (r: { id: string; emoji: string; username: string }) => {
-      const fr: FloatingReaction = {
-        id: r.id,
-        emoji: r.emoji,
-        username: r.username,
-        left: 8 + Math.random() * 78,
-      };
-      setReactions((prev) => [...prev.slice(-24), fr]);
-      setTimeout(() => {
-        setReactions((prev) => prev.filter((x) => x.id !== fr.id));
-      }, 2600);
-    });
-
+    queueMicrotask(() => void refreshRooms());
     const interval = setInterval(refreshRooms, 15000);
     return () => {
       clearInterval(interval);
-      socket.disconnect();
     };
   }, [refreshRooms]);
+
+  useEffect(() => () => {
+    if (pingIntervalRef.current) clearInterval(pingIntervalRef.current);
+    if (heartbeatIntervalRef.current) clearInterval(heartbeatIntervalRef.current);
+    if (driftIntervalRef.current) clearInterval(driftIntervalRef.current);
+    socketRef.current?.disconnect();
+  }, []);
 
   // Load owned animes for create dialog
   useEffect(() => {
     if (createOpen && user) {
       fetch("/api/animes")
-        .then((r) => r.json())
+        .then(async (r) => {
+          if (!r.ok) throw new Error("Unable to load your library");
+          return r.json();
+        })
         .then((d) => {
           setOwnedAnimes((d.animes || []).filter((a: AnimeSummary) => a.owned || a.isFree));
         })
-        .catch(() => {});
+        .catch((error: unknown) => toast.error(error instanceof Error ? error.message : "Unable to load your library"));
     }
   }, [createOpen, user]);
 
@@ -177,17 +172,147 @@ export function WatchTogetherView() {
   useEffect(() => {
     if (selAnime) {
       fetch(`/api/animes/${selAnime}`)
-        .then((r) => r.json())
+        .then(async (r) => {
+          if (!r.ok) throw new Error("Unable to load anime episodes");
+          return r.json();
+        })
         .then((d: { anime: AnimeDetail; episodes: EpisodeItem[] }) => {
-          const watchable = d.anime.owned || d.anime.isFree ? d.episodes : [];
+          const watchable = (d.anime.owned || d.anime.isFree ? d.episodes : [])
+            .filter((episode) => Boolean(episode.streamId || episode.hlsKey));
           setEpisodes(watchable);
           setSelEpisode(watchable[0]?.id || "");
         })
-        .catch(() => setEpisodes([]));
+        .catch((error: unknown) => {
+          setEpisodes([]);
+          toast.error(error instanceof Error ? error.message : "Unable to load anime episodes");
+        });
     }
   }, [selAnime]);
 
-  function createRoom() {
+  function applyPlaybackState(state: PartyPlaybackState) {
+    playbackStateRef.current = state;
+    const controls = controlsRef.current;
+    if (!controls) {
+      setTimeout(() => {
+        if (playbackStateRef.current === state) applyPlaybackState(state);
+      }, 100);
+      return;
+    }
+    const expected = expectedPlaybackPosition({
+      position: state.position,
+      isPlaying: state.is_playing,
+      serverTs: state.server_ts,
+      playbackRate: state.playback_rate,
+    }, Date.now() + clockOffsetRef.current);
+    controls.setRate(state.playback_rate);
+    if (state.is_playing) controls.play(expected);
+    else controls.pause(expected);
+  }
+
+  function connectToParty(
+    ticket: string,
+    party: PartyRoom,
+    initialParticipants: Participant[],
+    initialState?: PartyPlaybackState,
+    initialMessages: PartyChatMessage[] = [],
+  ) {
+    socketRef.current?.disconnect();
+    setActiveRoom(party);
+    const participantsWithKeys = initialParticipants.map((participant) => ({
+      ...participant,
+      socketId: participant.socketId || participant.userId,
+    }));
+    setParticipants(participantsWithKeys);
+    setAutoplayBlocked(false);
+    setIsHost(participantsWithKeys.some((participant) => participant.userId === user?.id && participant.isHost));
+    setChatMessages(initialMessages);
+    setReactions([]);
+    if (initialState) applyPlaybackState(initialState);
+
+    const socket = io(process.env.NEXT_PUBLIC_WATCH_PARTY_URL || "/?XTransformPort=3003", {
+      auth: { ticket },
+      transports: ["websocket", "polling"],
+      forceNew: true,
+      reconnection: true,
+      reconnectionAttempts: Infinity,
+      timeout: 10000,
+    });
+    socketRef.current = socket;
+    socket.on("connect", () => {
+      if (pingIntervalRef.current) clearInterval(pingIntervalRef.current);
+      if (heartbeatIntervalRef.current) clearInterval(heartbeatIntervalRef.current);
+      if (driftIntervalRef.current) clearInterval(driftIntervalRef.current);
+      const ping = () => {
+        const sentAt = Date.now();
+        socket.emit("clock:ping", { sentAt }, ({ serverTs }: { serverTs: number }) => {
+          const receivedAt = Date.now();
+          clockOffsetRef.current = serverTs - (sentAt + receivedAt) / 2;
+          setLatencyMs(Math.round(receivedAt - sentAt));
+        });
+      };
+      ping();
+      pingIntervalRef.current = setInterval(ping, 4000);
+      socket.emit("party:heartbeat");
+      heartbeatIntervalRef.current = setInterval(() => socket.emit("party:heartbeat"), 20_000);
+      driftIntervalRef.current = setInterval(() => {
+        const state = playbackStateRef.current;
+        const controls = controlsRef.current;
+        if (!state || !controls || !state.is_playing) return;
+        const expected = expectedPlaybackPosition({
+          position: state.position,
+          isPlaying: state.is_playing,
+          serverTs: state.server_ts,
+          playbackRate: state.playback_rate,
+        }, Date.now() + clockOffsetRef.current);
+        const correction = playbackCorrection(controls.getCurrentTime(), expected);
+        if (correction.seekTo !== null) controls.seek(correction.seekTo);
+        else controls.setRate(state.playback_rate * correction.rate);
+      }, 1000);
+    });
+    socket.on("connect_error", (error) => {
+      toast.error(`Watch party connection failed: ${error.message}`);
+    });
+    socket.on("rooms:updated", () => void refreshRooms());
+    socket.on("party:state", (payload: { state: PartyPlaybackState; participants: Participant[]; messages: PartyChatMessage[] }) => {
+      setParticipants(payload.participants);
+      setIsHost(payload.participants.some((participant) => participant.userId === user?.id && participant.isHost));
+      setChatMessages(payload.messages || []);
+      applyPlaybackState(payload.state);
+    });
+    socket.on("party:participants", (nextParticipants: Participant[]) => {
+      setParticipants(nextParticipants);
+      setIsHost(nextParticipants.some((participant) => participant.userId === user?.id && participant.isHost));
+    });
+    socket.on("party:host-changed", ({ userId: hostId, hostName }: { userId: string; hostName: string }) => {
+      setParticipants((current) => current.map((participant) => ({ ...participant, isHost: participant.userId === hostId })));
+      setIsHost(hostId === user?.id);
+      toast.info(`${hostName} is now the host`);
+    });
+    socket.on("party:ended", ({ reason }: { reason: string }) => {
+      toast.info(reason);
+      socket.disconnect();
+      setActiveRoom(null);
+      setParticipants([]);
+      void refreshRooms();
+    });
+    socket.on("party:error", ({ error }: { error: string }) => toast.error(error));
+    socket.on("playback:state", (state: PartyPlaybackState) => applyPlaybackState(state));
+    socket.on("chat:message", (message: PartyChatMessage) => {
+      setChatMessages((current) => [...current.slice(-99), message]);
+    });
+    socket.on("reaction", (reaction: { id: string; emoji: string; username: string }) => {
+      const floating: FloatingReaction = {
+        id: reaction.id,
+        emoji: reaction.emoji,
+        username: reaction.username,
+        left: 8 + Math.random() * 78,
+      };
+      setReactions((current) => [...current.slice(-24), floating]);
+      setTimeout(() => setReactions((current) => current.filter((item) => item.id !== floating.id)), 2600);
+    });
+  }
+
+  async function createRoom() {
     if (!user) {
       setAuthOpen(true);
       return;
@@ -200,114 +325,87 @@ export function WatchTogetherView() {
     const episode = episodes.find((e) => e.id === selEpisode);
     if (!anime || !episode) return;
     setCreating(true);
-    socketRef.current?.emit(
-      "room:create",
-      {
-        user: {
-          id: user.id,
-          username: user.username,
-          displayName: user.displayName || user.username,
-          avatarUrl: user.avatarUrl,
-          accentColor: user.accentColor,
-        },
-        room: {
-          name: roomName || `${user.displayName || user.username}'s Watch Party`,
-          animeId: anime.id,
-          animeTitle: anime.title,
-          episodeId: episode.id,
-          episodeNumber: episode.number,
-          episodeTitle: episode.title,
-          videoUrl: episode.videoUrl,
-          coverImage: anime.coverImage,
-        },
-      },
-      (res: { ok: boolean; room?: PartyRoom; error?: string }) => {
-        setCreating(false);
-        if (res.ok && res.room) {
-          setCreateOpen(false);
-          setActiveRoom(res.room);
-          setIsHost(true);
-          setParticipants([
-            {
-              socketId: socketRef.current?.id || "me",
-              userId: user.id,
-              username: user.username,
-              displayName: user.displayName || user.username,
-              avatarUrl: user.avatarUrl,
-              accentColor: user.accentColor,
-              isHost: true,
-            },
-          ]);
-          toast.success(`Party created! Share code: ${res.room.code}`, {
-            description: "Friends can join with this code from Watch Together page.",
-            duration: 8000,
-          });
-        } else {
-          toast.error(res.error || "Failed to create room");
-        }
-      }
-    );
+    try {
+      const response = await fetch("/api/watch-parties", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ episodeId: episode.id, name: roomName }),
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "Failed to create party");
+      const host: Participant = {
+        socketId: "host",
+        userId: user.id,
+        username: user.username,
+        displayName: user.displayName || user.username,
+        avatarUrl: user.avatarUrl,
+        accentColor: user.accentColor,
+        isHost: true,
+      };
+      setCreateOpen(false);
+      connectToParty(data.ticket, data.party, [host]);
+      toast.success(`Party created! Share code: ${data.party.code}`, {
+        description: `${data.entryCostCredits} credits charged for entry.`,
+        duration: 8000,
+      });
+      void refreshRooms();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Failed to create party");
+    } finally {
+      setCreating(false);
+    }
   }
 
-  function joinRoom(code?: string) {
+  async function joinRoom(code?: string) {
     const finalCode = (code || joinCode).trim().toUpperCase();
     if (!user) {
       setAuthOpen(true);
       return;
     }
     if (!finalCode) return;
-    socketRef.current?.emit(
-      "room:join",
-      {
-        code: finalCode,
-        user: {
-          id: user.id,
-          username: user.username,
-          displayName: user.displayName || user.username,
-          avatarUrl: user.avatarUrl,
-          accentColor: user.accentColor,
-        },
-      },
-      (res: {
-        ok: boolean;
-        room?: PartyRoom;
-        state?: { isPlaying: boolean; position: number; playbackRate: number };
-        participants?: Participant[];
-        error?: string;
-      }) => {
-        if (res.ok && res.room) {
-          setJoinOpen(false);
-          setJoinCode("");
-          setActiveRoom(res.room);
-          setParticipants(res.participants || []);
-          setIsHost((res.participants || []).some((p) => p.userId === user.id && p.isHost));
-          // Catch up to current state
-          if (res.state) {
-            const st = res.state;
-            setTimeout(() => {
-              controlsRef.current?.seek(st.position);
-              if (st.isPlaying) controlsRef.current?.play();
-            }, 600);
-          }
-          toast.success(`Joined ${res.room.name}! 🎉`);
-        } else {
-          toast.error(res.error || "Failed to join room");
-        }
-      }
-    );
+    try {
+      const response = await fetch("/api/watch-parties/join", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ code: finalCode }),
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "Failed to join party");
+      setJoinOpen(false);
+      setJoinCode("");
+      connectToParty(data.ticket, data.party, data.participants || [], data.state, data.messages || []);
+      toast.success(`Joined ${data.party.name}!`, { description: `${data.entryCostCredits} credits charged for entry.` });
+      void refreshRooms();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Failed to join party");
+    }
   }
 
   function leaveRoom() {
-    socketRef.current?.emit("room:leave");
+    socketRef.current?.emit("party:leave");
+    socketRef.current?.disconnect();
+    socketRef.current = null;
     setActiveRoom(null);
     setParticipants([]);
     setReactions([]);
+    setChatMessages([]);
+    playbackStateRef.current = null;
+    if (pingIntervalRef.current) clearInterval(pingIntervalRef.current);
+    if (heartbeatIntervalRef.current) clearInterval(heartbeatIntervalRef.current);
+    if (driftIntervalRef.current) clearInterval(driftIntervalRef.current);
     refreshRooms();
     toast.info("Left the watch party");
   }
 
   function sendReaction(emoji: string) {
     socketRef.current?.emit("reaction", { emoji });
+  }
+
+  function sendChat() {
+    const body = chatText.trim();
+    if (!body) return;
+    socketRef.current?.emit("chat:send", { body });
+    setChatText("");
   }
 
   // ============ ACTIVE PARTY MODE ============
@@ -319,7 +417,9 @@ export function WatchTogetherView() {
       title: activeRoom.episodeTitle,
       description: null,
       videoUrl: activeRoom.videoUrl,
-      duration: 0,
+      streamId: activeRoom.streamId,
+      hlsKey: activeRoom.hlsKey,
+      duration: activeRoom.duration || 0,
       progress: null,
     };
     return (
@@ -337,7 +437,19 @@ export function WatchTogetherView() {
           onLocalPause={(pos) => socketRef.current?.emit("playback:pause", { position: pos })}
           onLocalSeek={(pos) => socketRef.current?.emit("playback:seek", { position: pos })}
           onLocalRate={(rate) => socketRef.current?.emit("playback:rate", { rate })}
+          onAutoplayBlocked={() => setAutoplayBlocked(true)}
         />
+        {autoplayBlocked && (
+          <div className="mx-4 mt-3 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm">
+            <span>Tap once to allow your browser to play synced video audio.</span>
+            <Button size="sm" onClick={() => {
+              controlsRef.current?.enableAudio();
+              setAutoplayBlocked(false);
+              const state = playbackStateRef.current;
+              if (state) setTimeout(() => applyPlaybackState(state), 300);
+            }}>Enable synced playback</Button>
+          </div>
+        )}
 
         {/* Reactions layer */}
         <div className="pointer-events-none fixed inset-0 z-50 overflow-hidden">
@@ -361,6 +473,9 @@ export function WatchTogetherView() {
                 <p className="text-sm text-muted-foreground mt-0.5">
                   {activeRoom.animeTitle} · EP {activeRoom.episodeNumber} —{" "}
                   <span className="font-mono font-bold text-primary">{activeRoom.code}</span>
+                </p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  {latencyMs === null ? "Measuring connection…" : `Sync latency ${latencyMs} ms`}
                 </p>
               </div>
               <div className="flex items-center gap-2">
@@ -408,6 +523,23 @@ export function WatchTogetherView() {
                   👑 The host controls playback — just sit back and enjoy the sync.
                 </p>
               )}
+            </div>
+
+            <div className="mt-4 pt-4 border-t">
+              <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground mb-2">Party chat</p>
+              <div className="max-h-44 space-y-2 overflow-y-auto rounded-xl bg-secondary/30 p-3">
+                {chatMessages.length === 0 ? (
+                  <p className="text-xs text-muted-foreground">No messages yet.</p>
+                ) : chatMessages.map((message) => (
+                  <p key={message.id} className="break-words text-xs">
+                    <span className="font-bold">{message.username}: </span>{message.body}
+                  </p>
+                ))}
+              </div>
+              <form className="mt-2 flex gap-2" onSubmit={(event) => { event.preventDefault(); sendChat(); }}>
+                <Input value={chatText} maxLength={500} onChange={(event) => setChatText(event.target.value)} placeholder="Message the party…" />
+                <Button type="submit" disabled={!chatText.trim()} className="shrink-0">Send</Button>
+              </form>
             </div>
           </div>
         </div>
@@ -473,7 +605,7 @@ export function WatchTogetherView() {
 
       {loading ? (
         <div className="flex items-center justify-center py-16 text-muted-foreground">
-          <Loader2 className="w-5 h-5 animate-spin mr-2" /> Connecting...
+          <Loader2 className="w-5 h-5 animate-spin mr-2" /> Loading live parties...
         </div>
       ) : rooms.length === 0 ? (
         <div className="rounded-2xl border border-dashed p-10 text-center">
@@ -527,7 +659,9 @@ export function WatchTogetherView() {
             <DialogTitle className="flex items-center gap-2">
               <PartyPopper className="w-5 h-5 text-primary" /> New Watch Party
             </DialogTitle>
-            <DialogDescription>Choose an anime you own and start the sync</DialogDescription>
+            <DialogDescription>
+              Choose an anime you own and start the sync. Entry costs {entryCostCredits ?? "…"} credits per participant, host included.
+            </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 pt-2">
             <div className="space-y-1.5">
@@ -585,6 +719,11 @@ export function WatchTogetherView() {
                 </div>
               </div>
             )}
+            {selAnime && episodes.length === 0 && (
+              <p className="text-xs text-muted-foreground rounded-xl border border-dashed p-4">
+                No owned/free episodes have HLS playback yet. Create an episode, prepare its HLS files locally, then upload them to the R2 path shown in Creator Studio.
+              </p>
+            )}
             <Button
               disabled={!selEpisode || creating}
               onClick={createRoom}
@@ -601,7 +740,9 @@ export function WatchTogetherView() {
         <DialogContent className="sm:max-w-[380px] rounded-2xl">
           <DialogHeader>
             <DialogTitle>Join a Watch Party</DialogTitle>
-            <DialogDescription>Enter the 6-character party code</DialogDescription>
+            <DialogDescription>
+              Enter the 6-character party code. Joining costs {entryCostCredits ?? "…"} credits.
+            </DialogDescription>
           </DialogHeader>
           <div className="flex gap-2 pt-2">
             <Input

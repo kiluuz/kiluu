@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Wallet, Zap, Gift, CreditCard, History, Check, Loader2, Sparkles } from "lucide-react";
+import { Wallet, Zap, Gift, History, Check, Loader2, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { useAppStore } from "../store";
@@ -16,27 +16,28 @@ interface CreditsData {
   transactions: CreditTx[];
 }
 
-const PAYMENT_METHODS = [
-  { id: "card", label: "Card", icon: "💳", desc: "Visa, Mastercard" },
-  { id: "paypal", label: "PayPal", icon: "🅿️", desc: "Fast checkout" },
-  { id: "crypto", label: "Crypto", icon: "₿", desc: "BTC, ETH, USDT" },
-];
-
 export function CreditsView() {
-  const { user, setAuthOpen, updateUser } = useAppStore();
-  const [data, setData] = useState<CreditsData | null>(null);
+  const { user, setAuthOpen } = useAppStore();
+  const [loadedData, setLoadedData] = useState<{ userId: string | null; value: CreditsData } | null>(null);
+  const data = loadedData?.userId === (user?.id ?? null) ? loadedData.value : null;
   const [checkout, setCheckout] = useState<CreditPackage | null>(null);
-  const [method, setMethod] = useState("card");
   const [processing, setProcessing] = useState(false);
 
-  const load = () => {
-    fetch("/api/credits")
-      .then((r) => r.json())
-      .then(setData)
-      .catch(() => toast.error("Failed to load credits data"));
-  };
-
-  useEffect(load, [user]);
+  useEffect(() => {
+    let active = true;
+    const load = async () => {
+      try {
+        const response = await fetch("/api/credits", { cache: "no-store" });
+        const result = await response.json();
+        if (!response.ok) throw new Error(result.error || "Failed to load credits data");
+        if (active) setLoadedData({ userId: user?.id ?? null, value: result });
+      } catch (error) {
+        if (active) toast.error(error instanceof Error ? error.message : "Failed to load credits data");
+      }
+    };
+    void load();
+    return () => { active = false; };
+  }, [user?.id]);
 
   async function pay() {
     if (!user) {
@@ -45,25 +46,22 @@ export function CreditsView() {
     }
     if (!checkout) return;
     setProcessing(true);
-    // simulate payment processing
-    await new Promise((r) => setTimeout(r, 1400));
     try {
-      const res = await fetch("/api/credits", {
+      const res = await fetch("/api/credits/invoice", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ packageId: checkout.id, paymentMethod: method }),
+        body: JSON.stringify({ packageId: checkout.id }),
       });
       const d = await res.json();
       if (!res.ok) {
-        toast.error(d.error || "Payment failed");
+        toast.error(d.error || "Invoice failed");
         return;
       }
-      updateUser({ credits: d.credits });
-      toast.success(`${formatCredits(d.added)} credits added! 🎉`, {
-        description: "Spend them on premium animes in Discover.",
-      });
-      setCheckout(null);
-      load();
+      if (d.invoiceLink) {
+        window.open(d.invoiceLink, "_blank");
+        toast.success("Telegram Stars invoice ochildi. To‘lovdan keyin balans yangilanadi.");
+        setCheckout(null);
+      }
     } catch {
       toast.error("Network error");
     } finally {
@@ -71,9 +69,10 @@ export function CreditsView() {
     }
   }
 
+  const starsOf = (pkg: CreditPackage) => pkg.starsPrice ?? 0;
+
   return (
     <div className="max-w-[1100px] mx-auto px-4 sm:px-8 py-6 pb-10">
-      {/* Header */}
       <div className="aurora relative overflow-hidden rounded-3xl border p-6 sm:p-10 mb-8">
         <div className="relative flex items-center justify-between gap-6 flex-wrap">
           <div>
@@ -84,8 +83,7 @@ export function CreditsView() {
               Get Credits
             </h1>
             <p className="text-sm sm:text-base text-muted-foreground mt-2 max-w-md">
-              Credits are DubAniX currency. Use them to buy premium animes —
-              and unlock the Exchange at <span className="font-bold text-foreground">20 purchases</span>.
+              Telegram Stars (XTR) orqali kredit. Narx dollar emas — paketdagi Stars soni.
             </p>
           </div>
           <div className="text-right">
@@ -98,7 +96,6 @@ export function CreditsView() {
         </div>
       </div>
 
-      {/* Packages */}
       <div className="grid grid-cols-2 lg:grid-cols-5 gap-3 sm:gap-4 mb-10">
         {(data?.packages || []).map((pkg) => (
           <button
@@ -126,12 +123,11 @@ export function CreditsView() {
               </p>
             )}
             <p className="text-xs text-muted-foreground mt-1">total {formatCredits(pkg.credits + pkg.bonus)}</p>
-            <p className="text-lg font-black mt-2">${pkg.priceUsd.toFixed(2)}</p>
+            <p className="text-lg font-black mt-2">{starsOf(pkg)} Stars</p>
           </button>
         ))}
       </div>
 
-      {/* Transaction history */}
       <div className="glass rounded-3xl p-5 sm:p-6">
         <h2 className="font-bold flex items-center gap-2 mb-4">
           <History className="w-4.5 h-4.5 text-primary" /> Transaction History
@@ -165,14 +161,13 @@ export function CreditsView() {
         )}
       </div>
 
-      {/* Checkout dialog */}
       <Dialog open={Boolean(checkout)} onOpenChange={(open) => !processing && setCheckout(open ? checkout : null)}>
         <DialogContent className="sm:max-w-[420px] rounded-2xl">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
-              <CreditCard className="w-5 h-5 text-primary" /> Checkout
+              <Sparkles className="w-5 h-5 text-primary" /> Telegram Stars
             </DialogTitle>
-            <DialogDescription>Simulated payment — no real money involved</DialogDescription>
+            <DialogDescription>To‘lov Telegram ichida XTR da. Kreditlar successful_payment dan keyin tushadi.</DialogDescription>
           </DialogHeader>
           {checkout && (
             <div className="space-y-5 pt-2">
@@ -183,29 +178,8 @@ export function CreditsView() {
                     <p className="text-xs text-emerald-500 font-bold">+{formatCredits(checkout.bonus)} bonus included</p>
                   )}
                 </div>
-                <p className="text-2xl font-black">${checkout.priceUsd.toFixed(2)}</p>
+                <p className="text-2xl font-black">{starsOf(checkout)} ★</p>
               </div>
-
-              <div className="space-y-1.5">
-                <p className="text-xs font-semibold">Payment method</p>
-                <div className="grid grid-cols-3 gap-2">
-                  {PAYMENT_METHODS.map((m) => (
-                    <button
-                      key={m.id}
-                      onClick={() => setMethod(m.id)}
-                      className={cn(
-                        "rounded-xl border p-3 text-center transition",
-                        method === m.id ? "border-primary bg-primary/10" : "hover:border-primary/40"
-                      )}
-                    >
-                      <span className="text-xl block mb-1">{m.icon}</span>
-                      <span className="text-[11px] font-bold block">{m.label}</span>
-                      <span className="text-[9px] text-muted-foreground">{m.desc}</span>
-                    </button>
-                  ))}
-                </div>
-              </div>
-
               <Button
                 disabled={processing}
                 onClick={pay}
@@ -213,16 +187,16 @@ export function CreditsView() {
               >
                 {processing ? (
                   <>
-                    <Loader2 className="w-5 h-5 animate-spin" /> Processing...
+                    <Loader2 className="w-5 h-5 animate-spin" /> Invoice...
                   </>
                 ) : (
                   <>
-                    <Sparkles className="w-5 h-5" /> Pay ${checkout.priceUsd.toFixed(2)}
+                    <Sparkles className="w-5 h-5" /> Pay {starsOf(checkout)} Stars
                   </>
                 )}
               </Button>
               <p className="text-[10px] text-center text-muted-foreground flex items-center justify-center gap-1">
-                <Check className="w-3 h-3" /> This is a demo checkout — credits are granted instantly
+                <Check className="w-3 h-3" /> Demo checkout yo‘q — haqiqiy Stars invoice
               </p>
             </div>
           )}

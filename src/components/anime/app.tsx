@@ -1,14 +1,15 @@
 "use client";
 
 import { useEffect } from "react";
-import { useAppStore } from "./store";
+import { useAppStore, pathToView } from "./store";
 import { Sidebar, TopBar } from "./shell";
 import { TabletRail } from "./tablet-rail";
 import { MobileDock } from "./mobile-dock";
 import { MobileSearch } from "./mobile-search";
 import { Onboarding } from "./auth";
 import { ProfileModal } from "./profile-card";
-import { WelcomeLoader } from "./welcome-loader";
+import dynamic from "next/dynamic";
+const WelcomeLoader = dynamic(() => import("./welcome-loader").then((m) => m.WelcomeLoader), { ssr: false });
 import { Logo } from "./logo";
 import { HomeView } from "./views/home";
 import { BrowseView } from "./views/browse";
@@ -18,27 +19,71 @@ import { LibraryView } from "./views/library";
 import { CommunityView } from "./views/community";
 import { WatchTogetherView } from "./views/watch-together";
 import { CreditsView } from "./views/credits";
-import { ExchangeView } from "./views/exchange";
+import { GiftsView } from "./views/gifts";
 import { ProfileFullView } from "./profile";
 import { StudioView } from "./views/studio";
 import { SettingsView } from "./views/settings";
 import { LoginView } from "./views/login";
 import { ScheduleView } from "./views/schedule";
 import { DubbingView } from "./views/dubbing";
+import { BotAdminView } from "./views/bot-admin";
 import type { AuthUser } from "./types";
 
 export default function AnimeApp() {
   const { view, setUserLoading, setUser } = useAppStore();
 
+  // Sync browser URL with app view & handle Back/Forward buttons
+  useEffect(() => {
+    const handlePopState = () => {
+      const targetView = pathToView(window.location.pathname, window.location.search);
+      useAppStore.getState().navigate(targetView.name, targetView, { skipPushState: true });
+    };
+
+    // On initial page load/refresh, restore state from URL
+    const initialView = pathToView(window.location.pathname, window.location.search);
+    if (initialView.name !== "home" || window.location.pathname !== "/") {
+      useAppStore.getState().navigate(initialView.name, initialView, { replace: true, skipPushState: true });
+    }
+
+    window.addEventListener("popstate", handlePopState);
+    return () => window.removeEventListener("popstate", handlePopState);
+  }, []);
+
   // Load session on mount
   useEffect(() => {
-    fetch("/api/auth/me")
-      .then((r) => r.json())
-      .then((d) => {
-        setUser((d.user as AuthUser) || null);
-      })
-      .catch(() => setUser(null))
-      .finally(() => setUserLoading(false));
+    let active = true;
+    const loadSession = async () => {
+      try {
+        for (let attempt = 0; attempt < 2; attempt += 1) {
+          const controller = new AbortController();
+          const timer = window.setTimeout(() => controller.abort(), 8_000);
+          try {
+            const response = await fetch("/api/auth/me", {
+              cache: "no-store",
+              credentials: "same-origin",
+              signal: controller.signal,
+            });
+            if (!response.ok) throw new Error(`Session request failed (${response.status})`);
+            const data = await response.json();
+            if (active && !useAppStore.getState().user) {
+              setUser((data.user as AuthUser) || null);
+            }
+            return;
+          } catch (error) {
+            if (attempt === 1) throw error;
+            await new Promise((resolve) => window.setTimeout(resolve, 500));
+          } finally {
+            window.clearTimeout(timer);
+          }
+        }
+      } catch {
+        if (active && !useAppStore.getState().user) setUser(null);
+      } finally {
+        if (active) setUserLoading(false);
+      }
+    };
+    void loadSession();
+    return () => { active = false; };
   }, [setUser, setUserLoading]);
 
   const loading = useAppStore((s) => s.userLoading);
@@ -111,10 +156,11 @@ export default function AnimeApp() {
         {view.name === "community" && <CommunityView />}
         {view.name === "watch-together" && <WatchTogetherView />}
         {view.name === "credits" && <CreditsView />}
-        {view.name === "exchange" && <ExchangeView />}
+        {view.name === "gifts" && <GiftsView />}
         {view.name === "user-profile" && view.username && <ProfileFullView username={view.username} />}
         {view.name === "studio" && <StudioView />}
         {view.name === "settings" && <SettingsView />}
+        {view.name === "bot-admin" && <BotAdminView />}
       </main>
 
       {/* Footer */}
@@ -131,7 +177,7 @@ export default function AnimeApp() {
             </span>
           </div>
           <span className="text-[11px] text-muted-foreground">
-            Stream · Collect · Exchange · Watch Together
+            Stream · Collect · Gift · Watch Together
           </span>
         </div>
       </footer>

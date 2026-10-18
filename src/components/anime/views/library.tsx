@@ -1,18 +1,22 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { Clock, Heart, Repeat, Sparkles, Film, Trophy, Timer, Package } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import {
+  Clock, Heart, Sparkles, Film, Trophy, Timer, Package,
+  Send, Link2, CheckCircle2, Loader2, ExternalLink, ShoppingBag, AlertCircle, Star
+} from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
-import { Progress } from "@/components/ui/progress";
 import { useAppStore } from "../store";
 import type { AnimeSummary } from "../types";
 import { AnimeCard, formatDuration, formatCredits } from "../ui-bits";
 import { toast } from "sonner";
+import { cn } from "@/lib/utils";
 
 interface LibraryData {
   owned: (AnimeSummary & { purchasedAt: string; episodeCount: number })[];
   favorites: (AnimeSummary & { episodeCount: number })[];
+  starsPurchases: (AnimeSummary & { purchasedAt: string; episodeCount: number })[];
   stats: {
     purchaseCount: number;
     totalWatchSeconds: number;
@@ -22,10 +26,35 @@ interface LibraryData {
   };
 }
 
+interface LeaderboardEntry {
+  id: string;
+  username: string;
+  displayName: string | null;
+  avatarUrl: string | null;
+  score: number;
+  level: number;
+  postCount?: number;
+  likeCount?: number;
+}
+
+interface Leaderboards {
+  collectors: LeaderboardEntry[];
+  contributors: LeaderboardEntry[];
+  creators: LeaderboardEntry[];
+}
+
 export function LibraryView() {
   const { user, setAuthOpen, navigate } = useAppStore();
   const [data, setData] = useState<LibraryData | null>(null);
   const [loading, setLoading] = useState(true);
+  const [botStatus, setBotStatus] = useState<{ linked: boolean; purchases: string[] } | null>(null);
+  const [botAnimes, setBotAnimes] = useState<any[]>([]);
+  const [botLoading, setBotLoading] = useState(false);
+  const [linkUrl, setLinkUrl] = useState<string | null>(null);
+  const [linkLoading, setLinkLoading] = useState(false);
+  const [polling, setPolling] = useState(false);
+  const [leaderboards, setLeaderboards] = useState<Leaderboards | null>(null);
+  const pollRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
     if (!user) return;
@@ -34,7 +63,93 @@ export function LibraryView() {
       .then(setData)
       .catch(() => toast.error("Failed to load library"))
       .finally(() => setLoading(false));
+
+    // Load bot status
+    setBotLoading(true);
+    fetch("/api/bot/status")
+      .then(r => r.json())
+      .then(async (statusData) => {
+        setBotStatus(statusData);
+        if (statusData.purchases?.length > 0) {
+          const catalogRes = await fetch("/api/bot/catalog");
+          const catalog = await catalogRes.json();
+          const purchased = Array.isArray(catalog)
+            ? catalog.filter((a: any) => statusData.purchases.includes(a.slug))
+            : [];
+          setBotAnimes(purchased);
+        }
+      })
+      .catch(() => {})
+      .finally(() => setBotLoading(false));
   }, [user]);
+
+  useEffect(() => {
+    fetch("/api/leaderboards")
+      .then(async (response) => {
+        const result = await response.json();
+        if (!response.ok) throw new Error(result.error || "Could not load leaderboards");
+        setLeaderboards(result);
+      })
+      .catch((error) => toast.error(error instanceof Error ? error.message : "Could not load leaderboards"));
+  }, []);
+
+  async function startLinking() {
+    setLinkLoading(true);
+    try {
+      const res = await fetch("/api/bot/link-token", { method: "POST" });
+      if (!res.ok) throw new Error();
+      const data = await res.json();
+      setLinkUrl(data.link);
+      try {
+        const parsed = new URL(data.link);
+        const domain = parsed.pathname.replace(/^\//, "");
+        const start = parsed.searchParams.get("start");
+        if (domain && start) {
+          window.location.href = `tg://resolve?domain=${encodeURIComponent(domain)}&start=${encodeURIComponent(start)}`;
+          setTimeout(() => {
+            if (!document.hidden) window.open(data.link, "_blank");
+          }, 1500);
+        } else {
+          window.open(data.link, "_blank");
+        }
+      } catch {
+        window.open(data.link, "_blank");
+      }
+      startPolling();
+    } catch {
+      toast.error("Telegram ulash havolasini olishda xatolik yuz berdi.");
+    } finally {
+      setLinkLoading(false);
+    }
+  }
+
+  function startPolling() {
+    setPolling(true);
+    const start = Date.now();
+    pollRef.current = setInterval(async () => {
+      if (Date.now() - start > 120000) { setPolling(false); clearInterval(pollRef.current!); return; }
+      try {
+        const res = await fetch("/api/bot/status");
+        const d = await res.json();
+        if (d.linked) {
+          setPolling(false);
+          clearInterval(pollRef.current!);
+          setBotStatus(d);
+          fetch("/api/bot/deliver-purchases", { method: "POST" })
+            .then(r => r.json())
+            .then(res => {
+              if (res.delivered > 0) {
+                toast.success(`✅ ${res.delivered} ta anime Telegram botga yuborildi!`);
+              }
+            })
+            .catch(() => {});
+          toast.success("Telegram muvaffaqiyatli ulandi! ✅");
+        }
+      } catch {}
+    }, 2500);
+  }
+
+  useEffect(() => () => { if (pollRef.current) clearInterval(pollRef.current); }, []);
 
   if (!user) {
     return (
@@ -48,8 +163,6 @@ export function LibraryView() {
       </div>
     );
   }
-
-  const exchangeProgress = data ? Math.min(100, (data.stats.purchaseCount / 20) * 100) : 0;
 
   return (
     <div className="max-w-[1280px] mx-auto px-4 sm:px-8 py-6 pb-10">
@@ -89,43 +202,30 @@ export function LibraryView() {
         </div>
       )}
 
-      {/* Exchange unlock progress */}
-      {data && !data.stats.exchangeUnlocked && (
-        <div className="glass rounded-2xl p-4 sm:p-5 mb-8 aurora relative overflow-hidden">
-          <div className="relative flex items-center gap-4 flex-wrap sm:flex-nowrap">
-            <div className="w-12 h-12 rounded-2xl bg-amber-500/15 border border-amber-500/30 flex items-center justify-center shrink-0">
-              <Repeat className="w-6 h-6 text-amber-500" />
-            </div>
-            <div className="flex-1 min-w-[220px]">
-              <div className="flex items-center justify-between mb-1.5">
-                <p className="font-bold text-sm">Exchange Marketplace</p>
-                <p className="text-xs font-bold text-amber-500 tabular-nums">
-                  {data.stats.purchaseCount} / 20 animes
-                </p>
-              </div>
-              <Progress value={exchangeProgress} className="h-2.5 [&>div]:brand-gradient" />
-              <p className="text-[11px] text-muted-foreground mt-1.5">
-                Buy {20 - data.stats.purchaseCount} more animes to unlock trading with other collectors
-              </p>
-            </div>
-            <Button
-              size="sm"
-              className="rounded-full brand-gradient text-white font-bold shrink-0"
-              onClick={() => navigate("browse")}
-            >
-              <Film className="w-4 h-4" /> Browse animes
-            </Button>
-          </div>
+      <div className="glass rounded-2xl p-4 sm:p-5 mb-8">
+        <div className="flex items-center justify-between gap-3 flex-wrap">
+          <p className="text-sm text-muted-foreground">
+            Kutubxonadagi versiyani do‘stga sovg‘a qilishingiz mumkin — o‘zingizda bo‘lsa ham to‘lanadi.
+          </p>
+          <Button size="sm" className="rounded-full brand-gradient text-white font-bold" onClick={() => navigate("gifts")}>
+            Sovg‘alar
+          </Button>
         </div>
-      )}
+      </div>
 
       <Tabs defaultValue="owned">
-        <TabsList className="rounded-xl mb-5">
+        <TabsList className="rounded-xl mb-5 flex-wrap h-auto gap-1">
           <TabsTrigger value="owned" className="rounded-lg">
             Owned ({data?.owned.length ?? 0})
           </TabsTrigger>
           <TabsTrigger value="favorites" className="rounded-lg">
             <Heart className="w-3.5 h-3.5 mr-1" /> Favorites ({data?.favorites.length ?? 0})
+          </TabsTrigger>
+          <TabsTrigger value="telegram" className="rounded-lg gap-1.5">
+            <Star className="w-3.5 h-3.5" /> Stars Xaridlar
+          </TabsTrigger>
+          <TabsTrigger value="leaderboards" className="rounded-lg gap-1.5">
+            <Trophy className="w-3.5 h-3.5" /> Leaderboards
           </TabsTrigger>
         </TabsList>
 
@@ -172,8 +272,174 @@ export function LibraryView() {
             />
           )}
         </TabsContent>
+
+        {/* Telegram Bot Purchases Tab */}
+        <TabsContent value="telegram">
+          <div className="space-y-6">
+            {data?.starsPurchases.length ? (
+              <section>
+                <h3 className="font-bold text-sm text-muted-foreground uppercase tracking-wider mb-3">Site Stars purchases</h3>
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
+                  {data.starsPurchases.map((anime) => (
+                    <div key={`${anime.id}-${anime.purchasedAt}`} className="flex justify-center">
+                      <AnimeCard anime={anime} />
+                    </div>
+                  ))}
+                </div>
+              </section>
+            ) : null}
+            {/* Telegram Status Card */}
+            <div className={cn(
+              "glass rounded-2xl p-5 border flex flex-col sm:flex-row sm:items-center gap-4",
+              botStatus?.linked ? "border-emerald-500/30 bg-emerald-500/5" : "border-border"
+            )}>
+              {botStatus?.linked ? (
+                <>
+                  <CheckCircle2 className="w-8 h-8 text-emerald-500 shrink-0" />
+                  <div className="flex-1">
+                    <p className="font-bold">✅ Telegram ulandi</p>
+                    <p className="text-sm text-muted-foreground mt-0.5">Xarid qilingan animeler avtomatik yuboriladi.</p>
+                  </div>
+                  <a href={`https://t.me/${process.env.NEXT_PUBLIC_BOT_USERNAME || "DubAniXbot"}`} target="_blank" rel="noopener noreferrer">
+                    <Button variant="outline" className="rounded-xl gap-2">
+                      <ExternalLink className="w-4 h-4" /> Botni ochish
+                    </Button>
+                  </a>
+                </>
+              ) : polling ? (
+                <>
+                  <Loader2 className="w-8 h-8 text-primary animate-spin shrink-0" />
+                  <div className="flex-1">
+                    <p className="font-bold">Telegram bog'lanishi kutilmoqda...</p>
+                    <p className="text-sm text-muted-foreground mt-0.5">Botni oching va /start bosing.</p>
+                  </div>
+                  {linkUrl && (
+                    <a href={linkUrl} target="_blank" rel="noopener noreferrer">
+                      <Button size="sm" variant="outline" className="rounded-xl gap-1.5">
+                        <ExternalLink className="w-3.5 h-3.5" /> Botni ochish
+                      </Button>
+                    </a>
+                  )}
+                </>
+              ) : (
+                <>
+                  <Link2 className="w-8 h-8 text-muted-foreground/50 shrink-0" />
+                  <div className="flex-1">
+                    <p className="font-bold">Telegram ulanmagan</p>
+                    <p className="text-sm text-muted-foreground mt-0.5">Animeni olish uchun Telegram hisobingizni ulang.</p>
+                  </div>
+                  <Button onClick={startLinking} disabled={linkLoading} className="rounded-xl brand-gradient text-white gap-2 shrink-0">
+                    {linkLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+                    Ulash
+                  </Button>
+                </>
+              )}
+            </div>
+
+            {/* Purchases List */}
+            <div>
+              <h3 className="font-bold text-sm text-muted-foreground uppercase tracking-wider mb-3">Xarid qilingan animeler</h3>
+              {botLoading ? (
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
+                  {[...Array(4)].map((_, i) => (
+                    <div key={i} className="rounded-2xl overflow-hidden">
+                      <div className="aspect-[2/3] skeleton rounded-2xl" />
+                      <div className="p-2 space-y-1.5"><div className="h-3 skeleton rounded" /><div className="h-3 w-2/3 skeleton rounded" /></div>
+                    </div>
+                  ))}
+                </div>
+              ) : botAnimes.length === 0 ? (
+                <div className="rounded-2xl border border-dashed p-12 text-center">
+                  <ShoppingBag className="w-10 h-10 text-muted-foreground/30 mx-auto mb-3" />
+                  <p className="font-bold">Hali xarid qilinmagan</p>
+                  <p className="text-sm text-muted-foreground mt-1 mb-4">Anime do'koniga boring va birinchi xaridingizni qiling!</p>
+                  <Button onClick={() => navigate("browse")} className="rounded-xl brand-gradient text-white gap-2">
+                    <ShoppingBag className="w-4 h-4" /> Do'konga o'tish
+                  </Button>
+                </div>
+              ) : (
+                <>
+                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
+                    {botAnimes.map((anime: any) => (
+                      <button
+                        key={anime.slug}
+                        onClick={() => navigate("detail", { animeId: anime.slug })}
+                        className="text-left rounded-2xl overflow-hidden border hover:border-primary/40 bg-secondary/20 hover:bg-secondary/40 transition-all group"
+                      >
+                        <div className="aspect-[2/3] overflow-hidden">
+                          <img src={anime.poster} alt={anime.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" loading="lazy" />
+                        </div>
+                        <div className="p-2">
+                          <p className="text-xs font-bold line-clamp-2">{anime.title}</p>
+                          <p className="text-[10px] text-primary mt-0.5 flex items-center gap-1">
+                            <Star className="w-2.5 h-2.5 fill-current" /> Stars orqali xarid qilingan
+                          </p>
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                  <div className="mt-4 p-4 rounded-xl bg-secondary/30 border text-sm text-muted-foreground">
+                    <p className="font-semibold mb-1">📦 Animeni qayta olish kerakmi?</p>
+                    <p>Telegram botida <code className="bg-secondary/80 px-1.5 py-0.5 rounded text-xs">/library</code> buyrug'ini yuboring — bot barcha animeleringizni qayta yuboradi.</p>
+                  </div>
+                </>
+              )}
+            </div>
+          </div>
+        </TabsContent>
+        <TabsContent value="leaderboards">
+          <div className="grid gap-4 lg:grid-cols-3">
+            <LeaderboardCard title="Top Collectors" entries={leaderboards?.collectors ?? []} loading={!leaderboards} scoreLabel="anime" />
+            <LeaderboardCard title="Top Contributors" entries={leaderboards?.contributors ?? []} loading={!leaderboards} scoreLabel="points" />
+            <LeaderboardCard title="Top Creators" entries={leaderboards?.creators ?? []} loading={!leaderboards} scoreLabel="anime" />
+          </div>
+        </TabsContent>
       </Tabs>
     </div>
+  );
+}
+
+function LeaderboardCard({
+  title,
+  entries,
+  loading,
+  scoreLabel,
+}: {
+  title: string;
+  entries: LeaderboardEntry[];
+  loading: boolean;
+  scoreLabel: string;
+}) {
+  return (
+    <section className="glass rounded-2xl p-4">
+      <h2 className="font-black mb-4">{title}</h2>
+      {loading ? (
+        <p className="text-xs text-muted-foreground">Loading…</p>
+      ) : entries.length ? (
+        <ol className="space-y-3">
+          {entries.map((entry, index) => (
+            <li key={entry.id} className="flex items-center gap-3">
+              <span className="w-5 text-xs font-black text-muted-foreground">{index + 1}</span>
+              <img
+                src={entry.avatarUrl || "/placeholder.svg"}
+                alt=""
+                className="w-8 h-8 rounded-full object-cover bg-muted"
+              />
+              <span className="min-w-0 flex-1 truncate text-sm font-semibold">
+                {entry.displayName || entry.username} <span className="text-[10px] text-muted-foreground">Lv.{entry.level}</span>
+              </span>
+              <span className="text-xs font-bold text-primary">
+                {entry.postCount !== undefined
+                  ? `${entry.postCount} posts · ${entry.likeCount ?? 0} likes`
+                  : `${entry.score} ${scoreLabel}`}
+              </span>
+            </li>
+          ))}
+        </ol>
+      ) : (
+        <p className="text-xs text-muted-foreground">No qualifying activity yet.</p>
+      )}
+    </section>
   );
 }
 

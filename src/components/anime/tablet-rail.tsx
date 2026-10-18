@@ -9,6 +9,7 @@ import { useResolvedNav, EXCHANGE_REQUIRED } from "./nav-config";
 import { Sidebar } from "./shell";
 import { Avatar } from "./ui-bits";
 import { Logo } from "./logo";
+import { toast } from "sonner";
 import {
   Tooltip, TooltipContent, TooltipProvider, TooltipTrigger,
 } from "@/components/ui/tooltip";
@@ -21,12 +22,12 @@ import { cn } from "@/lib/utils";
    sidebar as an overlay. No bottom dock on tablet.
    ============================================================ */
 
-function RailButton({ id }: { id: import("./types").ViewName }) {
+function RailButton({ id, onNavigate }: { id: import("./types").ViewName; onNavigate: () => void }) {
   const items = useResolvedNav();
   const navigate = useAppStore((s) => s.navigate);
   const item = items.find((i) => i.def.id === id);
   if (!item) return null;
-  const { def, active, badgeText } = item;
+  const { def, active, badgeText, locked } = item;
   const Icon = def.icon;
   const label = `${def.label}${badgeText ? ` · ${def.id === "exchange" ? `${item.ownedCount}/${EXCHANGE_REQUIRED}` : badgeText}` : ""}`;
 
@@ -34,7 +35,14 @@ function RailButton({ id }: { id: import("./types").ViewName }) {
     <Tooltip delayDuration={250}>
       <TooltipTrigger asChild>
         <button
-          onClick={() => navigate(def.id as never)}
+          onClick={() => {
+            if (locked && def.lockHint) {
+              toast.info(def.lockHint, { duration: 5000, id: `lock-${def.id}` });
+              return;
+            }
+            onNavigate();
+            navigate(def.id as never);
+          }}
           className={cn(
             "relative w-12 h-12 rounded-2xl flex items-center justify-center transition-all outline-none",
             "focus-visible:ring-2 focus-visible:ring-ring active:scale-[0.94]",
@@ -43,7 +51,7 @@ function RailButton({ id }: { id: import("./types").ViewName }) {
               : "text-muted-foreground hover:text-foreground hover:bg-accent/60"
           )}
           aria-current={active ? "page" : undefined}
-          aria-label={def.label}
+          aria-label={locked ? `${def.label} — locked` : def.label}
         >
           {active && (
             <span className="absolute left-0 top-1/2 -translate-y-1/2 -translate-x-[7px] w-[3px] h-6 rounded-full brand-gradient" />
@@ -51,9 +59,11 @@ function RailButton({ id }: { id: import("./types").ViewName }) {
           <Icon className="w-[21px] h-[21px]" strokeWidth={active ? 2.4 : 2} />
           {badgeText && (
             <span
-              className="absolute top-1.5 right-1.5 w-[7px] h-[7px] rounded-full bg-primary border border-background"
-              aria-hidden="true"
-            />
+              className="absolute -top-1 -right-1 rounded-full bg-primary px-1 text-[7px] leading-3 font-black text-primary-foreground border border-background"
+              aria-label={badgeText}
+            >
+              {badgeText}
+            </span>
           )}
         </button>
       </TooltipTrigger>
@@ -119,7 +129,14 @@ export function TabletRail() {
 
         <div className="flex-1 flex flex-col items-center gap-1 overflow-y-auto no-scrollbar w-full px-2">
           {items.map((it) => (
-            <RailButton key={it.def.id} id={it.def.id} />
+            <RailButton
+              key={it.def.id}
+              id={it.def.id}
+              onNavigate={() => {
+                cancelTimers();
+                setExpanded(false);
+              }}
+            />
           ))}
         </div>
 
@@ -195,7 +212,13 @@ export function TabletRail() {
               onMouseEnter={cancelTimers}
               onMouseLeave={scheduleClose}
             >
-              <Sidebar variant="overlay" />
+              <Sidebar
+                variant="overlay"
+                onNavigate={() => {
+                  cancelTimers();
+                  setExpanded(false);
+                }}
+              />
             </motion.div>
           </>
         )}

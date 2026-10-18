@@ -122,7 +122,7 @@ export function LoginView() {
               <Clapperboard className="w-4 h-4 text-primary" /> Creators earn from every view
             </span>
             <span className="flex items-center gap-2">
-              <Swords className="w-4 h-4 text-rose-400" /> Trade animes in the Exchange
+              <Swords className="w-4 h-4 text-rose-400" /> Gift a version even if you already own it
             </span>
           </div>
         </div>
@@ -151,7 +151,7 @@ export function LoginView() {
               Welcome to <span className="gradient-text">DubAniX</span>
             </h1>
             <p className="text-muted-foreground text-sm mt-2">
-              Stream, collect and exchange premium anime — dubbed your way.
+              Stream, collect and gift premium anime — dubbed your way.
             </p>
           </div>
 

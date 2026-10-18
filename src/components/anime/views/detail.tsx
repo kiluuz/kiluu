@@ -1,16 +1,19 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   Play, Star, Plus, Check, Coins, Heart, Share2, Users, Video,
-  Clock3, Loader2, BadgeCheck, Tv, Film, Package, Sparkles, Clapperboard,
+  Clock3, Loader2, BadgeCheck, Tv, Film, Package, Sparkles, Clapperboard, Send, ShoppingCart, Bell, BellOff, Link2, Lock
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { useAppStore } from "../store";
-import type { AnimeDetail, EpisodeItem, AnimeSummary } from "../types";
+import type { AnimeDetail, EpisodeItem, AnimeSummary, AnimeVersionCard } from "../types";
 import { AnimeCard, Avatar, SmartImage, formatCredits } from "../ui-bits";
+import { useBotCatalog, useBotStatus } from "../bot-hooks";
+import { CreditPurchaseModal, LinkTelegramModal } from "../bot-ui";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 
@@ -20,34 +23,152 @@ interface DetailResponse {
   related: AnimeSummary[];
 }
 
+function formatDetailCountdown(ms: number): string {
+  if (ms <= 0) return "0s";
+  const d = Math.floor(ms / (1000 * 60 * 60 * 24));
+  const h = Math.floor((ms % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+  const m = Math.floor((ms % (1000 * 60 * 60)) / (1000 * 60));
+  const s = Math.floor((ms % (1000 * 60)) / 1000);
+
+  const parts: string[] = [];
+  if (d > 0) parts.push(`${d}k`);
+  if (h > 0 || d > 0) parts.push(`${h}s`);
+  if (m > 0 || h > 0 || d > 0) parts.push(`${m}d`);
+  parts.push(`${s}s`);
+
+  return parts.join(" ");
+}
+
 export function DetailView() {
   const { view, user, setAuthOpen, navigate, updateUser } = useAppStore();
-  const [data, setData] = useState<DetailResponse | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [buying, setBuying] = useState(false);
-  const [favBusy, setFavBusy] = useState(false);
-
+  const queryClient = useQueryClient();
   const animeId = view.animeId!;
+  const detailKey = ["anime-detail", animeId, user?.id ?? "anonymous"] as const;
+  const { data, isPending: loading, error: detailError } = useQuery({
+    queryKey: detailKey,
+    queryFn: async (): Promise<DetailResponse> => {
+      const response = await fetch(`/api/animes/${encodeURIComponent(animeId)}`, {
+        cache: "no-store",
+      });
+      const payload = await response.json();
+      if (!response.ok) throw new Error(payload.error || "Failed to load anime");
+      return payload as DetailResponse;
+    },
+    staleTime: 30_000,
+    refetchOnWindowFocus: true,
+  });
+  const [favBusy, setFavBusy] = useState(false);
+  const [ratingBusy, setRatingBusy] = useState(false);
 
-  const load = async () => {
-    try {
-      const res = await fetch(`/api/animes/${animeId}`);
-      if (!res.ok) throw new Error();
-      const d: DetailResponse = await res.json();
-      setData(d);
-    } catch {
-      toast.error("Failed to load anime");
-    } finally {
-      setLoading(false);
-    }
-  };
+  const [showCreditModal, setShowCreditModal] = useState(false);
+  const [showLinkModal, setShowLinkModal] = useState(false);
+  const [delivering, setDelivering] = useState(false);
+  const [justPurchased, setJustPurchased] = useState(false);
+  const [notifySubscribed, setNotifySubscribed] = useState(false);
+  const [notifyBusy, setNotifyBusy] = useState(false);
+  const [episodePurchaseModal, setEpisodePurchaseModal] = useState<{number: number; title: string; price: number} | null>(null);
+  const [episodeBuying, setEpisodeBuying] = useState(false);
+  const [selectedVersionId, setSelectedVersionId] = useState<string | null>(null);
+
+  const [anilistEntry, setAnilistEntry] = useState<any>(null);
+  const [now, setNow] = useState(() => Date.now());
 
   useEffect(() => {
-    setLoading(true);
-    setData(null);
-    load();
-     
-  }, [animeId, user?.id]);
+    const t = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(t);
+  }, []);
+
+  useEffect(() => {
+    if (!data?.anime) return;
+    let alive = true;
+    fetch("/api/anilist/schedule?days=7")
+      .then(r => r.ok ? r.json() : null)
+      .then(d => {
+        if (!alive || !d?.schedule) return;
+        const searchArr = [
+          data.anime.title.toLowerCase(),
+          data.anime.altTitle?.toLowerCase(),
+        ].filter(Boolean) as string[];
+
+        let match = null;
+        for (const list of Object.values(d.schedule)) {
+          for (const entry of (list as any[])) {
+            const tRomaji = entry.media.titleRomaji.toLowerCase();
+            const tEn = entry.media.title.toLowerCase();
+            const tNative = entry.media.titleNative?.toLowerCase();
+
+            if (searchArr.some(s => tEn.includes(s) || tRomaji.includes(s) || (tNative && tNative.includes(s)) || s.includes(tEn) || s.includes(tRomaji))) {
+              if (entry.airingAt * 1000 > Date.now()) {
+                match = entry;
+              }
+              break;
+            }
+          }
+          if (match) break;
+        }
+        if (match) setAnilistEntry(match);
+      })
+      .catch(() => {});
+    return () => { alive = false; };
+  }, [data?.anime.title, data?.anime.altTitle]);
+
+  async function rateAnime(rating: number) {
+    if (!user) {
+      setAuthOpen(true);
+      return;
+    }
+    if (!data) return;
+    setRatingBusy(true);
+    try {
+      const response = await fetch(`/api/animes/${data.anime.id}/rating`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ rating }),
+      });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error || "Could not save rating");
+      queryClient.setQueryData<DetailResponse>(detailKey, (current) => current ? {
+        ...current,
+        anime: {
+          ...current.anime,
+          myRating: result.myRating,
+          communityRating: result.communityRating,
+          ratingCount: result.ratingCount,
+        },
+      } : current);
+      toast.success("Your rating was saved");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Could not save rating");
+    } finally {
+      setRatingBusy(false);
+    }
+  }
+
+  useEffect(() => {
+    if (detailError) {
+      toast.error(detailError instanceof Error ? detailError.message : "Failed to load anime");
+    }
+  }, [detailError]);
+
+  // Bot integration state (ALL hooks must be called before early returns)
+  const { map: botMap, loading: botLoading, botError } = useBotCatalog();
+  const botStatus = useBotStatus(!!user);
+  const { episodePurchases } = botStatus;
+
+  // Notify subscription — uses data?.anime.id so it's safe before data is loaded
+  const currentAnimeId = data?.anime.id ?? null;
+  const currentSlug = data?.anime.slug ?? null;
+  // isAvailableInBot: true if in catalog OR if bot is unreachable (don't block purchase when bot is down)
+  const isAvailableInBot = botError || !!(botMap && currentSlug && botMap[currentSlug]);
+  const isUpcoming = data?.anime.status === "UPCOMING";
+
+  useEffect(() => {
+    if (!user || !currentAnimeId || !isUpcoming) return;
+    fetch(`/api/notify/${currentAnimeId}`)
+      .then(r => r.ok ? r.json() : null)
+      .then(d => d && setNotifySubscribed(d.subscribed))
+      .catch(() => {});
+  }, [currentAnimeId, user?.id, isUpcoming]);
 
   if (loading) {
     return (
@@ -75,39 +196,80 @@ export function DetailView() {
   }
 
   const { anime, episodes, related } = data;
-  const canWatch = anime.owned || anime.isFree;
-  const firstUnwatched = episodes.find((e) => !e.progress?.completed) || episodes[0];
+  const versions: AnimeVersionCard[] = anime.versions || [];
+  const selectedVersion =
+    versions.find((v) => v.id === selectedVersionId) ||
+    versions.find((v) => v.kind === "official") ||
+    versions[0];
+  const ownsSelected = Boolean(selectedVersion?.owned || anime.owned);
 
-  async function buy() {
+  const botAnime = botMap ? botMap[anime.slug] : null;
+  const isPurchasedInBot = justPurchased || (botStatus?.purchases || []).includes(anime.slug);
+  // episodePurchases for this anime: {"1": true, "2": true}
+  const myEpisodePurchases: Record<string, boolean> = {};
+  if (episodePurchases && episodePurchases[anime.slug]) {
+    for (const epNum of episodePurchases[anime.slug]) {
+      myEpisodePurchases[String(epNum)] = true;
+    }
+  }
+  if (Array.isArray((anime as any).ownedEpisodes)) {
+    for (const epNum of (anime as any).ownedEpisodes) {
+      myEpisodePurchases[String(epNum)] = true;
+    }
+  }
+
+  const displayEpisodes =
+    episodes && episodes.length > 0
+      ? episodes
+      : botAnime?.episodes && Array.isArray(botAnime.episodes)
+        ? botAnime.episodes.map((num: number) => ({
+            id: `ep-${anime.slug}-${num}`,
+            animeId: anime.id,
+            number: num,
+            title: `${anime.title} ${num}-qism`,
+            description: `${anime.title} serialining ${num}-qismi`,
+            videoUrl: "telegram",
+            duration: 1440,
+            createdAt: new Date().toISOString(),
+            progress: null,
+          }))
+        : [];
+
+  const totalEpisodesCount = Math.max(
+    episodes?.length || 0,
+    botAnime?.episode_count || 0,
+    botAnime?.episodes?.length || 0,
+    displayEpisodes.length
+  );
+
+  async function toggleNotify() {
+    if (!user) { setAuthOpen(true); return; }
+    setNotifyBusy(true);
+    try {
+      const method = notifySubscribed ? "DELETE" : "POST";
+      const res = await fetch(`/api/notify/${anime.id}`, { method });
+      if (res.ok) {
+        setNotifySubscribed(!notifySubscribed);
+        toast.success(notifySubscribed ? "Eslatma bekor qilindi" : "🔔 Anime chiqqanda xabar olasiz!");
+      }
+    } catch {
+      toast.error("Xatolik yuz berdi");
+    } finally {
+      setNotifyBusy(false);
+    }
+  }
+
+  // They can watch if they bought it via old system OR it's free.
+  // But if it's a paid bot anime, they use the bot flow.
+  const canWatchLocally = anime.owned || anime.isFree;
+  const firstUnwatched = displayEpisodes.find((e) => !e.progress?.completed) || displayEpisodes[0];
+
+  function buy() {
     if (!user) {
       setAuthOpen(true);
       return;
     }
-    if (user.credits < anime.price) {
-      toast.error(`Not enough credits — you need ${anime.price - user.credits} more`, {
-        description: "Top up your balance in Get Credits",
-        action: { label: "Get Credits", onClick: () => navigate("credits") },
-      });
-      return;
-    }
-    setBuying(true);
-    try {
-      const res = await fetch(`/api/animes/${anime.slug}/purchase`, { method: "POST" });
-      const d = await res.json();
-      if (!res.ok) {
-        toast.error(d.error || "Purchase failed");
-        return;
-      }
-      updateUser({ credits: d.credits });
-      toast.success(`"${anime.title}" added to your library! 🎉`, {
-        description: d.unlockedExchange ? "Exchange Marketplace unlocked!" : undefined,
-      });
-      load();
-    } catch {
-      toast.error("Network error");
-    } finally {
-      setBuying(false);
-    }
+    setShowCreditModal(true);
   }
 
   async function toggleFavorite() {
@@ -120,7 +282,11 @@ export function DetailView() {
       const res = await fetch(`/api/animes/${anime.slug}/favorite`, { method: "POST" });
       const d = await res.json();
       if (res.ok) {
-        setData((prev) => (prev ? { ...prev, anime: { ...prev.anime, favorited: d.favorited, favoriteCount: prev.anime.favoriteCount + (d.favorited ? 1 : -1) } } : prev));
+        queryClient.setQueryData<DetailResponse>(detailKey, (prev) => (
+          prev
+            ? { ...prev, anime: { ...prev.anime, favorited: d.favorited, favoriteCount: prev.anime.favoriteCount + (d.favorited ? 1 : -1) } }
+            : prev
+        ));
         toast.success(d.favorited ? "Added to favorites ♥" : "Removed from favorites");
       }
     } catch {
@@ -145,13 +311,102 @@ export function DetailView() {
       setAuthOpen(true);
       return;
     }
-    if (!canWatch) {
-      toast.error("Purchase this anime first to watch it", {
-        action: { label: "Buy", onClick: buy },
+    if (!canWatchLocally) {
+      toast.error("Sotib olish zarur", {
+        action: { label: "Sotib olish", onClick: buy },
       });
       return;
     }
     navigate("watch", { animeId: anime.slug, episodeId: episodeId || firstUnwatched?.id });
+  }
+
+  async function handleWatchTelegram(episodeNumber?: number) {
+    if (!user) {
+      setAuthOpen(true);
+      return;
+    }
+    if (!botStatus.linked) {
+      setShowLinkModal(true);
+      return;
+    }
+
+    setDelivering(true);
+    try {
+      const res = await fetch("/api/bot/deliver-purchases", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          slug: anime.slug,
+          episode_number: episodeNumber,
+        }),
+      });
+      const data = await res.json();
+      toast.success(
+        episodeNumber
+          ? `✅ ${episodeNumber}-qism Telegram botingizga yuborildi!`
+          : "✅ Anime Telegram botingizga yuborildi!"
+      );
+      botStatus.refresh();
+
+      // Open Telegram (native first, then web fallback)
+      const botUsername = process.env.NEXT_PUBLIC_BOT_USERNAME || "DubAniXbot";
+      window.location.href = `tg://resolve?domain=${botUsername}`;
+      setTimeout(() => {
+        if (!document.hidden) {
+          window.open(`https://t.me/${botUsername}`, "_blank");
+        }
+      }, 1500);
+    } catch {
+      toast.error("Anime yuborishda xatolik yuz berdi");
+    } finally {
+      setDelivering(false);
+    }
+  }
+
+  async function handleBuyEpisode(episodeNumber: number, price: number) {
+    if (!user) { setAuthOpen(true); return; }
+    setEpisodeBuying(true);
+    try {
+      // Check credits
+      if ((user.credits ?? 0) < price) {
+        toast.error(`Kredit yetarli emas. Yana ${price - (user.credits ?? 0)} kredit kerak.`, {
+          action: { label: "Kredit olish", onClick: () => setShowCreditModal(true) },
+        });
+        setEpisodeBuying(false);
+        return;
+      }
+      const res = await fetch(`/api/animes/${anime.slug}/purchase`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ episodeNumber, episodePrice: price }),
+      });
+      const d = await res.json();
+      if (!res.ok) {
+        if (d.alreadyOwned) {
+          // Already bought — just deliver
+          toast.info("Bu qismni allaqachon sotib olgansiz, Telegramga yuborilmoqda...");
+          setEpisodePurchaseModal(null);
+          await handleWatchTelegram(episodeNumber);
+          return;
+        }
+        toast.error(d.error || "Xarid amalga oshmadi");
+        setEpisodeBuying(false);
+        return;
+      }
+      // Update local credits
+      if (typeof d.credits === "number") {
+        updateUser({ credits: d.credits });
+      }
+      toast.success(`✅ ${episodeNumber}-qism sotib olindi!`);
+      setEpisodePurchaseModal(null);
+      botStatus.refresh();
+      // Deliver to Telegram
+      await handleWatchTelegram(episodeNumber);
+    } catch {
+      toast.error("Xarid amalga oshmadi");
+    } finally {
+      setEpisodeBuying(false);
+    }
   }
 
   return (
@@ -176,8 +431,12 @@ export function DetailView() {
             <div className="flex items-center gap-2 justify-center md:justify-start flex-wrap mb-2">
               {anime.isFree ? (
                 <Badge className="bg-emerald-500/90 border-0 font-bold">FREE</Badge>
-              ) : canWatch ? (
+              ) : isPurchasedInBot || anime.owned ? (
                 <Badge className="bg-primary/90 border-0 font-bold gap-1 text-primary-foreground"><BadgeCheck className="w-3 h-3" /> OWNED</Badge>
+              ) : botAnime ? (
+                <Badge className="bg-amber-500/90 border-0 font-bold gap-1">
+                  {new Intl.NumberFormat("uz-UZ").format(botAnime.price)} so'm
+                </Badge>
               ) : (
                 <Badge className="bg-amber-500/90 border-0 font-bold gap-1">
                   <Coins className="w-3 h-3" /> {formatCredits(anime.price)} credits
@@ -187,7 +446,20 @@ export function DetailView() {
                 {anime.type === "MOVIE" ? <Film className="w-3 h-3" /> : <Tv className="w-3 h-3" />}
                 {anime.type}
               </Badge>
-              <Badge variant="outline" className="font-semibold">{anime.status}</Badge>
+              {anime.status === "ONGOING" ? (
+                <Badge className="bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 font-bold gap-1.5 px-2.5 py-0.5">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                  EFIRDA (ONGOING)
+                </Badge>
+              ) : anime.status === "UPCOMING" ? (
+                <Badge className="bg-sky-500/15 text-sky-400 border border-sky-500/30 font-bold gap-1.5 px-2.5 py-0.5">
+                  TEZ KUNDA (UPCOMING)
+                </Badge>
+              ) : (
+                <Badge variant="outline" className="font-semibold text-muted-foreground border-border/80 px-2.5 py-0.5">
+                  TUGALLANGAN (COMPLETED)
+                </Badge>
+              )}
             </div>
 
             <h1 className="text-2xl sm:text-4xl font-black leading-tight">{anime.title}</h1>
@@ -197,12 +469,12 @@ export function DetailView() {
 
             <div className="flex items-center gap-3 mt-3 text-sm flex-wrap justify-center md:justify-start">
               <span className="flex items-center gap-1 font-bold">
-                <Star className="w-4 h-4 fill-amber-400 text-amber-400" /> {anime.rating.toFixed(1)}
+                <Star className="w-4 h-4 fill-amber-400 text-amber-400" /> {anime.catalogRating.toFixed(1)} <span className="text-xs text-muted-foreground">catalog</span>
               </span>
               <span className="text-muted-foreground">{anime.year}</span>
               <span className="text-muted-foreground">·</span>
               <span className="text-muted-foreground flex items-center gap-1">
-                <Package className="w-3.5 h-3.5" /> {episodes.length} episodes
+                <Package className="w-3.5 h-3.5" /> {totalEpisodesCount} {totalEpisodesCount === 1 ? "qism" : "qismlar"}
               </span>
               <span className="text-muted-foreground">·</span>
               <span className="text-muted-foreground flex items-center gap-1">
@@ -228,26 +500,183 @@ export function DetailView() {
               ))}
             </div>
 
+            {anilistEntry && (anilistEntry.airingAt * 1000 - now > 0) && (
+              <div className="mt-6 p-5 rounded-3xl border-2 border-primary/20 bg-primary/5 flex items-center justify-between gap-4 flex-wrap max-w-md mx-auto md:mx-0 shadow-lg shadow-primary/5 relative overflow-hidden">
+                <div className="absolute top-0 left-0 w-full h-1 bg-primary/20" />
+                <div className="absolute top-0 left-0 h-1 bg-primary transition-all duration-1000" style={{ width: `${Math.max(0, Math.min(100, 100 - ((anilistEntry.airingAt * 1000 - now) / (7 * 24 * 60 * 60 * 1000)) * 100))}%` }} />
+                <div>
+                  <p className="text-xs font-black uppercase tracking-wider text-primary mb-1 flex items-center gap-1.5"><Clock3 className="w-3.5 h-3.5" /> Keyingi qism</p>
+                  <h3 className="text-2xl font-black">{anilistEntry.episode}-qism</h3>
+                </div>
+                <div className="text-right">
+                  <p className="text-xs text-muted-foreground font-semibold mb-1">Qolgan vaqt</p>
+                  <div className="font-display text-xl sm:text-2xl font-black tabular-nums text-foreground tracking-tight">
+                    {formatDetailCountdown(anilistEntry.airingAt * 1000 - now)}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {versions.length > 0 && (
+              <div className="mt-4 flex flex-wrap gap-2 justify-center md:justify-start">
+                {versions.map((v) => (
+                  <button
+                    key={v.id}
+                    type="button"
+                    onClick={() => setSelectedVersionId(v.id)}
+                    className={cn(
+                      "px-3 py-1.5 rounded-full text-xs font-bold border transition",
+                      (selectedVersion?.id === v.id)
+                        ? "border-primary bg-primary/15 text-primary"
+                        : "border-border hover:border-primary/40"
+                    )}
+                  >
+                    {v.label} · {v.price} kr {v.owned ? "· owned" : ""}
+                  </button>
+                ))}
+              </div>
+            )}
+
             {/* Actions */}
             <div className="flex items-center gap-2.5 mt-5 flex-wrap justify-center md:justify-start">
-              {canWatch ? (
+              {botLoading ? (
+                <Button size="lg" disabled className="h-12 px-7 rounded-full bg-secondary text-muted-foreground font-bold">
+                  <Loader2 className="w-5 h-5 animate-spin mr-2" /> Tekshirilmoqda...
+                </Button>
+              ) : isUpcoming ? (
+                <div className="flex items-center gap-2 flex-wrap">
+                  <Button size="lg" disabled className="h-12 px-7 rounded-full bg-secondary/80 text-muted-foreground font-bold cursor-not-allowed">
+                    <Bell className="w-5 h-5 mr-2" /> Tez kunda
+                  </Button>
+                  <Button
+                    size="lg"
+                    variant={notifySubscribed ? "default" : "outline"}
+                    disabled={notifyBusy}
+                    onClick={toggleNotify}
+                    className={cn(
+                      "h-12 px-5 rounded-full font-bold transition-all",
+                      notifySubscribed
+                        ? "bg-primary/20 text-primary border border-primary/40 hover:bg-primary/30"
+                        : "border-dashed hover:border-primary/60 hover:text-primary"
+                    )}
+                  >
+                    {notifyBusy ? (
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    ) : notifySubscribed ? (
+                      <><BellOff className="w-4 h-4 mr-2" /> Bekor qilish</>
+                    ) : (
+                      <><Bell className="w-4 h-4 mr-2" /> Eslatma</>
+                    )}
+                  </Button>
+                  {anime.releaseDate && (
+                    <span className="text-xs text-muted-foreground bg-secondary/60 px-3 py-2 rounded-full font-medium">
+                      📅 {new Date(anime.releaseDate).toLocaleDateString("uz-UZ", { day: "numeric", month: "long", year: "numeric" })}
+                    </span>
+                  )}
+                </div>
+              ) : (isPurchasedInBot || anime.isFree || ownsSelected) ? (
+                <div className="flex flex-col gap-2.5 w-full md:w-auto">
+                  <div className="flex items-center gap-2.5 flex-wrap">
+                    <Button
+                      size="lg"
+                      onClick={() => handleWatchTelegram()}
+                      disabled={delivering}
+                      className="h-12 px-7 rounded-full brand-gradient hover:opacity-90 text-white font-bold shadow-xl shadow-primary/30"
+                    >
+                      {delivering ? (
+                        <>
+                          <Loader2 className="w-5 h-5 mr-2 animate-spin" />
+                          Yuborilmoqda...
+                        </>
+                      ) : (
+                        <>
+                          <Play className="w-5 h-5 mr-2 fill-current" />
+                          Ko&apos;rish (Telegram)
+                        </>
+                      )}
+                    </Button>
+
+                    {!botStatus.linked && (
+                      <Button
+                        size="lg"
+                        variant="outline"
+                        onClick={() => setShowLinkModal(true)}
+                        className="h-12 px-5 rounded-full font-bold border-amber-500/40 text-amber-500 hover:bg-amber-500/10 shadow-sm"
+                      >
+                        <Send className="w-4 h-4 mr-2" /> Telegramni ulash
+                      </Button>
+                    )}
+                  </div>
+
+                  {!botStatus.linked && (
+                    <div className="p-3.5 rounded-2xl bg-amber-500/10 border border-amber-500/25 text-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3 animate-in fade-in">
+                      <div className="flex items-center gap-2.5">
+                        <span className="text-base shrink-0">⚠️</span>
+                        <span className="text-muted-foreground leading-snug">
+                          Bot animeni tashlab berishi uchun saytdagi <strong>«Telegramni ulash»</strong> tugmasini bosing!
+                        </span>
+                      </div>
+                      <Button
+                        size="sm"
+                        onClick={() => setShowLinkModal(true)}
+                        className="h-8 px-4 rounded-xl text-xs font-bold brand-gradient text-white shrink-0"
+                      >
+                        Ulash
+                      </Button>
+                    </div>
+                  )}
+                </div>
+              ) : !botLoading && !isAvailableInBot && !selectedVersion ? (
+                <div className="flex items-center gap-2 flex-wrap">
+                  <Button
+                    size="lg"
+                    disabled
+                    className="h-12 px-7 rounded-full bg-secondary/80 text-muted-foreground font-bold cursor-not-allowed"
+                  >
+                    <Bell className="w-5 h-5 mr-2" /> Qismlar yo‘q
+                  </Button>
+                  <Button
+                    size="lg"
+                    variant={notifySubscribed ? "default" : "outline"}
+                    disabled={notifyBusy}
+                    onClick={toggleNotify}
+                    className={cn(
+                      "h-12 px-5 rounded-full font-bold transition-all",
+                      notifySubscribed
+                        ? "bg-primary/20 text-primary border border-primary/40 hover:bg-primary/30"
+                        : "border-dashed hover:border-primary/60 hover:text-primary"
+                    )}
+                  >
+                    {notifyBusy ? (
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    ) : notifySubscribed ? (
+                      <><BellOff className="w-4 h-4 mr-2" /> Bekor qilish</>
+                    ) : (
+                      <><Bell className="w-4 h-4 mr-2" /> Xabardor qiling</>
+                    )}
+                  </Button>
+                </div>
+              ) : (selectedVersion?.price ?? anime.price) > 0 ? (
                 <Button
                   size="lg"
-                  onClick={() => startWatching()}
+                  onClick={buy}
                   className="h-12 px-7 rounded-full brand-gradient hover:opacity-90 text-white font-bold shadow-xl shadow-primary/30"
                 >
-                  <Play className="w-5 h-5 fill-white" />
-                  {data.anime && firstUnwatched?.progress ? "Resume" : "Watch Now"}
+                  <Coins className="w-5 h-5 mr-2" />
+                  To&apos;liq xarid — {(selectedVersion?.price ?? anime.price).toLocaleString()} kredit
                 </Button>
               ) : (
                 <Button
                   size="lg"
-                  disabled={buying}
-                  onClick={buy}
-                  className="h-12 px-7 rounded-full brand-gradient hover:opacity-90 text-white font-bold shadow-xl shadow-primary/30"
+                  variant="outline"
+                  onClick={() => {
+                    const el = document.getElementById("episodes-section");
+                    el?.scrollIntoView({ behavior: "smooth" });
+                  }}
+                  className="h-12 px-6 rounded-full font-bold border-primary/40 text-primary hover:bg-primary/10 shadow-sm"
                 >
-                  {buying ? <Loader2 className="w-5 h-5 animate-spin" /> : <Coins className="w-5 h-5" />}
-                  Buy for {formatCredits(anime.price)} credits
+                  <Tv className="w-5 h-5 mr-2" />
+                  Qismlarni tanlash
                 </Button>
               )}
               <Button
@@ -270,7 +699,7 @@ export function DetailView() {
               >
                 <Share2 className="w-5 h-5" />
               </Button>
-              {canWatch && episodes.length > 0 && (
+              {canWatchLocally && episodes.length > 0 && (
                 <Button
                   size="lg"
                   variant="ghost"
@@ -296,29 +725,49 @@ export function DetailView() {
 
             {/* Episodes */}
             <Separator className="my-7" />
-            <div className="flex items-center justify-between mb-4">
+            <div id="episodes-section" className="flex items-center justify-between mb-4">
               <h2 className="text-lg font-bold flex items-center gap-2">
-                <Tv className="w-5 h-5 text-primary" /> Episodes
+                <Tv className="w-5 h-5 text-primary" /> Qismlar (Episodes)
               </h2>
-              <span className="text-xs text-muted-foreground">{episodes.length} total</span>
+              <span className="text-xs text-muted-foreground">{totalEpisodesCount} jami</span>
             </div>
 
-            {episodes.length === 0 ? (
+            {displayEpisodes.length === 0 ? (
               <div className="rounded-2xl border border-dashed p-8 text-center text-muted-foreground">
                 <Clapperboard className="w-8 h-8 mx-auto mb-2 opacity-50" />
-                <p className="text-sm font-medium">No episodes yet — coming soon!</p>
+                <p className="text-sm font-medium">Hozircha qismlar yuklanmagan — tez kunda!</p>
               </div>
             ) : (
               <div className="space-y-2.5">
-                {episodes.map((ep) => {
-                  const locked = !canWatch;
+                {displayEpisodes.map((ep) => {
+                  const isTelegramOnly = !ep.videoUrl || ep.videoUrl === "telegram";
+                  // Determine if user owns this specific episode
+                  const ownedViaFullPurchase = canWatchLocally || isPurchasedInBot;
+                  const ownedThisEp = ownedViaFullPurchase || myEpisodePurchases[String(ep.number)];
+                  const epPrice = botAnime?.episode_prices?.[String(ep.number)] ?? botAnime?.price ?? 0;
+                  const locked = !ownedThisEp;
                   const pct = ep.progress && ep.progress.duration > 0
                     ? Math.min(100, (ep.progress.position / ep.progress.duration) * 100)
                     : 0;
                   return (
                     <button
                       key={ep.id}
-                      onClick={() => startWatching(ep.id)}
+                      onClick={() => {
+                        if (locked) {
+                          // Show per-episode purchase modal
+                          setEpisodePurchaseModal({
+                            number: ep.number,
+                            title: ep.title,
+                            price: epPrice,
+                          });
+                          return;
+                        }
+                        if (isTelegramOnly) {
+                          handleWatchTelegram(ep.number);
+                        } else {
+                          startWatching(ep.id);
+                        }
+                      }}
                       className="w-full flex items-center gap-3.5 p-2.5 rounded-2xl border bg-card hover:border-primary/50 hover:bg-accent/50 transition group text-left"
                       aria-label={`Play episode ${ep.number}: ${ep.title}`}
                     >
@@ -340,10 +789,21 @@ export function DetailView() {
                         )}
                       </div>
                       <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-2 flex-wrap">
                           <span className="text-xs font-black text-primary">EP {String(ep.number).padStart(2, "0")}</span>
                           {ep.progress?.completed && (
                             <Badge className="h-4.5 text-[9px] px-1.5 bg-emerald-500/15 text-emerald-500 border-emerald-500/30">WATCHED</Badge>
+                          )}
+                          {isTelegramOnly && (
+                            <Badge variant="outline" className="h-4.5 text-[9px] px-1.5 border-primary/30 text-primary">TELEGRAM</Badge>
+                          )}
+                          {locked && epPrice > 0 && (
+                            <Badge className="h-4.5 text-[9px] px-1.5 bg-amber-500/15 text-amber-600 border-amber-500/30 gap-0.5">
+                              <Coins className="w-2.5 h-2.5" />{epPrice}
+                            </Badge>
+                          )}
+                          {!locked && (
+                            <Badge className="h-4.5 text-[9px] px-1.5 bg-emerald-500/15 text-emerald-600 border-emerald-500/30">OWNED</Badge>
                           )}
                         </div>
                         <p className="font-semibold text-sm truncate mt-0.5">{ep.title}</p>
@@ -351,7 +811,10 @@ export function DetailView() {
                           <p className="text-xs text-muted-foreground line-clamp-1 mt-0.5 hidden sm:block">{ep.description}</p>
                         )}
                         <p className="text-[11px] text-muted-foreground/70 mt-1 flex items-center gap-1">
-                          <Clock3 className="w-3 h-3" /> {Math.max(1, Math.round((ep.duration || 600) / 60))} min
+                          <Clock3 className="w-3 h-3" /> {Math.max(1, Math.round((ep.duration || 1440) / 60))} min
+                          {locked && epPrice > 0 && (
+                            <span className="ml-2 text-primary font-semibold">• Sotib olish: {epPrice} 💰</span>
+                          )}
                         </p>
                       </div>
                     </button>
@@ -387,16 +850,42 @@ export function DetailView() {
             <div className="glass rounded-2xl p-4 space-y-3">
               <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Anime Stats</p>
               {[
-                { icon: <Star className="w-4 h-4 text-amber-400" />, label: "Rating", value: anime.rating.toFixed(1) },
-                { icon: <Users className="w-4 h-4 text-primary" />, label: "Collectors", value: formatCredits(anime.purchaseCount) },
+                { icon: <Star className="w-4 h-4 text-amber-400" />, label: `Community rating (${anime.ratingCount})`, value: anime.communityRating === null ? "No ratings yet" : anime.communityRating.toFixed(1) },
+                { icon: <Star className="w-4 h-4 text-muted-foreground" />, label: "Catalog rating", value: anime.catalogRating.toFixed(1) },
+                { icon: <Users className="w-4 h-4 text-primary" />, label: "Collectors", value: formatCredits(anime.collectorCount) },
                 { icon: <Heart className="w-4 h-4 text-rose-400" />, label: "Favorites", value: formatCredits(anime.favoriteCount) },
-                { icon: <Sparkles className="w-4 h-4 text-primary" />, label: "Status", value: anime.status },
+                {
+                  icon: <Sparkles className="w-4 h-4 text-primary" />,
+                  label: "Status",
+                  value: anime.status === "ONGOING" ? "Efirda (Chiqmoqda)" : anime.status === "UPCOMING" ? "Tez kunda" : "Tugallangan (Completed)",
+                },
               ].map((row) => (
                 <div key={row.label} className="flex items-center justify-between text-sm">
                   <span className="flex items-center gap-2 text-muted-foreground">{row.icon}{row.label}</span>
                   <span className="font-bold">{row.value}</span>
                 </div>
               ))}
+              <div className="border-t pt-3">
+                <p className="text-xs font-semibold mb-2">{anime.myRating ? `Your rating: ${anime.myRating}/10` : "Rate this anime"}</p>
+                <div className="grid grid-cols-10 gap-1">
+                  {Array.from({ length: 10 }, (_, index) => index + 1).map((rating) => (
+                    <button
+                      key={rating}
+                      type="button"
+                      disabled={ratingBusy}
+                      onClick={() => void rateAnime(rating)}
+                      aria-label={`Rate ${rating} out of 10`}
+                      aria-pressed={anime.myRating === rating}
+                      className={cn(
+                        "h-7 rounded-md border text-[10px] font-bold transition-colors disabled:opacity-50",
+                        anime.myRating === rating ? "border-primary bg-primary text-primary-foreground" : "border-border hover:border-primary hover:text-primary"
+                      )}
+                    >
+                      {rating}
+                    </button>
+                  ))}
+                </div>
+              </div>
             </div>
 
             {related.length > 0 && (
@@ -441,15 +930,109 @@ export function DetailView() {
           </div>
         )}
       </div>
-    </div>
-  );
-}
+      {/* Credit Purchase Modal */}
+      {showCreditModal && (
+        <CreditPurchaseModal
+          animeSlug={anime.slug}
+          animeTitle={anime.title}
+          price={selectedVersion?.price ?? anime.price}
+          versionId={selectedVersion?.id}
+          userCredits={user?.credits ?? 0}
+          botLinked={botStatus?.linked ?? null}
+          onClose={() => setShowCreditModal(false)}
+          onSuccess={() => {
+            setShowCreditModal(false);
+            setJustPurchased(true);
+            updateUser({ credits: (user?.credits ?? 0) - (selectedVersion?.price ?? anime.price) });
+            botStatus.refresh();
+            toast.success("Xarid muvaffaqiyatli!");
+          }}
+        />
+      )}
 
-function Lock({ size = 16, className }: { size?: number; className?: string }) {
-  return (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
-      <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
-      <path d="M7 11V7a5 5 0 0 1 10 0v4" />
-    </svg>
+      {/* Standalone Telegram Link Modal */}
+      <LinkTelegramModal
+        open={showLinkModal}
+        animeTitle={anime.title}
+        onClose={() => setShowLinkModal(false)}
+        onLinked={() => {
+          botStatus.refresh();
+          toast.success("✅ Telegram ulandi! Anime botingizga yuborilmoqda...");
+        }}
+      />
+
+      {/* Episode Purchase Modal */}
+      {episodePurchaseModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-in fade-in">
+          <div className="bg-card border rounded-3xl p-6 max-w-sm w-full shadow-2xl animate-in zoom-in-95">
+            {/* Header */}
+            <div className="flex items-center gap-3 mb-5">
+              <div className="w-12 h-12 rounded-2xl bg-primary/10 flex items-center justify-center shrink-0">
+                <Tv className="w-6 h-6 text-primary" />
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground font-semibold uppercase tracking-wider">Qismni sotib olish</p>
+                <h3 className="font-bold text-base leading-tight">{episodePurchaseModal.number}-qism</h3>
+              </div>
+            </div>
+
+            {/* Episode info */}
+            <div className="bg-secondary/50 rounded-2xl p-4 mb-5 space-y-2">
+              <p className="text-sm font-semibold truncate">{episodePurchaseModal.title}</p>
+              <div className="flex items-center justify-between text-sm">
+                <span className="text-muted-foreground">Narxi</span>
+                <span className="font-black text-lg text-primary flex items-center gap-1">
+                  <Coins className="w-4 h-4" /> {episodePurchaseModal.price} kredit
+                </span>
+              </div>
+              <div className="flex items-center justify-between text-sm">
+                <span className="text-muted-foreground">Sizda</span>
+                <span className={`font-bold ${(user?.credits ?? 0) >= episodePurchaseModal.price ? "text-emerald-500" : "text-rose-500"}`}>
+                  {user?.credits ?? 0} kredit
+                </span>
+              </div>
+              {(user?.credits ?? 0) < episodePurchaseModal.price && (
+                <p className="text-xs text-rose-500 font-medium pt-1">
+                  ⚠️ Kredit yetarli emas. Yana {episodePurchaseModal.price - (user?.credits ?? 0)} kredit kerak.
+                </p>
+              )}
+            </div>
+
+            {/* Actions */}
+            <div className="flex gap-2">
+              <Button
+                variant="outline"
+                className="flex-1 rounded-2xl h-11"
+                onClick={() => setEpisodePurchaseModal(null)}
+                disabled={episodeBuying}
+              >
+                Bekor qilish
+              </Button>
+              {(user?.credits ?? 0) < episodePurchaseModal.price ? (
+                <Button
+                  className="flex-1 rounded-2xl h-11 brand-gradient text-white font-bold"
+                  onClick={() => { setEpisodePurchaseModal(null); setShowCreditModal(true); }}
+                >
+                  <Coins className="w-4 h-4 mr-1.5" /> Kredit olish
+                </Button>
+              ) : (
+                <Button
+                  className="flex-1 rounded-2xl h-11 brand-gradient text-white font-bold"
+                  onClick={() => handleBuyEpisode(episodePurchaseModal.number, episodePurchaseModal.price)}
+                  disabled={episodeBuying}
+                >
+                  {episodeBuying ? (
+                    <><Loader2 className="w-4 h-4 mr-1.5 animate-spin" /> Sotib olinmoqda...</>
+                  ) : (
+                    <><ShoppingCart className="w-4 h-4 mr-1.5" /> Sotib olish</>
+                  )}
+                </Button>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+    </div>
   );
 }

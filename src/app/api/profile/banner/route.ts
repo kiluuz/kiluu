@@ -34,9 +34,13 @@ export async function POST(req: NextRequest) {
       } catch { /* ignore bad crop, fall back to center */ }
     }
 
-    // Premium flag: animated banners allowed for users who pass the gate.
-    // The client sends animatedAllowed=true only after unlocking with credits.
-    const animatedAllowed = form.get("animatedAllowed") === "true";
+    let showcase: { unlocked?: unknown } = {};
+    try {
+      showcase = user.showcase ? JSON.parse(user.showcase) as { unlocked?: unknown } : {};
+    } catch {
+      showcase = {};
+    }
+    const animatedAllowed = Array.isArray(showcase.unlocked) && showcase.unlocked.includes("animatedBanner");
 
     const buf = Buffer.from(await file.arrayBuffer());
     const processed = await processBanner(buf, user.id, crop, animatedAllowed);
@@ -49,7 +53,7 @@ export async function POST(req: NextRequest) {
         if (sc && typeof sc === "object" && typeof sc.prevBanner === "string") oldFiles.push(sc.prevBanner);
       }
     } catch { /* ignore */ }
-    await deleteUploadedByUrl(oldFiles.filter((u) => u && u.startsWith("/uploads/")));
+    await deleteUploadedByUrl(oldFiles);
 
     const bannerUrl = processed.animatedUrl || processed.mainUrl;
     const updated = await db.user.update({

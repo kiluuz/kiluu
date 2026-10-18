@@ -1,0 +1,23 @@
+{
+  "episodes": "Episodes",
+  "pickEpisodes": "Choose episodes",
+  "notifyMe": "Notify me",
+  "notifyCancel": "Cancel",
+  "globalSchedule": "Global schedule",
+  "scheduleSubtitle": "All anime releases in the next 7 days",
+  "episodesEmpty": "No episodes yet — coming soon!",
+  "total": "total",
+  "signIn": "Sign in",
+  "createAccount": "Create account",
+  "language": "Language",
+  "profile.overview": "Overview",
+  "profile.collection": "Collection",
+  "profile.favorites": "Favorites",
+  "profile.activity": "Activity & posts",
+  "profile.achievements": "Achievements",
+  "profile.owned": "Owned",
+  "profile.watchTime": "Watch time",
+  "profile.followers": "Followers",
+  "profile.posts": "Posts",
+  "profile.hours": "h"
+}

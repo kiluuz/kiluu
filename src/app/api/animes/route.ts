@@ -1,9 +1,63 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { getCurrentUser } from "@/lib/auth";
+import { getBotCatalog, getDeletedAnimes } from "@/lib/bot-api";
+import { ensureAnimeInDatabase } from "@/lib/anime-enricher";
+
+// Auto-sync cache: fire-and-forget so users never wait for Render cold-start
+let lastBotSyncTime = 0;
+const BOT_SYNC_INTERVAL = 5 * 60_000; // 5 minutes — Render free tier sleeps
+let _syncInFlight = false;
+
+async function syncBotCatalogToDatabase() {
+  const now = Date.now();
+  if (now - lastBotSyncTime < BOT_SYNC_INTERVAL) return;
+  lastBotSyncTime = now;
+
+  try {
+    // 1. Sync deleted animes from bot
+    try {
+      const deletedSlugs = await getDeletedAnimes();
+      if (Array.isArray(deletedSlugs) && deletedSlugs.length > 0) {
+        await db.anime.deleteMany({
+          where: { slug: { in: deletedSlugs } },
+        });
+      }
+    } catch {}
+
+    // 2. Sync active animes from bot
+    const botAnimes = await getBotCatalog(true);
+    if (Array.isArray(botAnimes) && botAnimes.length > 0) {
+      for (const b of botAnimes) {
+        if (!b.slug && !b.title) continue;
+        let effectivePrice = b.price || 0;
+        if (effectivePrice === 0 && b.episode_prices) {
+          const epPrices = Object.values(b.episode_prices).map(Number).filter(n => n > 0);
+          if (epPrices.length > 0) effectivePrice = Math.min(...epPrices);
+        }
+        await ensureAnimeInDatabase({
+          title: b.title || b.slug,
+          slug: b.slug,
+          price: effectivePrice > 0 ? effectivePrice : 100,
+          coverImage: b.poster,
+          description: b.description,
+        });
+      }
+    }
+  } catch (e) {
+    // Graceful degrade if bot API is sleeping or cold starting
+  }
+}
 
 // GET /api/animes?search=&genre=&type=&sort=&free=
 export async function GET(req: NextRequest) {
+  // Fire-and-forget sync — NEVER block the response waiting for Render bot
+  const now = Date.now();
+  if (!_syncInFlight && now - lastBotSyncTime >= BOT_SYNC_INTERVAL) {
+    _syncInFlight = true;
+    syncBotCatalogToDatabase().finally(() => { _syncInFlight = false; });
+  }
+
   const { searchParams } = new URL(req.url);
   const search = searchParams.get("search")?.trim() || "";
   const genre = searchParams.get("genre") || "";
@@ -13,7 +67,10 @@ export async function GET(req: NextRequest) {
 
   const user = await getCurrentUser();
 
-  const where: Record<string, unknown> = {};
+  const where: Record<string, unknown> = {
+    hidden: false,
+    moderationStatus: "APPROVED",
+  };
   if (search) {
     where.OR = [
       { title: { contains: search } },
@@ -72,6 +129,7 @@ export async function GET(req: NextRequest) {
     price: a.price,
     episodeCount: a._count.episodes,
     creator: a.creator,
+    source: a.source,
     owned: ownedIds.has(a.id),
   }));
 

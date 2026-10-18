@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   Clapperboard, Plus, Loader2, Film, Users, Heart, Package, Link2, Trophy, Sparkles, Trash2,
 } from "lucide-react";
@@ -18,30 +19,25 @@ import { SmartImage, formatCredits } from "../ui-bits";
 import { COVER_BANNER_PRESETS } from "../profile-assets";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import { TelegramLinkWidget } from "../bot-ui";
 
 const GENRES = [
   "Action", "Adventure", "Comedy", "Drama", "Fantasy", "Sci-Fi", "Romance",
   "Thriller", "Supernatural", "Mystery", "Sports", "Slice of Life", "Horror", "Psychological",
 ];
 
-const SAMPLE_VIDEOS = [
-  "/videos/bbb-trailer.ogg",
-  "/videos/sintel-trailer.mp4",
-  "/videos/bbb-clip.mp4",
-  "/videos/sintel-clip.mp4",
-  "/videos/jellyfish.mp4",
-  "/videos/flower.mp4",
-];
-
 interface CreatorAnime extends AnimeSummary {
   purchaseCount: number;
   favoriteCount: number;
+  moderationStatus?: string;
+  hidden?: boolean;
 }
 
 export function StudioView() {
   const { user, setAuthOpen, navigate } = useAppStore();
-  const [animes, setAnimes] = useState<CreatorAnime[]>([]);
-  const [loading, setLoading] = useState(true);
+  const queryClient = useQueryClient();
+  const [linkedUserId, setLinkedUserId] = useState<string | null>(null);
+  const telegramLinked = Boolean(user?.telegramLinked) || linkedUserId === user?.id;
 
   // publish dialog state
   const [pubOpen, setPubOpen] = useState(false);
@@ -56,30 +52,75 @@ export function StudioView() {
   const [type, setType] = useState("TV");
   const [isFree, setIsFree] = useState(false);
   const [price, setPrice] = useState("100");
+  const [releaseDate, setReleaseDate] = useState("");
   const [publishing, setPublishing] = useState(false);
+  const [autoFetching, setAutoFetching] = useState(false);
+
+  const handleAutoFetch = async () => {
+    if (!title.trim()) {
+      toast.error("Iltimos, avval anime nomini yozing (masalan: Black Clover)");
+      return;
+    }
+    setAutoFetching(true);
+    try {
+      const res = await fetch(`/api/animes/auto-fetch?q=${encodeURIComponent(title.trim())}`);
+      const data = await res.json();
+      if (data.ok && data.anime) {
+        const a = data.anime;
+        if (a.title && (!title || title.length < 3)) setTitle(a.title);
+        if (a.altTitle) setAltTitle(a.altTitle);
+        if (a.description) setDescription(a.description);
+        if (a.coverImage) setCoverImage(a.coverImage);
+        if (a.genres && a.genres.length > 0) setGenres(a.genres);
+        if (a.year) setYear(String(a.year));
+        if (a.type) setType(a.type);
+        if (a.status) setStatus(a.status);
+        toast.success("Anime rasmlari va ma'lumotlari avtomatik yuklandi! ✨");
+      } else {
+        toast.error("Ma'lumot topilmadi, iltimos nomini tekshiring");
+      }
+    } catch {
+      toast.error("Avtomatik yuklashda xatolik yuz berdi");
+    } finally {
+      setAutoFetching(false);
+    }
+  };
 
   // episode dialog
   const [epOpen, setEpOpen] = useState(false);
   const [epAnime, setEpAnime] = useState<CreatorAnime | null>(null);
   const [epTitle, setEpTitle] = useState("");
-  const [epVideoUrl, setEpVideoUrl] = useState(SAMPLE_VIDEOS[0]);
   const [epDesc, setEpDesc] = useState("");
   const [epDuration, setEpDuration] = useState("600");
   const [epSaving, setEpSaving] = useState(false);
 
-  const load = () => {
-    if (!user || user.role !== "CREATOR") {
-      setLoading(false);
-      return;
-    }
-    fetch("/api/creator")
-      .then((r) => r.json())
-      .then((d) => setAnimes(d.animes || []))
-      .catch(() => toast.error("Failed to load studio"))
-      .finally(() => setLoading(false));
-  };
+  const fetchCreatorAnimes = useCallback(async (): Promise<CreatorAnime[]> => {
+    const response = await fetch("/api/creator");
+    if (!response.ok) throw new Error(`Studio request failed (${response.status})`);
+    const data: { animes?: CreatorAnime[] } = await response.json();
+    return data.animes ?? [];
+  }, []);
+  const creatorAnimeQueryKey = ["creator-animes", user?.id ?? "anonymous"] as const;
 
-  useEffect(load, [user]);
+  const {
+    data: animes = [],
+    isPending: loading,
+    error: studioError,
+  } = useQuery({
+    queryKey: creatorAnimeQueryKey,
+    queryFn: fetchCreatorAnimes,
+    enabled: Boolean(user && user.role === "CREATOR"),
+    staleTime: 5 * 60_000,
+    gcTime: 30 * 60_000,
+    refetchOnWindowFocus: false,
+  });
+
+  useEffect(() => {
+    if (studioError) {
+      console.error("Failed to load creator studio", studioError);
+      toast.error("Failed to load studio");
+    }
+  }, [studioError]);
 
   if (!user) {
     return (
@@ -113,8 +154,20 @@ export function StudioView() {
   const totalFavorites = animes.reduce((a, x) => a + x.favoriteCount, 0);
 
   async function publish() {
-    if (!title.trim() || description.trim().length < 20 || !coverImage || genres.length === 0) {
-      toast.error("Fill in title, description (20+ chars), cover and at least one genre");
+    if (title.trim().length < 2) {
+      toast.error("Title must be at least 2 characters");
+      return;
+    }
+    if (description.trim().length < 20) {
+      toast.error("Description must be at least 20 characters");
+      return;
+    }
+    if (!coverImage.trim()) {
+      toast.error("Add a cover image");
+      return;
+    }
+    if (genres.length === 0) {
+      toast.error("Choose at least one genre");
       return;
     }
     setPublishing(true);
@@ -126,6 +179,7 @@ export function StudioView() {
           title, altTitle, description, coverImage,
           genres, year, studio, status, type,
           isFree, price: isFree ? 0 : price,
+          releaseDate: status === "UPCOMING" && releaseDate ? releaseDate : null,
         }),
       });
       const d = await res.json();
@@ -137,8 +191,8 @@ export function StudioView() {
         description: "Add episodes to complete your release.",
       });
       setPubOpen(false);
-      setTitle(""); setAltTitle(""); setDescription(""); setCoverImage(""); setGenres([]); setStudio("");
-      load();
+      setTitle(""); setAltTitle(""); setDescription(""); setCoverImage(""); setGenres([]); setStudio(""); setReleaseDate("");
+      await queryClient.invalidateQueries({ queryKey: creatorAnimeQueryKey });
     } catch {
       toast.error("Network error");
     } finally {
@@ -147,8 +201,8 @@ export function StudioView() {
   }
 
   async function addEpisode() {
-    if (!epAnime || !epTitle.trim() || !epVideoUrl) {
-      toast.error("Episode title and video URL required");
+    if (!epAnime || !epTitle.trim()) {
+      toast.error("Episode title is required");
       return;
     }
     setEpSaving(true);
@@ -160,7 +214,7 @@ export function StudioView() {
           animeId: epAnime.id,
           title: epTitle,
           description: epDesc,
-          videoUrl: epVideoUrl,
+          useR2Hls: true,
           duration: epDuration,
         }),
       });
@@ -169,10 +223,17 @@ export function StudioView() {
         toast.error(d.error);
         return;
       }
-      toast.success(`Episode ${d.episode.number} added to "${epAnime.title}"!`);
+      if (d.hlsKey) {
+        toast.success(`Episode ${d.episode.number} created`, {
+          description: `Upload your HLS folder to R2 under ${d.hlsKey.replace(/\/index\.m3u8$/, "")}`,
+          duration: 12000,
+        });
+      } else {
+        toast.success(`Episode ${d.episode.number} added to "${epAnime.title}"!`);
+      }
       setEpOpen(false);
-      setEpTitle(""); setEpDesc(""); setEpVideoUrl(SAMPLE_VIDEOS[0]);
-      load();
+      setEpTitle(""); setEpDesc("");
+      await queryClient.invalidateQueries({ queryKey: creatorAnimeQueryKey });
     } finally {
       setEpSaving(false);
     }
@@ -223,6 +284,37 @@ export function StudioView() {
         </div>
       </div>
 
+      <section className="glass rounded-2xl p-5 sm:p-6 mb-7 border border-primary/20">
+        <div className="flex items-start gap-3 mb-4">
+          <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
+            <Link2 className="w-5 h-5 text-primary" />
+          </div>
+          <div>
+            <h2 className="font-bold">Creator bot — My Animes va upload</h2>
+            <p className="text-sm text-muted-foreground mt-1">
+              Telegram akkauntingizni ulang. Botdagi <code>/my_animes</code> o&apos;zingiz yuklagan animelarni
+              ko&apos;rsatadi, <code>/upload_anime</code> esa poster va tavsif bilan yangi anime qabul qiladi.
+            </p>
+          </div>
+        </div>
+        {telegramLinked ? (
+          <div className="rounded-xl border border-emerald-500/25 bg-emerald-500/5 p-4 space-y-2 text-sm">
+            <p className="font-semibold text-emerald-500">Telegram akkaunt ulangan</p>
+            <p className="text-muted-foreground">
+              Botga <code>/my_animes</code> yoki <code>/upload_anime</code> yuboring. Epizod videosini
+              <code> #anime-slug 1-qism — Qism nomi</code> caption bilan yuboring.
+            </p>
+            <p className="text-xs text-muted-foreground">
+              Yuklangan material moderator tekshiruvidan o&apos;tmaguncha katalogda ko&apos;rinmaydi.
+              Telegram orqali yuklangan videolar botda ko&apos;riladi; brauzer playeri uchun Studio&apos;dagi Episode
+              bo&apos;limiga haqiqiy HLS yoki MP4 manba kiriting.
+            </p>
+          </div>
+        ) : (
+          <TelegramLinkWidget onLinked={() => user && setLinkedUserId(user.id)} />
+        )}
+      </section>
+
       {/* My animes */}
       {loading ? (
         <div className="flex items-center justify-center py-20 text-muted-foreground">
@@ -257,6 +349,11 @@ export function StudioView() {
                 <p className="text-[11px] text-muted-foreground">
                   {a.year} · {a.type} · {a.status} · {a.isFree ? "Free" : `${a.price} credits`}
                 </p>
+                {a.moderationStatus && a.moderationStatus !== "APPROVED" && (
+                  <p className="text-[11px] text-amber-500 mt-1">
+                    Moderation: {a.moderationStatus.toLowerCase()}
+                  </p>
+                )}
                 <div className="flex items-center gap-3 mt-1.5 text-[11px] text-muted-foreground">
                   <span className="flex items-center gap-1"><Film className="w-3 h-3" /> {a.episodeCount} eps</span>
                   <span className="flex items-center gap-1"><Users className="w-3 h-3" /> {a.purchaseCount} buyers</span>
@@ -298,9 +395,31 @@ export function StudioView() {
           </DialogHeader>
 
           <div className="space-y-4 pt-1">
+            {/* Auto-fill banner */}
+            <div className="flex items-center justify-between p-3 rounded-xl bg-primary/10 border border-primary/20 gap-3">
+              <div className="text-xs">
+                <p className="font-bold text-foreground flex items-center gap-1.5">
+                  <Sparkles className="w-3.5 h-3.5 text-primary" /> Google / AniList'dan avtomatik to'ldirish
+                </p>
+                <p className="text-muted-foreground text-[11px] mt-0.5">
+                  Nomini yozib tugmani bosing — poster, banner, janr va tavsif avtomatik olinadi
+                </p>
+              </div>
+              <Button
+                type="button"
+                size="sm"
+                onClick={handleAutoFetch}
+                disabled={autoFetching || !title.trim()}
+                className="shrink-0 rounded-xl gap-1.5 text-xs h-8 brand-gradient text-white border-0 shadow-md shadow-primary/20 font-bold"
+              >
+                {autoFetching ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5" />}
+                Avto-olish
+              </Button>
+            </div>
+
             <div className="grid sm:grid-cols-2 gap-3">
               <div className="space-y-1.5">
-                <Label className="text-xs font-semibold">Title *</Label>
+                <Label className="text-xs font-semibold">Title * <span className="text-muted-foreground font-normal">(min 2 characters)</span></Label>
                 <Input value={title} onChange={(e) => setTitle(e.target.value)} maxLength={80} placeholder="Chronicles of the Star Realm" className="h-10 rounded-xl" />
               </div>
               <div className="space-y-1.5">
@@ -390,6 +509,18 @@ export function StudioView() {
                 <Label className="text-xs font-semibold">Studio</Label>
                 <Input value={studio} onChange={(e) => setStudio(e.target.value)} maxLength={40} placeholder="Optional" className="h-10 rounded-xl" />
               </div>
+              {status === "UPCOMING" && (
+                <div className="space-y-1.5">
+                  <Label className="text-xs font-semibold">📅 Chiqish sanasi</Label>
+                  <Input
+                    type="date"
+                    value={releaseDate}
+                    onChange={(e) => setReleaseDate(e.target.value)}
+                    className="h-10 rounded-xl"
+                  />
+                  <p className="text-[10px] text-muted-foreground">Foydalanuvchilarga ko'rsatiladi. Chiqarilganda eslatma yuboriladi.</p>
+                </div>
+              )}
             </div>
 
             <div className="flex items-center justify-between rounded-xl border p-3.5">
@@ -443,25 +574,10 @@ export function StudioView() {
               <Textarea value={epDesc} onChange={(e) => setEpDesc(e.target.value)} maxLength={400} placeholder="What happens in this episode..." className="rounded-xl min-h-16" />
             </div>
             <div className="space-y-1.5">
-              <Label className="text-xs font-semibold">Video URL (mp4) *</Label>
-              <div className="relative">
-                <Link2 className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
-                <Input value={epVideoUrl} onChange={(e) => setEpVideoUrl(e.target.value)} placeholder="https://.../episode.mp4" className="pl-9 h-10 rounded-xl text-xs" />
-              </div>
-              <div className="flex flex-wrap gap-1.5 mt-1.5">
-                {SAMPLE_VIDEOS.map((v) => (
-                  <button
-                    key={v}
-                    onClick={() => setEpVideoUrl(v)}
-                    className={cn(
-                      "text-[10px] font-bold px-2.5 py-1 rounded-full border transition",
-                      epVideoUrl === v ? "brand-gradient text-white border-transparent" : "text-muted-foreground hover:border-primary/50"
-                    )}
-                  >
-                    {v.split("/").pop()?.replace(".mp4", "")}
-                  </button>
-                ))}
-              </div>
+              <Label className="text-xs font-semibold">Watch Together playback</Label>
+              <p className="text-[11px] text-muted-foreground">
+                Send the episode video through Telegram bot first. Convert a copy to HLS on your computer, then upload that folder to the private R2 path shown after creating this episode.
+              </p>
             </div>
             <div className="space-y-1.5">
               <Label className="text-xs font-semibold">Duration (seconds)</Label>

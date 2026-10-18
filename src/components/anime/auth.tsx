@@ -104,11 +104,11 @@ export function Onboarding() {
                 <Swords className="w-9 h-9 mb-3" />
                 <h3 className="font-black text-lg">Viewer</h3>
                 <p className={`text-xs mt-1.5 leading-relaxed ${choice === "VIEWER" ? "text-white/85" : "text-muted-foreground"}`}>
-                  Watch, collect and exchange animes. Build your library, join watch parties and make friends.
+                  Watch, collect and gift animes. Build your library, join watch parties and make friends.
                 </p>
                 <ul className={`mt-3 space-y-1 text-[11px] ${choice === "VIEWER" ? "text-white/80" : "text-muted-foreground"}`}>
                   <li className="flex items-center gap-1.5"><Check className="w-3 h-3" /> Full streaming access</li>
-                  <li className="flex items-center gap-1.5"><Check className="w-3 h-3" /> Collect & exchange animes</li>
+                  <li className="flex items-center gap-1.5"><Check className="w-3 h-3" /> Collect & gift animes</li>
                   <li className="flex items-center gap-1.5"><Check className="w-3 h-3" /> Watch parties & community</li>
                 </ul>
                 {choice === "VIEWER" && (

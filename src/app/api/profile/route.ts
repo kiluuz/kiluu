@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { getCurrentUser, toPublicUser } from "@/lib/auth";
+import { parseOnboardingRole } from "@/lib/rbac";
+import { sanitizeText } from "@/lib/sanitize";
+import { parseProfilePrivacy } from "@/lib/profile-privacy";
 
 const HEX = /^#[0-9a-fA-F]{6}$/;
 
@@ -15,10 +18,14 @@ export async function PATCH(req: NextRequest) {
 
     // Onboarding: role selection
     if (typeof body.role === "string") {
-      if (!["CREATOR", "VIEWER"].includes(body.role)) {
+      if (user.onboardingDone) {
+        return NextResponse.json({ error: "Role can only be set once" }, { status: 400 });
+      }
+      const mapped = parseOnboardingRole(body.role);
+      if (!mapped) {
         return NextResponse.json({ error: "Role must be CREATOR or VIEWER" }, { status: 400 });
       }
-      data.role = body.role;
+      data.role = mapped;
       data.onboardingDone = true;
     }
 
@@ -33,7 +40,7 @@ export async function PATCH(req: NextRequest) {
       if (body.bio.length > 500) {
         return NextResponse.json({ error: "About me must be under 500 characters" }, { status: 400 });
       }
-      data.bio = body.bio;
+      data.bio = sanitizeText(body.bio, 500);
     }
     if (typeof body.pronouns === "string") {
       if (body.pronouns.length > 24) return NextResponse.json({ error: "Pronouns too long" }, { status: 400 });
@@ -60,11 +67,16 @@ export async function PATCH(req: NextRequest) {
       }
       if (links === null) {
         data.socialLinks = "";
-      } else if (typeof links === "object") {
+      } else if (typeof links === "object" && !Array.isArray(links)) {
         const clean: Record<string, string> = {};
         for (const key of ["telegram", "instagram", "youtube", "x"]) {
           const v = (links as Record<string, unknown>)[key];
-          if (typeof v === "string" && v.length <= 120) clean[key] = v.trim().slice(0, 120);
+          if (typeof v === "string" && v.length <= 120) {
+            const value = v.trim();
+            if (!value || /^[\w.@/-]+$/.test(value) || /^https:\/\/(www\.)?(t\.me|instagram\.com|youtube\.com|youtu\.be|x\.com)\//i.test(value)) {
+              clean[key] = value;
+            }
+          }
         }
         data.socialLinks = JSON.stringify(clean);
       }
@@ -96,6 +108,18 @@ export async function PATCH(req: NextRequest) {
       if (!allowed.includes(body.avatarFrame)) {
         return NextResponse.json({ error: "Unknown frame" }, { status: 400 });
       }
+      if (["gold", "neon", "sakura"].includes(body.avatarFrame)) {
+        let unlocked: unknown = [];
+        try {
+          const showcase = user.showcase ? JSON.parse(user.showcase) as { unlocked?: unknown } : {};
+          unlocked = showcase.unlocked;
+        } catch {
+          unlocked = [];
+        }
+        if (!Array.isArray(unlocked) || !unlocked.includes(`frame:${body.avatarFrame}`)) {
+          return NextResponse.json({ error: "Unlock this premium frame before using it" }, { status: 403 });
+        }
+      }
       data.avatarFrame = body.avatarFrame === "none" ? "" : body.avatarFrame;
     }
 
@@ -113,11 +137,72 @@ export async function PATCH(req: NextRequest) {
       }
       if (sc === null) {
         data.showcase = "";
-      } else if (typeof sc === "object") {
+      } else if (typeof sc === "object" && !Array.isArray(sc)) {
         if (JSON.stringify(sc).length > 4000) {
           return NextResponse.json({ error: "Showcase config too large" }, { status: 400 });
         }
-        data.showcase = JSON.stringify(sc);
+        const config = sc as Record<string, unknown>;
+        const sections = ["topFive", "currentlyWatching", "favorites", "collection", "pinned", "achievements"];
+        const topFive = Array.isArray(config.topFive)
+          ? [...new Set(config.topFive.filter((id): id is string => typeof id === "string"))].slice(0, 5)
+          : [];
+        if (config.pinnedPostId !== null && config.pinnedPostId !== undefined && typeof config.pinnedPostId !== "string") {
+          return NextResponse.json({ error: "Invalid pinned post" }, { status: 400 });
+        }
+        if (typeof config.pinnedPostId === "string") {
+          const pinned = await db.post.findFirst({ where: { id: config.pinnedPostId, userId: user.id } });
+          if (!pinned) return NextResponse.json({ error: "Pinned post must belong to you" }, { status: 400 });
+        }
+        if (topFive.length) {
+          const previousOrders = await db.order.findMany({
+            where: { site_user_id: user.id, status: { in: ["COMPLETED", "PAID_PENDING_GRANT"] } },
+            select: { anime_slug: true },
+          });
+          const eligible = await db.anime.findMany({
+            where: {
+              id: { in: topFive },
+              OR: [
+                { favorites: { some: { userId: user.id } } },
+                { purchases: { some: { userId: user.id } } },
+                { slug: { in: previousOrders.map((order) => order.anime_slug) } },
+              ],
+            },
+            select: { id: true },
+          });
+          if (eligible.length !== topFive.length) {
+            return NextResponse.json({ error: "Top 5 can only include anime in your collection or favorites" }, { status: 400 });
+          }
+        }
+        const genres = Array.isArray(config.genres)
+          ? [...new Set(config.genres.filter((genre): genre is string =>
+              typeof genre === "string" && ["Action", "Adventure", "Fantasy", "Sci-Fi", "Drama", "Comedy", "Romance", "Horror", "Mystery", "Thriller", "Sports", "Slice of Life", "Mecha", "Supernatural"].includes(genre)
+            ))].slice(0, 8)
+          : [];
+        const order = Array.isArray(config.order)
+          ? [...new Set(config.order.filter((section): section is string =>
+              typeof section === "string" && sections.includes(section)
+            ))]
+          : sections;
+        const hiddenInput = config.hidden && typeof config.hidden === "object" && !Array.isArray(config.hidden)
+          ? config.hidden as Record<string, unknown>
+          : {};
+        const hidden = Object.fromEntries(sections.map((section) => [section, hiddenInput[section] === true]));
+        let currentShowcase: Record<string, unknown> = {};
+        try { currentShowcase = user.showcase ? JSON.parse(user.showcase) : {}; } catch { /* invalid old config is ignored */ }
+        const unlocked = Array.isArray(currentShowcase.unlocked)
+          ? currentShowcase.unlocked.filter((item): item is string => typeof item === "string")
+          : [];
+        data.showcase = JSON.stringify({
+          topFive,
+          pinnedPostId: typeof config.pinnedPostId === "string" ? config.pinnedPostId : null,
+          genres,
+          achievementIds: Array.isArray(config.achievementIds)
+            ? [...new Set(config.achievementIds.filter((id): id is string => typeof id === "string"))].slice(0, 6)
+            : [],
+          order,
+          hidden,
+          unlocked,
+        });
       }
     }
 
@@ -129,11 +214,11 @@ export async function PATCH(req: NextRequest) {
       }
       if (pv === null) {
         data.privacy = "";
-      } else if (typeof pv === "object") {
+      } else if (typeof pv === "object" && !Array.isArray(pv)) {
         if (JSON.stringify(pv).length > 1000) {
           return NextResponse.json({ error: "Privacy config too large" }, { status: 400 });
         }
-        data.privacy = JSON.stringify(pv);
+        data.privacy = JSON.stringify(parseProfilePrivacy(JSON.stringify(pv)));
       }
     }
 
