@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 
-export const EXCHANGE_UNLOCK_COUNT = 20;
+const EXCHANGE_UNLOCK_COUNT = 20;
 
 /** 4-qism: Exchange archived (tables kept). Gift is the live flow. */
 export async function GET() {
