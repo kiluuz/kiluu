@@ -1,19 +1,30 @@
 // src/lib/email.ts
-// Gmail SMTP orqali email yuborish (nodemailer)
-// Vercel da ishlashi uchun: GMAIL_USER va GMAIL_APP_PASSWORD env kerak
+// Brevo (Sendinblue) SMTP orqali email yuborish
+// Bepul: 300 email/kun, domen tasdiqsiz (faqat sender email tasdiqlash kerak)
 
 import nodemailer from "nodemailer";
 
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || "https://kiluu.vercel.app";
 
+// Email yuborish imkoniyati bormi?
+export function isEmailEnabled(): boolean {
+  return !!(process.env.BREVO_SMTP_USER && process.env.BREVO_SMTP_KEY);
+}
+
 function createTransport() {
-  const user = process.env.GMAIL_USER;
-  const pass = process.env.GMAIL_APP_PASSWORD;
+  const user = process.env.BREVO_SMTP_USER; // Brevo accaunt emailingiz
+  const pass = process.env.BREVO_SMTP_KEY;  // Brevo SMTP Key (parol emas!)
   if (!user || !pass) return null;
   return nodemailer.createTransport({
-    service: "gmail",
+    host: "smtp-relay.brevo.com",
+    port: 587,
+    secure: false,
     auth: { user, pass },
   });
+}
+
+function getFromEmail(): string {
+  return process.env.EMAIL_FROM || `Kiluu <${process.env.BREVO_SMTP_USER}>`;
 }
 
 export async function sendVerificationEmail(opts: {
@@ -23,8 +34,7 @@ export async function sendVerificationEmail(opts: {
 }): Promise<void> {
   const transport = createTransport();
   if (!transport) {
-    // Dev modeda kod konsolga chiqadi
-    console.log(`[EMAIL] OTP for ${opts.to}: ${opts.code}`);
+    console.log(`[EMAIL DEV] OTP for ${opts.to}: ${opts.code}`);
     return;
   }
 
@@ -67,7 +77,7 @@ export async function sendVerificationEmail(opts: {
 </html>`;
 
   await transport.sendMail({
-    from: `Kiluu <${process.env.GMAIL_USER}>`,
+    from: getFromEmail(),
     to: opts.to,
     subject: `${opts.code} — Kiluu email tasdiqlash`,
     html,
@@ -83,7 +93,7 @@ export async function sendGiftNotificationEmail(opts: {
 }): Promise<void> {
   const transport = createTransport();
   if (!transport) {
-    console.log(`[EMAIL] Gift notification to ${opts.to}: ${opts.senderUsername} -> ${opts.animeTitle}`);
+    console.log(`[EMAIL DEV] Gift: ${opts.senderUsername} -> ${opts.to}: ${opts.animeTitle}`);
     return;
   }
 
@@ -97,12 +107,8 @@ export async function sendGiftNotificationEmail(opts: {
       <h1 style="color:#fff;margin:0;font-size:28px;font-weight:800;">Kiluu</h1>
     </div>
     <div style="padding:36px 32px;">
-      <div style="text-align:center;margin-bottom:24px;">
-        <span style="font-size:48px;">🎁</span>
-      </div>
-      <h2 style="color:#fff;margin:0 0 12px;font-size:20px;font-weight:700;text-align:center;">
-        Sizga sovg'a yuborildi!
-      </h2>
+      <div style="text-align:center;margin-bottom:24px;"><span style="font-size:48px;">🎁</span></div>
+      <h2 style="color:#fff;margin:0 0 12px;font-size:20px;font-weight:700;text-align:center;">Sizga sovg'a yuborildi!</h2>
       <p style="color:#aaa;margin:0 0 20px;font-size:14px;line-height:1.6;text-align:center;">
         <strong style="color:#f97316;">@${opts.senderUsername}</strong> sizga
         <strong style="color:#fff;">"${opts.animeTitle}"</strong> animeni sovg'a qildi!
@@ -124,7 +130,7 @@ export async function sendGiftNotificationEmail(opts: {
 </html>`;
 
   await transport.sendMail({
-    from: `Kiluu <${process.env.GMAIL_USER}>`,
+    from: getFromEmail(),
     to: opts.to,
     subject: `🎁 @${opts.senderUsername} sizga "${opts.animeTitle}" sovg'a qildi — Kiluu`,
     html,
