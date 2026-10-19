@@ -58,7 +58,7 @@ export function StudioView() {
 
   const handleAutoFetch = async () => {
     if (!title.trim()) {
-      toast.error("Iltimos, avval anime nomini yozing (masalan: Black Clover)");
+      toast.error("Enter an anime title first (for example: Black Clover)");
       return;
     }
     setAutoFetching(true);
@@ -75,12 +75,12 @@ export function StudioView() {
         if (a.year) setYear(String(a.year));
         if (a.type) setType(a.type);
         if (a.status) setStatus(a.status);
-        toast.success("Anime rasmlari va ma'lumotlari avtomatik yuklandi! ✨");
+        toast.success("Anime artwork and details imported! ✨");
       } else {
-        toast.error("Ma'lumot topilmadi, iltimos nomini tekshiring");
+        toast.error("No information found. Check the title and try again.");
       }
     } catch {
-      toast.error("Avtomatik yuklashda xatolik yuz berdi");
+      toast.error("Automatic import failed");
     } finally {
       setAutoFetching(false);
     }
@@ -292,22 +292,21 @@ export function StudioView() {
           <div>
             <h2 className="font-bold">Creator bot — My Animes va upload</h2>
             <p className="text-sm text-muted-foreground mt-1">
-              Telegram akkauntingizni ulang. Botdagi <code>/my_animes</code> o&apos;zingiz yuklagan animelarni
-              ko&apos;rsatadi, <code>/upload_anime</code> esa poster va tavsif bilan yangi anime qabul qiladi.
+              Link your Telegram account. Use <code>/my_animes</code> in the bot to list your uploads,
+              or <code>/upload_anime</code> to submit a new anime with a poster and description.
             </p>
           </div>
         </div>
         {telegramLinked ? (
           <div className="rounded-xl border border-emerald-500/25 bg-emerald-500/5 p-4 space-y-2 text-sm">
-            <p className="font-semibold text-emerald-500">Telegram akkaunt ulangan</p>
+            <p className="font-semibold text-emerald-500">Telegram account connected</p>
             <p className="text-muted-foreground">
-              Botga <code>/my_animes</code> yoki <code>/upload_anime</code> yuboring. Epizod videosini
-              <code> #anime-slug 1-qism — Qism nomi</code> caption bilan yuboring.
+              Send <code>/my_animes</code> or <code>/upload_anime</code> to the bot. Send episode videos
+              Send with a caption like <code>#anime-slug Episode 1 — Episode title</code>.
             </p>
             <p className="text-xs text-muted-foreground">
-              Yuklangan material moderator tekshiruvidan o&apos;tmaguncha katalogda ko&apos;rinmaydi.
-              Telegram orqali yuklangan videolar botda ko&apos;riladi; brauzer playeri uchun Studio&apos;dagi Episode
-              bo&apos;limiga haqiqiy HLS yoki MP4 manba kiriting.
+              Submissions appear in the catalog after moderator review. Videos uploaded through Telegram
+              are watched in the bot; for browser playback, add a valid HLS or MP4 source in the Studio&apos;s Episode section.
             </p>
           </div>
         ) : (
@@ -391,7 +390,7 @@ export function StudioView() {
             <DialogTitle className="flex items-center gap-2">
               <Sparkles className="w-5 h-5 text-primary" /> Publish New Anime
             </DialogTitle>
-            <DialogDescription>Release it to the DubAniX catalog</DialogDescription>
+            <DialogDescription>Release it to the Kiluu catalog</DialogDescription>
           </DialogHeader>
 
           <div className="space-y-4 pt-1">
@@ -399,10 +398,10 @@ export function StudioView() {
             <div className="flex items-center justify-between p-3 rounded-xl bg-primary/10 border border-primary/20 gap-3">
               <div className="text-xs">
                 <p className="font-bold text-foreground flex items-center gap-1.5">
-                  <Sparkles className="w-3.5 h-3.5 text-primary" /> Google / AniList'dan avtomatik to'ldirish
+                  <Sparkles className="w-3.5 h-3.5 text-primary" /> Auto-fill from Google / AniList
                 </p>
                 <p className="text-muted-foreground text-[11px] mt-0.5">
-                  Nomini yozib tugmani bosing — poster, banner, janr va tavsif avtomatik olinadi
+                  Enter a title and click the button to fetch its poster, banner, genres, and description
                 </p>
               </div>
               <Button
@@ -511,14 +510,14 @@ export function StudioView() {
               </div>
               {status === "UPCOMING" && (
                 <div className="space-y-1.5">
-                  <Label className="text-xs font-semibold">📅 Chiqish sanasi</Label>
+                  <Label className="text-xs font-semibold">📅 Release date</Label>
                   <Input
                     type="date"
                     value={releaseDate}
                     onChange={(e) => setReleaseDate(e.target.value)}
                     className="h-10 rounded-xl"
                   />
-                  <p className="text-[10px] text-muted-foreground">Foydalanuvchilarga ko'rsatiladi. Chiqarilganda eslatma yuboriladi.</p>
+                  <p className="text-[10px] text-muted-foreground">Shown to users. A reminder is sent when it is released.</p>
                 </div>
               )}
             </div>
@@ -549,7 +548,7 @@ export function StudioView() {
               className="w-full h-11 rounded-xl brand-gradient text-white font-bold"
             >
               {publishing ? <Logo variant="mark" theme="mono" size={20} state="playing" /> : <Sparkles className="w-4 h-4" />}
-              {publishing ? "Publishing…" : "Publish to DubAniX"}
+              {publishing ? "Publishing…" : "Publish to Kiluu"}
             </Button>
           </div>
         </DialogContent>

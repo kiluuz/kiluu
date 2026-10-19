@@ -23,7 +23,7 @@ interface BotAnime {
 }
 
 function formatPrice(p: number) {
-  return new Intl.NumberFormat("uz-UZ").format(p) + " so'm";
+  return new Intl.NumberFormat("en-US").format(p) + " UZS";
 }
 
 function EditModal({ anime, onClose, onSaved }: {
@@ -49,9 +49,9 @@ function EditModal({ anime, onClose, onSaved }: {
         body: JSON.stringify({ slug: anime.slug, ...form }),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Xatolik yuz berdi");
+      if (!res.ok) throw new Error(data.error || "Something went wrong");
       onSaved({ ...anime, ...form });
-      toast.success("O'zgarishlar saqlandi");
+      toast.success("Changes saved");
       onClose();
     } catch (e: any) {
       toast.error(e.message);
@@ -63,14 +63,14 @@ function EditModal({ anime, onClose, onSaved }: {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
       <div className="w-full max-w-lg glass-strong rounded-3xl p-6 shadow-2xl animate-in zoom-in-95 duration-200 max-h-[90vh] overflow-y-auto">
-        <h2 className="text-xl font-black mb-5">Animeni tahrirlash</h2>
+        <h2 className="text-xl font-black mb-5">Edit anime</h2>
         <div className="space-y-4">
           <div>
-            <label className="text-xs font-bold text-muted-foreground mb-1.5 block">Nomi</label>
+            <label className="text-xs font-bold text-muted-foreground mb-1.5 block">Title</label>
             <Input value={form.title} onChange={e => setForm(f => ({ ...f, title: e.target.value }))} className="rounded-xl" />
           </div>
           <div>
-            <label className="text-xs font-bold text-muted-foreground mb-1.5 block">Tavsif</label>
+            <label className="text-xs font-bold text-muted-foreground mb-1.5 block">Description</label>
             <textarea
               value={form.description}
               onChange={e => setForm(f => ({ ...f, description: e.target.value }))}
@@ -82,7 +82,7 @@ function EditModal({ anime, onClose, onSaved }: {
             <Input value={form.poster} onChange={e => setForm(f => ({ ...f, poster: e.target.value }))} className="rounded-xl font-mono text-xs" />
           </div>
           <div>
-            <label className="text-xs font-bold text-muted-foreground mb-1.5 block">Narx (so'm)</label>
+            <label className="text-xs font-bold text-muted-foreground mb-1.5 block">Price (UZS)</label>
             <Input
               type="number"
               min={0}
@@ -101,16 +101,16 @@ function EditModal({ anime, onClose, onSaved }: {
             >
               <span className={cn("absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full transition-transform shadow", form.is_active && "translate-x-5")} />
             </button>
-            <span className="text-sm font-semibold">{form.is_active ? "Faol" : "Nofaol"}</span>
+            <span className="text-sm font-semibold">{form.is_active ? "Active" : "Inactive"}</span>
           </div>
         </div>
         <div className="flex gap-3 mt-6">
           <Button variant="outline" className="flex-1 rounded-xl" onClick={onClose} disabled={saving}>
-            Bekor
+            Cancel
           </Button>
           <Button className="flex-1 rounded-xl brand-gradient text-white gap-2" onClick={save} disabled={saving}>
             {saving && <Loader2 className="w-4 h-4 animate-spin" />}
-            Saqlash
+            Save
           </Button>
         </div>
       </div>
@@ -133,21 +133,21 @@ export function BotAdminView() {
       const data = await res.json();
       setAnimes(Array.isArray(data) ? data : []);
     } catch {
-      toast.error("Catalog yuklanmadi");
+      toast.error("Could not load the catalog");
     } finally {
       setLoading(false);
     }
   }
 
   async function deleteAnime(slug: string, title: string) {
-    if (!confirm(`Haqiqatan ham "${title}" animesini saytdan butunlay o'chirmoqchimisiz?`)) return;
+    if (!confirm(`Are you sure you want to permanently delete "${title}" from the site?`)) return;
     try {
       const res = await fetch(`/api/animes/${slug}`, { method: "DELETE" });
-      if (!res.ok) throw new Error("O'chirishda xatolik");
-      toast.success("Anime o'chirildi");
+      if (!res.ok) throw new Error("Could not delete the anime");
+      toast.success("Anime deleted");
       setAnimes(prev => prev.filter(a => a.slug !== slug));
     } catch (e: any) {
-      toast.error(e.message || "Xatolik yuz berdi");
+      toast.error(e.message || "Something went wrong");
     }
   }
 
@@ -157,8 +157,8 @@ export function BotAdminView() {
     return (
       <div className="flex flex-col items-center justify-center py-32 px-4 text-center">
         <AlertCircle className="w-12 h-12 text-destructive opacity-70 mb-4" />
-        <p className="text-xl font-black">Ruxsat yo'q</p>
-        <p className="text-sm text-muted-foreground mt-2">Bu sahifa faqat adminlar uchun.</p>
+        <p className="text-xl font-black">Access denied</p>
+        <p className="text-sm text-muted-foreground mt-2">This page is for administrators only.</p>
       </div>
     );
   }
@@ -172,13 +172,13 @@ export function BotAdminView() {
             <Settings2 className="w-6 h-6 text-white" />
           </div>
           <div>
-            <h1 className="text-2xl font-black">Admin Paneli</h1>
-            <p className="text-sm text-muted-foreground">Bot katalogini boshqarish</p>
+            <h1 className="text-2xl font-black">Admin panel</h1>
+            <p className="text-sm text-muted-foreground">Manage the bot catalog</p>
           </div>
         </div>
         <Button onClick={loadAnimes} variant="outline" className="rounded-xl gap-2" disabled={loading}>
           <RefreshCw className={cn("w-4 h-4", loading && "animate-spin")} />
-          Yangilash
+          Refresh
         </Button>
       </div>
 
@@ -186,21 +186,21 @@ export function BotAdminView() {
       <div className="glass rounded-2xl p-5 mb-8 border-l-4 border-l-primary">
         <h2 className="font-black text-base flex items-center gap-2 mb-3">
           <BookOpen className="w-5 h-5 text-primary" />
-          Kanalga yuklash qoidasi
+          Channel upload format
         </h2>
         <div className="space-y-2 text-sm text-muted-foreground">
-          <p>Telegram kanaliga anime post yuklash uchun quyidagi formatdan foydalaning:</p>
+          <p>Use the following format to post anime to the Telegram channel:</p>
           <div className="bg-secondary/40 rounded-xl p-4 font-mono text-xs leading-relaxed">
             <p className="text-primary font-bold">#anime naruto</p>
-            <p>Nomi: Naruto</p>
-            <p>Narx: 30000</p>
-            <p>Tavsif: Qisqa tavsif...</p>
+            <p>Title: Naruto</p>
+            <p>Price: 30000</p>
+            <p>Description: Short description...</p>
           </div>
           <ul className="space-y-1.5 mt-3">
-            <li className="flex items-start gap-2"><Info className="w-3.5 h-3.5 shrink-0 mt-0.5 text-primary" /> <span><strong>#anime naruto</strong> — anime slug-ini belgilaydi</span></li>
-            <li className="flex items-start gap-2"><Info className="w-3.5 h-3.5 shrink-0 mt-0.5 text-primary" /> <span>Yangi qism yuklashda faylni <strong>naruto|1</strong> formatida nomlang (naruto 1-qism)</span></li>
-            <li className="flex items-start gap-2"><Info className="w-3.5 h-3.5 shrink-0 mt-0.5 text-primary" /> <span>Postni tahrirlash metadata-ni avtomatik yangilaydi</span></li>
-            <li className="flex items-start gap-2"><Info className="w-3.5 h-3.5 shrink-0 mt-0.5 text-primary" /> <span><strong>Faol: yo'q</strong> yozsangiz — anime yashirinadi</span></li>
+            <li className="flex items-start gap-2"><Info className="w-3.5 h-3.5 shrink-0 mt-0.5 text-primary" /> <span><strong>#anime naruto</strong> sets the anime slug</span></li>
+            <li className="flex items-start gap-2"><Info className="w-3.5 h-3.5 shrink-0 mt-0.5 text-primary" /> <span>Name episode files with <strong>naruto|1</strong> when uploading new episodes</span></li>
+            <li className="flex items-start gap-2"><Info className="w-3.5 h-3.5 shrink-0 mt-0.5 text-primary" /> <span>Editing the post automatically updates its metadata</span></li>
+            <li className="flex items-start gap-2"><Info className="w-3.5 h-3.5 shrink-0 mt-0.5 text-primary" /> <span>Set <strong>Active: no</strong> to hide the anime</span></li>
           </ul>
         </div>
       </div>
@@ -221,7 +221,7 @@ export function BotAdminView() {
         </div>
       ) : animes.length === 0 ? (
         <div className="text-center py-20">
-          <p className="text-muted-foreground">Hech qanday anime topilmadi</p>
+          <p className="text-muted-foreground">No anime found</p>
         </div>
       ) : (
         <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -248,7 +248,7 @@ export function BotAdminView() {
                   )}
                 </div>
                 <p className="text-xs text-muted-foreground mb-0.5">
-                  {anime.episode_count} qism
+                  {anime.episode_count} episodes
                 </p>
                 <p className="text-xs font-bold text-primary mb-3">{formatPrice(anime.price)}</p>
                 <div className="flex gap-1.5">
@@ -258,13 +258,13 @@ export function BotAdminView() {
                     className="rounded-lg flex-1 gap-1.5 text-xs h-7"
                     onClick={() => setEditTarget(anime)}
                   >
-                    <Edit3 className="w-3 h-3" /> Tahrirlash
+                    <Edit3 className="w-3 h-3" /> Edit
                   </Button>
                   <Button
                     size="sm"
                     variant="destructive"
                     className="rounded-lg px-2 text-xs h-7"
-                    title="Animeni o'chirish"
+                    title="Delete anime"
                     onClick={() => deleteAnime(anime.slug, anime.title)}
                   >
                     <Trash2 className="w-3.5 h-3.5" />

@@ -8,10 +8,11 @@ import {
 } from "lucide-react";
 import { useTheme } from "next-themes";
 import { useAppStore } from "./store";
+import { useI18n } from "@/components/i18n-provider";
 import { Avatar, formatCredits } from "./ui-bits";
 import { Logo } from "./logo";
 import {
-  useResolvedNav, NAV_GROUP_LABELS, EXCHANGE_REQUIRED,
+  useResolvedNav, EXCHANGE_REQUIRED,
   type NavGroup, type ResolvedNavItem,
 } from "./nav-config";
 import { Input } from "@/components/ui/input";
@@ -20,14 +21,14 @@ import { toast } from "sonner";
 import type { AnimeSummary } from "./types";
 import type { ViewName } from "./types";
 
-/** Brand lockup — DubAniX logo (animated mark + wordmark), links home */
+/** Brand lockup — Kiluu logo (animated mark + wordmark), links home */
 export function BrandLockup() {
   const navigate = useAppStore((s) => s.navigate);
   return (
     <button
       className="flex items-center group shrink-0 rounded-xl focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-primary"
       onClick={() => navigate("home")}
-      aria-label="DubAniX home"
+      aria-label="Kiluu home"
     >
       <Logo variant="full" size={38} />
     </button>
@@ -200,6 +201,7 @@ export function Sidebar({
 }) {
   const { user, view, navigate } = useAppStore();
   const { theme, setTheme } = useTheme();
+  const { t } = useI18n();
   const items = useResolvedNav();
 
   async function logout() {
@@ -232,7 +234,7 @@ export function Sidebar({
           grouped[group].length === 0 ? null : (
             <div key={group} className="space-y-1">
               <p className="px-3 pb-1.5 text-[10.5px] font-bold uppercase tracking-[0.14em] text-muted-foreground/60">
-                {NAV_GROUP_LABELS[group]}
+                {t(`nav.group.${group}`)}
               </p>
               {grouped[group].map((item) => (
                 <NavButton
@@ -326,7 +328,7 @@ export function Sidebar({
             className="w-full flex items-center gap-3 px-3 py-3 rounded-xl brand-gradient text-white font-bold text-sm hover:opacity-90 transition shadow-lg shadow-primary/25"
           >
             <UserRound className="w-4 h-4" />
-            Sign in to DubAniX
+            Sign in to Kiluu
           </button>
         )}
       </div>
@@ -376,14 +378,103 @@ const VIEW_TITLES: Partial<Record<ViewName, string>> = {
   login: "Sign in",
 };
 
+type SiteNotification = {
+  id: string;
+  type: string;
+  title: string;
+  body: string;
+  readAt: string | null;
+  createdAt: string;
+};
+
 /** Slim top bar — compact on mobile/tablet, search + actions on desktop. */
 export function TopBar() {
   const { user, view, goBack, setProfileModalOpen, navigate } = useAppStore();
   const { theme, setTheme } = useTheme();
   const [scrolled, setScrolled] = useState(false);
+  const [notifications, setNotifications] = useState<SiteNotification[]>([]);
+  const [unreadNotifications, setUnreadNotifications] = useState(0);
+  const [notificationsUserId, setNotificationsUserId] = useState<string | null>(null);
+  const [notificationsOpen, setNotificationsOpen] = useState(false);
+  const [notificationsLoading, setNotificationsLoading] = useState(false);
+  const [notificationsError, setNotificationsError] = useState<string | null>(null);
   const reducedMotion = useReducedMotion();
 
   const inSubView = ["detail", "watch", "user-profile", "studio", "settings"].includes(view.name);
+
+  useEffect(() => {
+    if (!user) {
+      setNotifications([]);
+      setUnreadNotifications(0);
+      setNotificationsUserId(null);
+      setNotificationsOpen(false);
+      setNotificationsLoading(false);
+      setNotificationsError(null);
+      return;
+    }
+
+    let alive = true;
+    let errorShown = false;
+    setNotificationsUserId(null);
+    setNotificationsLoading(true);
+    setNotificationsError(null);
+    const load = async () => {
+      try {
+        const response = await fetch("/api/community/notifications", { cache: "no-store" });
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.error || "Could not load notifications");
+        if (alive) {
+          setNotifications(data.notifications || []);
+          setUnreadNotifications(data.unread || 0);
+          setNotificationsUserId(user.id);
+          setNotificationsLoading(false);
+          setNotificationsError(null);
+          errorShown = false;
+        }
+      } catch (error) {
+        if (alive && !errorShown) {
+          errorShown = true;
+          setNotificationsLoading(false);
+          const message = error instanceof Error ? error.message : "Could not load notifications";
+          setNotificationsError(message);
+          toast.error(message);
+        }
+      }
+    };
+    void load();
+    const timer = window.setInterval(load, 20_000);
+    return () => {
+      alive = false;
+      window.clearInterval(timer);
+    };
+  }, [user]);
+
+  async function markNotificationRead(id?: string) {
+    try {
+      const response = await fetch("/api/community/notifications", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(id ? { id } : { all: true }),
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "Could not update notification");
+      if (id) {
+        const notification = notifications.find((item) => item.id === id);
+        setNotifications((items) => items.map((item) =>
+          item.id === id ? { ...item, readAt: new Date().toISOString() } : item
+        ));
+        if (notification && !notification.readAt) {
+          setUnreadNotifications((count) => Math.max(0, count - 1));
+        }
+      } else {
+        const readAt = new Date().toISOString();
+        setNotifications((items) => items.map((item) => ({ ...item, readAt })));
+        setUnreadNotifications(0);
+      }
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Could not update notification");
+    }
+  }
 
   /* border-on-scroll for the compact bar */
   useEffect(() => {
@@ -406,7 +497,7 @@ export function TopBar() {
     >
       <div className="flex items-center gap-2 sm:gap-3 px-3 sm:px-6 h-14 min-[1100px]:h-16">
         {/* Mobile/tablet: back or brand (desktop brand is in sidebar).
-            Brand = mark + DubAniX wordmark; on scroll the wordmark collapses
+            Brand = mark + Kiluu wordmark; on scroll the wordmark collapses
             to a sliver and the page title fades in (YouTube-style swap).
             Tablet rail carries the mark — the top bar shows the wordmark only. */}
         {inSubView ? (
@@ -494,14 +585,64 @@ export function TopBar() {
             <Moon className="w-[18px] h-[18px] dark:hidden" />
           </button>
 
-          <button
-            className="p-2.5 rounded-xl hover:bg-accent transition relative min-h-[44px] min-w-[44px] hidden sm:inline-flex items-center justify-center"
-            aria-label="Notifications"
-            onClick={() => toast.info("You're all caught up! Nothing new here.", { id: "notif" })}
-          >
-            <Bell className="w-[18px] h-[18px]" />
-            <span className="absolute top-2 right-2 w-1.5 h-1.5 rounded-full bg-emerald-500 live-dot" />
-          </button>
+          <div className="relative">
+            <button
+              className="p-2.5 rounded-xl hover:bg-accent transition relative min-h-[44px] min-w-[44px] inline-flex items-center justify-center"
+              aria-label="Notifications"
+              aria-expanded={notificationsOpen}
+              onClick={() => {
+                if (!user) {
+                  navigate("login");
+                  return;
+                }
+                setNotificationsOpen((open) => !open);
+              }}
+            >
+              <Bell className="w-[18px] h-[18px]" />
+              {unreadNotifications > 0 && (
+                <span className="absolute -right-1 -top-1 min-w-4 h-4 rounded-full bg-primary px-1 text-[9px] font-bold leading-4 text-white">
+                  {unreadNotifications > 99 ? "99+" : unreadNotifications}
+                </span>
+              )}
+            </button>
+            {notificationsOpen && (
+              <div
+                className="absolute right-0 top-[calc(100%+0.5rem)] z-[60] w-[min(22rem,calc(100vw-1rem))] max-h-[min(24rem,70vh)] overflow-y-auto rounded-2xl border bg-background p-3 shadow-xl"
+                role="dialog"
+                aria-label="Notifications"
+              >
+                <div className="flex items-center justify-between p-2">
+                  <strong className="text-sm">Notifications</strong>
+                  {unreadNotifications > 0 && (
+                    <button onClick={() => void markNotificationRead()} className="text-xs text-primary">
+                      Mark all read
+                    </button>
+                  )}
+                </div>
+                {notificationsLoading ? (
+                  <p className="p-3 text-xs text-muted-foreground">Loading notifications…</p>
+                ) : notificationsError ? (
+                  <p className="p-3 text-xs text-destructive">{notificationsError}</p>
+                ) : notificationsUserId !== user?.id || !notifications.length ? (
+                  <p className="p-3 text-xs text-muted-foreground">No notifications yet.</p>
+                ) : (
+                  notifications.map((notification) => (
+                    <button
+                      key={notification.id}
+                      onClick={() => notification.readAt ? undefined : void markNotificationRead(notification.id)}
+                      className={cn(
+                        "block w-full rounded-xl p-3 text-left text-xs hover:bg-secondary/50",
+                        !notification.readAt && "bg-primary/5"
+                      )}
+                    >
+                      <span className="font-bold">{notification.title}</span>
+                      <span className="mt-1 block text-muted-foreground">{notification.body}</span>
+                    </button>
+                  ))
+                )}
+              </div>
+            )}
+          </div>
 
           {user && (
             <button

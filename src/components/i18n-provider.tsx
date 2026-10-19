@@ -1,9 +1,33 @@
 "use client";
 
-import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useSyncExternalStore } from "react";
 import { DEFAULT_LOCALE, isLocale, t as translate, type Locale } from "@/lib/i18n";
 
 const KEY = "dubanix.lang";
+const CHANGE_EVENT = "kiluu-locale-change";
+let memoryLocale: Locale = DEFAULT_LOCALE;
+
+function getLocaleSnapshot(): Locale {
+  try {
+    const saved = localStorage.getItem(KEY);
+    if (isLocale(saved)) {
+      memoryLocale = saved;
+      return saved;
+    }
+  } catch {
+    // Use the in-memory selection when storage is unavailable.
+  }
+  return memoryLocale;
+}
+
+function subscribeToLocale(callback: () => void) {
+  window.addEventListener(CHANGE_EVENT, callback);
+  window.addEventListener("storage", callback);
+  return () => {
+    window.removeEventListener(CHANGE_EVENT, callback);
+    window.removeEventListener("storage", callback);
+  };
+}
 
 const I18nContext = createContext<{
   locale: Locale;
@@ -16,25 +40,19 @@ const I18nContext = createContext<{
 });
 
 export function I18nProvider({ children }: { children: React.ReactNode }) {
-  const [locale, setLocaleState] = useState<Locale>(DEFAULT_LOCALE);
-
+  const locale = useSyncExternalStore(subscribeToLocale, getLocaleSnapshot, () => DEFAULT_LOCALE);
   useEffect(() => {
-    try {
-      const v = localStorage.getItem(KEY);
-      if (isLocale(v)) setLocaleState(v);
-    } catch {
-      /* private mode */
-    }
-  }, []);
+    document.documentElement.lang = locale;
+  }, [locale]);
 
   const setLocale = useCallback((l: Locale) => {
-    setLocaleState(l);
+    memoryLocale = l;
     try {
       localStorage.setItem(KEY, l);
     } catch {
-      /* ignore */
+      // Keep the selection for this session when storage is unavailable.
     }
-    document.documentElement.lang = l;
+    window.dispatchEvent(new Event(CHANGE_EVENT));
   }, []);
 
   const value = useMemo(

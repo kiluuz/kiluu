@@ -122,7 +122,7 @@ export function TabletRail() {
         <button
           onClick={() => navigate("home")}
           className="mb-4 p-1.5 rounded-xl outline-none focus-visible:ring-2 focus-visible:ring-ring"
-          aria-label="DubAniX home"
+          aria-label="Kiluu home"
         >
           <Logo variant="mark" size={34} />
         </button>

@@ -50,11 +50,11 @@ export function Onboarding() {
             <Logo variant="mark" size={64} animated />
           </div>
           <h1 className="text-3xl font-black">
-            Welcome to <span className="gradient-text">DubAniX</span>
+            Welcome to <span className="gradient-text">Kiluu</span>
           </h1>
           {step === "role" ? (
             <p className="text-muted-foreground mt-2 text-sm">
-              One quick thing — how will you use DubAniX?
+              One quick thing — how will you use Kiluu?
               <br />
               <span className="text-xs opacity-70">(You choose this only once)</span>
             </p>
@@ -151,7 +151,7 @@ export function Onboarding() {
                 onClick={() => finish(choice!)}
                 className="flex-1 h-11 rounded-xl font-bold brand-gradient hover:opacity-90 text-white"
               >
-                {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : `Enter DubAniX as ${choice === "CREATOR" ? "Creator" : "Viewer"}`}
+                {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : `Enter Kiluu as ${choice === "CREATOR" ? "Creator" : "Viewer"}`}
               </Button>
             </div>
           </div>

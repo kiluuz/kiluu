@@ -16,6 +16,9 @@ import { toast } from "sonner";
 export function LoginView() {
   const { setUser, navigate, user } = useAppStore();
   const [loading, setLoading] = useState(false);
+  const [otpStep, setOtpStep] = useState<{ email: string } | null>(null);
+  const [otpCode, setOtpCode] = useState("");
+  const [resendCooldown, setResendCooldown] = useState(0);
   const [hero, setHero] = useState<{ banner: string | null; cover: string | null; title: string; quote: string } | null>(null);
 
   // Already signed in → go home
@@ -78,7 +81,7 @@ export function LoginView() {
         return;
       }
       setUser(data.user as AuthUser);
-      toast.success(mode === "login" ? `Welcome back, ${data.user.displayName || data.user.username}!` : "Account created! Welcome to DubAniX ✦");
+      toast.success(mode === "login" ? `Welcome back, ${data.user.displayName || data.user.username}!` : "Account created! Welcome to Kiluu ✦");
       navigate("home");
     } catch {
       toast.error("Network error. Please try again.");
@@ -86,6 +89,94 @@ export function LoginView() {
       setLoading(false);
     }
   }
+
+  async function handleRegister(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    setLoading(true);
+    const form = new FormData(e.currentTarget);
+    const email = String(form.get("email") || "");
+    const username = String(form.get("username") || "");
+    const password = String(form.get("password") || "");
+    const confirm = String(form.get("confirm") || "");
+    if (password !== confirm) {
+      toast.error("Passwords do not match");
+      setLoading(false);
+      return;
+    }
+    try {
+      const res = await fetch("/api/auth/register", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, username, password }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        toast.error(data.error || "Registration failed");
+        return;
+      }
+      // OTP bosqichiga o'tish
+      setOtpStep({ email });
+      setOtpCode("");
+      setResendCooldown(60);
+      toast.success("Tasdiqlash kodi emailingizga yuborildi!");
+    } catch {
+      toast.error("Network error. Please try again.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function handleVerifyOtp(e: React.FormEvent) {
+    e.preventDefault();
+    if (!otpStep) return;
+    setLoading(true);
+    try {
+      const res = await fetch("/api/auth/verify-email", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: otpStep.email, code: otpCode }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        toast.error(data.error || "Invalid code");
+        return;
+      }
+      setUser(data.user as AuthUser);
+      toast.success("Email tasdiqlandi! Kiluu ga xush kelibsiz ✦");
+      navigate("home");
+    } catch {
+      toast.error("Network error. Please try again.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function handleResendOtp() {
+    if (!otpStep || resendCooldown > 0) return;
+    try {
+      const res = await fetch("/api/auth/verify-email", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: otpStep.email }),
+      });
+      if (res.ok) {
+        toast.success("Yangi kod yuborildi!");
+        setResendCooldown(60);
+      } else {
+        const d = await res.json();
+        toast.error(d.error || "Failed to resend");
+      }
+    } catch {
+      toast.error("Network error");
+    }
+  }
+
+  // Resend countdown
+  useEffect(() => {
+    if (resendCooldown <= 0) return;
+    const t = setTimeout(() => setResendCooldown((c) => c - 1), 1000);
+    return () => clearTimeout(t);
+  }, [resendCooldown]);
 
   return (
     <div className="min-h-screen flex flex-col lg:flex-row bg-background">
@@ -148,18 +239,69 @@ export function LoginView() {
 
           <div className="text-center mb-8">
             <h1 className="font-display text-3xl font-black tracking-tight">
-              Welcome to <span className="gradient-text">DubAniX</span>
+              Welcome to <span className="gradient-text">Kiluu</span>
             </h1>
             <p className="text-muted-foreground text-sm mt-2">
               Stream, collect and gift premium anime — dubbed your way.
             </p>
           </div>
 
-          <Tabs defaultValue="login">
-            <TabsList className="grid grid-cols-2 w-full mb-6 rounded-xl">
-              <TabsTrigger value="login" className="rounded-lg">Sign In</TabsTrigger>
-              <TabsTrigger value="register" className="rounded-lg">Create Account</TabsTrigger>
-            </TabsList>
+          {/* OTP Verification Step */}
+          {otpStep ? (
+            <div className="space-y-6">
+              <div className="text-center">
+                <div className="w-16 h-16 rounded-2xl brand-gradient flex items-center justify-center mx-auto mb-4">
+                  <Mail className="w-8 h-8 text-white" />
+                </div>
+                <h2 className="font-bold text-lg">Emailingizni tasdiqlang</h2>
+                <p className="text-muted-foreground text-sm mt-1">
+                  <span className="text-primary font-medium">{otpStep.email}</span> ga 6 xonali kod yuborildi
+                </p>
+              </div>
+              <form onSubmit={handleVerifyOtp} className="space-y-4">
+                <div className="space-y-1.5">
+                  <Label htmlFor="otp-code" className="text-xs font-semibold">Tasdiqlash kodi</Label>
+                  <Input
+                    id="otp-code"
+                    value={otpCode}
+                    onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, "").slice(0, 6))}
+                    placeholder="000000"
+                    maxLength={6}
+                    required
+                    className="h-14 rounded-xl text-center text-2xl font-mono tracking-widest"
+                    autoFocus
+                  />
+                </div>
+                <Button
+                  type="submit"
+                  disabled={loading || otpCode.length !== 6}
+                  className="w-full h-12 rounded-xl brand-gradient hover:opacity-90 text-white font-bold text-[15px]"
+                >
+                  {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : "Tasdiqlash"}
+                </Button>
+              </form>
+              <div className="text-center">
+                <button
+                  onClick={handleResendOtp}
+                  disabled={resendCooldown > 0}
+                  className="text-sm text-muted-foreground hover:text-foreground transition disabled:opacity-50"
+                >
+                  {resendCooldown > 0 ? `Qayta yuborish (${resendCooldown}s)` : "Kodni qayta yuborish"}
+                </button>
+              </div>
+              <button
+                onClick={() => setOtpStep(null)}
+                className="flex items-center gap-1.5 text-[13px] text-muted-foreground hover:text-foreground transition mx-auto"
+              >
+                <ArrowLeft className="w-4 h-4" /> Orqaga
+              </button>
+            </div>
+          ) : (
+            <Tabs defaultValue="login">
+              <TabsList className="grid grid-cols-2 w-full mb-6 rounded-xl">
+                <TabsTrigger value="login" className="rounded-lg">Sign In</TabsTrigger>
+                <TabsTrigger value="register" className="rounded-lg">Create Account</TabsTrigger>
+              </TabsList>
 
             <TabsContent value="login">
               <form onSubmit={(e) => handleSubmit("login", e)} className="space-y-4">
@@ -187,7 +329,7 @@ export function LoginView() {
             </TabsContent>
 
             <TabsContent value="register">
-              <form onSubmit={(e) => handleSubmit("register", e)} className="space-y-3.5">
+              <form onSubmit={handleRegister} className="space-y-3.5">
                 <div className="space-y-1.5">
                   <Label htmlFor="reg-username" className="text-xs font-semibold">Username</Label>
                   <div className="relative">
@@ -222,6 +364,7 @@ export function LoginView() {
               </form>
             </TabsContent>
           </Tabs>
+          )} {/* end otpStep ternary */}
 
           <p className="mt-8 text-center text-[11px] text-muted-foreground/70">
             By continuing you agree to watch responsibly and pause for snacks.

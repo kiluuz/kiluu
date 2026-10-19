@@ -6,6 +6,7 @@ import { isAdminUser } from "@/lib/config";
 import { isCreator } from "@/lib/rbac";
 import { userOwnsVersion } from "@/lib/owns";
 import { sqlTable } from "@/lib/sql-table";
+import { isVerifiedByFollowerCount } from "@/lib/verification";
 
 const episodeSyncCooldowns = new Map<string, number>();
 
@@ -35,6 +36,20 @@ export async function GET(
   if (!anime) {
     return NextResponse.json({ error: "Anime not found" }, { status: 404 });
   }
+  const creatorFollowerCount = anime.creator
+    ? await db.follow.count({ where: { followedId: anime.creator.id } })
+    : 0;
+  const creator = anime.creator
+    ? {
+        id: anime.creator.id,
+        username: anime.creator.username,
+        displayName: anime.creator.displayName,
+        avatarUrl: anime.creator.avatarUrl,
+        accentColor: anime.creator.accentColor,
+        role: anime.creator.role,
+        isVerified: isVerifiedByFollowerCount(creatorFollowerCount),
+      }
+    : null;
   const staff = isAdminUser(user) || (user && anime.creatorId === user.id);
   if (anime.hidden && !staff) {
     return NextResponse.json({ error: "Anime not found" }, { status: 404 });
@@ -80,7 +95,7 @@ export async function GET(
               id: `ep-${anime.slug}-${episodeNumber}`,
               animeId: anime.id,
               number: episodeNumber,
-              title: `${anime.title} ${episodeNumber}-qism`,
+              title: `${anime.title} Episode ${episodeNumber}`,
               description: `${anime.title} serialining ${episodeNumber}-qismi`,
               videoUrl: "telegram",
               duration: 0,
@@ -146,6 +161,7 @@ export async function GET(
   return NextResponse.json({
     anime: {
       ...anime,
+      creator,
       genres: anime.genres.split(",").filter(Boolean),
       owned,
       ownedEpisodes,
@@ -169,7 +185,7 @@ export async function GET(
             status: v.status,
             episodeCount: v._count.episodes,
             sales: v._count.purchases,
-            label: v.kind === "official" ? "DubAniX" : `by @${v.creator?.username || "creator"}`,
+            label: v.kind === "official" ? "Kiluu" : `by @${v.creator?.username || "creator"}`,
             owned: user ? await userOwnsVersion(user.id, v.id, 0) : false,
           }))
       ),

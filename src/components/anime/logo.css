@@ -1,7 +1,7 @@
 /* ============================================================
-   DUBANIX LOGO — exact port of reference (scoped .dbx-*)
+   KILUU LOGO (scoped .dbx-*)
    Mark: rounded square (rx 17) + 5 white waveform bars forming "D"
-   Wordmark: Unbounded — "DubAni" (600, .92) + gradient "X"
+   Wordmark: Unbounded — "Kiluu"
    ============================================================ */
 
 :root { --dbx-ink: #14111d; }   /* light UI ink */
@@ -49,24 +49,6 @@
 
 .dbx-wm b { font-weight: 600; opacity: 0.92; display: inline-flex; align-items: baseline; }
 
-.dbx-x {
-  font-style: normal;
-  background: linear-gradient(135deg, #ff4d1c, #ffa23a, #ff4d1c);
-  background-size: 200% 100%;
-  background-position: 0% 0;
-  -webkit-background-clip: text;
-  background-clip: text;
-  color: transparent;
-  padding-right: 0.04em;
-}
-/* mono: pure white on orange backgrounds (X also white) */
-.dbx-lock[data-theme="mono"] .dbx-x {
-  background: none;
-  -webkit-background-clip: initial;
-  background-clip: initial;
-  color: #fff;
-}
-
 /* ---- idle equalizer (reference: 1.3s, staggered .15s, scaleY .62) ---- */
 .dbx-bars .dbx-bar {
   transform-box: fill-box;
@@ -89,7 +71,7 @@
   transition: transform 0.17s ease;
 }
 
-/* ---- intro: mark scale+rotate, bars grow, letters rise, X sweep (≤1.2s) ---- */
+/* ---- intro: mark scale+rotate, bars grow, letters rise ---- */
 .dbx-lock[data-state="intro"] .dbx-mk {
   animation: dbx-mk-in 0.5s cubic-bezier(0.2, 0.8, 0.2, 1) both;
 }
@@ -110,18 +92,6 @@
   from { opacity: 0; transform: translateY(60%); filter: blur(8px); }
   to { opacity: 1; transform: none; filter: blur(0); }
 }
-.dbx-lock[data-state="intro"] .dbx-x {
-  animation:
-    dbx-ltr-in 0.5s cubic-bezier(0.2, 0.8, 0.2, 1) both,
-    dbx-x-sweep 0.75s ease 0.35s both;
-  animation-delay: calc(var(--dbx-li, 0) * 35ms + 140ms), 0.35s;
-}
-@keyframes dbx-x-sweep {
-  0% { background-position: 0% 0; }
-  50% { background-position: 100% 0; }
-  100% { background-position: 0% 0; }
-}
-
 /* ---- pause when tab hidden or offscreen ---- */
 .dbx-lock[data-dbx-paused="1"] .dbx-bar,
 .dbx-lock[data-dbx-paused="1"] .dbx-ltr,
@@ -176,7 +146,6 @@
   .dbx-bars .dbx-bar,
   .dbx-ltr,
   .dbx-mk,
-  .dbx-x { animation: none !important; }
   .dbx-lock:hover .dbx-mk { transform: none; filter: none; }
   .dbx-bars .dbx-bar,
   .dbx-ltr { opacity: 1 !important; transform: none !important; filter: none !important; }

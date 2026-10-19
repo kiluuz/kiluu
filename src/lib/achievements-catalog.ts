@@ -14,7 +14,7 @@ export interface AchievementSeed {
 }
 
 export const ACHIEVEMENT_SEEDS: AchievementSeed[] = [
-  { id: "join", emoji: "🎬", name: "DubAniX Citizen", description: "Joined DubAniX", rarity: "common", category: "social", condition: { type: "join" } },
+  { id: "join", emoji: "🎬", name: "Kiluu Citizen", description: "Joined Kiluu", rarity: "common", category: "social", condition: { type: "join" } },
   { id: "first", emoji: "💎", name: "First Purchase", description: "Bought your first anime", rarity: "common", category: "collection", condition: { type: "purchases", gte: 1 } },
   { id: "collector_i", emoji: "📦", name: "Collector I", description: "Own 10 animes", rarity: "common", category: "collection", condition: { type: "purchases", gte: 10 } },
   { id: "collector_ii", emoji: "📚", name: "Collector II", description: "Own 25 animes", rarity: "rare", category: "collection", condition: { type: "purchases", gte: 25 }, reward: { cosmetics: ["frame:gold"], credits: 25 } },

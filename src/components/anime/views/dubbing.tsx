@@ -17,14 +17,14 @@ export function DubbingView() {
     let active = true;
     fetch("/api/dubbing/waitlist")
       .then(async (response) => {
-        if (!response.ok) throw new Error("Kutish ro'yxati holatini yuklab bo'lmadi");
+        if (!response.ok) throw new Error("Could not load your waitlist status");
         return response.json();
       })
       .then((data: { joined?: boolean }) => {
         if (active) setJoined(Boolean(data.joined));
       })
       .catch((error: unknown) => {
-        if (active) toast.error(error instanceof Error ? error.message : "Kutish ro'yxati yuklanmadi");
+        if (active) toast.error(error instanceof Error ? error.message : "Could not load your waitlist");
       })
     return () => { active = false; };
   }, [user?.id]);
@@ -38,11 +38,11 @@ export function DubbingView() {
     try {
       const response = await fetch("/api/dubbing/waitlist", { method: isJoined ? "DELETE" : "POST" });
       const data = await response.json();
-      if (!response.ok) throw new Error(data.error || "So'rov bajarilmadi");
+      if (!response.ok) throw new Error(data.error || "The request could not be completed");
       setJoined(Boolean(data.joined));
-      toast.success(data.joined ? "Kutish ro'yxatiga qo'shildingiz" : "Kutish ro'yxatidan chiqarildingiz");
+      toast.success(data.joined ? "You joined the waitlist" : "You left the waitlist");
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "So'rov bajarilmadi");
+      toast.error(error instanceof Error ? error.message : "The request could not be completed");
     } finally {
       setLoading(false);
     }
@@ -60,17 +60,17 @@ export function DubbingView() {
         </div>
         <h1 className="font-display text-3xl font-black tracking-tight sm:text-4xl">AI Dubbing</h1>
         <p className="mx-auto mt-4 max-w-2xl text-muted-foreground">
-          O'zbekcha AI dublyaj ustida ishlayapmiz. Xizmat tayyor bo'lganda sizga xabar berishimiz uchun
-          kutish ro'yxatiga qo'shiling. Hozircha hech qanday dublyaj yoki kredit yechimi mavjud emas.
+          We are working on AI dubbing. Join the waitlist and we will notify you when it is available.
+          Dubbing and credit charges are not available yet.
         </p>
         <div className="mx-auto mt-7 grid max-w-xl gap-3 text-left sm:grid-cols-2">
           <div className="flex items-start gap-3 rounded-xl border bg-background/60 p-4">
             <Languages className="mt-0.5 h-5 w-5 shrink-0 text-primary" />
-            <span className="text-sm text-muted-foreground">O'zbek tilidagi dublyaj imkoniyatlari tayyor bo'lganda e'lon qilinadi.</span>
+            <span className="text-sm text-muted-foreground">Uzbek dubbing options will be announced when they are ready.</span>
           </div>
           <div className="flex items-start gap-3 rounded-xl border bg-background/60 p-4">
             <Sparkles className="mt-0.5 h-5 w-5 shrink-0 text-primary" />
-            <span className="text-sm text-muted-foreground">Kutish ro'yxatiga qo'shilish bepul va istalgan payt bekor qilinadi.</span>
+            <span className="text-sm text-muted-foreground">Joining the waitlist is free, and you can leave at any time.</span>
           </div>
         </div>
         <Button
@@ -80,9 +80,9 @@ export function DubbingView() {
           variant={isJoined ? "outline" : "default"}
         >
           {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : isJoined ? <Check className="mr-2 h-4 w-4" /> : <Bell className="mr-2 h-4 w-4" />}
-          {isJoined ? "Ro'yxatdan chiqish" : "Xabardor qiling"}
+          {isJoined ? "Leave waitlist" : "Join waitlist"}
         </Button>
-        {!user && <p className="mt-3 text-xs text-muted-foreground">Kutish ro'yxatiga qo'shilish uchun tizimga kiring.</p>}
+        {!user && <p className="mt-3 text-xs text-muted-foreground">Sign in to join the waitlist.</p>}
       </section>
     </div>
   );

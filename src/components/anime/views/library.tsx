@@ -117,7 +117,7 @@ export function LibraryView() {
       }
       startPolling();
     } catch {
-      toast.error("Telegram ulash havolasini olishda xatolik yuz berdi.");
+      toast.error("Could not get the Telegram link.");
     } finally {
       setLinkLoading(false);
     }
@@ -139,11 +139,11 @@ export function LibraryView() {
             .then(r => r.json())
             .then(res => {
               if (res.delivered > 0) {
-                toast.success(`✅ ${res.delivered} ta anime Telegram botga yuborildi!`);
+                toast.success(`✅ ${res.delivered} anime sent to your Telegram bot!`);
               }
             })
             .catch(() => {});
-          toast.success("Telegram muvaffaqiyatli ulandi! ✅");
+          toast.success("Telegram connected! ✅");
         }
       } catch {}
     }, 2500);
@@ -205,10 +205,10 @@ export function LibraryView() {
       <div className="glass rounded-2xl p-4 sm:p-5 mb-8">
         <div className="flex items-center justify-between gap-3 flex-wrap">
           <p className="text-sm text-muted-foreground">
-            Kutubxonadagi versiyani do‘stga sovg‘a qilishingiz mumkin — o‘zingizda bo‘lsa ham to‘lanadi.
+            You can gift an anime from your library to a friend. Credits are charged even if you already own it.
           </p>
           <Button size="sm" className="rounded-full brand-gradient text-white font-bold" onClick={() => navigate("gifts")}>
-            Sovg‘alar
+            Gifts
           </Button>
         </div>
       </div>
@@ -222,7 +222,7 @@ export function LibraryView() {
             <Heart className="w-3.5 h-3.5 mr-1" /> Favorites ({data?.favorites.length ?? 0})
           </TabsTrigger>
           <TabsTrigger value="telegram" className="rounded-lg gap-1.5">
-            <Star className="w-3.5 h-3.5" /> Stars Xaridlar
+            <Star className="w-3.5 h-3.5" /> Stars purchases
           </TabsTrigger>
           <TabsTrigger value="leaderboards" className="rounded-lg gap-1.5">
             <Trophy className="w-3.5 h-3.5" /> Leaderboards
@@ -297,12 +297,12 @@ export function LibraryView() {
                 <>
                   <CheckCircle2 className="w-8 h-8 text-emerald-500 shrink-0" />
                   <div className="flex-1">
-                    <p className="font-bold">✅ Telegram ulandi</p>
-                    <p className="text-sm text-muted-foreground mt-0.5">Xarid qilingan animeler avtomatik yuboriladi.</p>
+                    <p className="font-bold">✅ Telegram connected</p>
+                    <p className="text-sm text-muted-foreground mt-0.5">Purchased anime is sent automatically.</p>
                   </div>
                   <a href={`https://t.me/${process.env.NEXT_PUBLIC_BOT_USERNAME || "DubAniXbot"}`} target="_blank" rel="noopener noreferrer">
                     <Button variant="outline" className="rounded-xl gap-2">
-                      <ExternalLink className="w-4 h-4" /> Botni ochish
+                      <ExternalLink className="w-4 h-4" /> Open bot
                     </Button>
                   </a>
                 </>
@@ -310,13 +310,13 @@ export function LibraryView() {
                 <>
                   <Loader2 className="w-8 h-8 text-primary animate-spin shrink-0" />
                   <div className="flex-1">
-                    <p className="font-bold">Telegram bog'lanishi kutilmoqda...</p>
-                    <p className="text-sm text-muted-foreground mt-0.5">Botni oching va /start bosing.</p>
+                    <p className="font-bold">Waiting for Telegram connection...</p>
+                    <p className="text-sm text-muted-foreground mt-0.5">Open the bot and tap /start.</p>
                   </div>
                   {linkUrl && (
                     <a href={linkUrl} target="_blank" rel="noopener noreferrer">
                       <Button size="sm" variant="outline" className="rounded-xl gap-1.5">
-                        <ExternalLink className="w-3.5 h-3.5" /> Botni ochish
+                        <ExternalLink className="w-3.5 h-3.5" /> Open bot
                       </Button>
                     </a>
                   )}
@@ -325,12 +325,12 @@ export function LibraryView() {
                 <>
                   <Link2 className="w-8 h-8 text-muted-foreground/50 shrink-0" />
                   <div className="flex-1">
-                    <p className="font-bold">Telegram ulanmagan</p>
-                    <p className="text-sm text-muted-foreground mt-0.5">Animeni olish uchun Telegram hisobingizni ulang.</p>
+                    <p className="font-bold">Telegram not connected</p>
+                    <p className="text-sm text-muted-foreground mt-0.5">Connect your Telegram account to receive anime.</p>
                   </div>
                   <Button onClick={startLinking} disabled={linkLoading} className="rounded-xl brand-gradient text-white gap-2 shrink-0">
                     {linkLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
-                    Ulash
+                    Connect
                   </Button>
                 </>
               )}
@@ -338,7 +338,7 @@ export function LibraryView() {
 
             {/* Purchases List */}
             <div>
-              <h3 className="font-bold text-sm text-muted-foreground uppercase tracking-wider mb-3">Xarid qilingan animeler</h3>
+              <h3 className="font-bold text-sm text-muted-foreground uppercase tracking-wider mb-3">Purchased anime</h3>
               {botLoading ? (
                 <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
                   {[...Array(4)].map((_, i) => (
@@ -351,10 +351,10 @@ export function LibraryView() {
               ) : botAnimes.length === 0 ? (
                 <div className="rounded-2xl border border-dashed p-12 text-center">
                   <ShoppingBag className="w-10 h-10 text-muted-foreground/30 mx-auto mb-3" />
-                  <p className="font-bold">Hali xarid qilinmagan</p>
-                  <p className="text-sm text-muted-foreground mt-1 mb-4">Anime do'koniga boring va birinchi xaridingizni qiling!</p>
+                  <p className="font-bold">No purchases yet</p>
+                  <p className="text-sm text-muted-foreground mt-1 mb-4">Visit the anime catalog to make your first purchase.</p>
                   <Button onClick={() => navigate("browse")} className="rounded-xl brand-gradient text-white gap-2">
-                    <ShoppingBag className="w-4 h-4" /> Do'konga o'tish
+                    <ShoppingBag className="w-4 h-4" /> Browse anime
                   </Button>
                 </div>
               ) : (
@@ -372,15 +372,15 @@ export function LibraryView() {
                         <div className="p-2">
                           <p className="text-xs font-bold line-clamp-2">{anime.title}</p>
                           <p className="text-[10px] text-primary mt-0.5 flex items-center gap-1">
-                            <Star className="w-2.5 h-2.5 fill-current" /> Stars orqali xarid qilingan
+                            <Star className="w-2.5 h-2.5 fill-current" /> Purchased with Stars
                           </p>
                         </div>
                       </button>
                     ))}
                   </div>
                   <div className="mt-4 p-4 rounded-xl bg-secondary/30 border text-sm text-muted-foreground">
-                    <p className="font-semibold mb-1">📦 Animeni qayta olish kerakmi?</p>
-                    <p>Telegram botida <code className="bg-secondary/80 px-1.5 py-0.5 rounded text-xs">/library</code> buyrug'ini yuboring — bot barcha animeleringizni qayta yuboradi.</p>
+                    <p className="font-semibold mb-1">📦 Need to receive your anime again?</p>
+                    <p>Send <code className="bg-secondary/80 px-1.5 py-0.5 rounded text-xs">/library</code> in the Telegram bot to receive your purchased anime again.</p>
                   </div>
                 </>
               )}

@@ -108,7 +108,7 @@ export function RightSidebar({ user, stats }: { user: AuthUser | null; stats: Co
           <li>3. Do not spam, impersonate others, or post illegal content.</li>
           <li>4. Report harmful content; do not retaliate.</li>
         </ul>
-        <p>© 2026 DubAniX Community</p>
+        <p>© 2026 Kiluu Community</p>
       </div>
     </div>
   );
@@ -362,7 +362,7 @@ export function PostCard({
               <button className="font-bold hover:text-primary transition truncate text-sm" onClick={() => openProfile(post.user.username)}>
                 {post.user.displayName || post.user.username}
               </button>
-              {post.user.role === "CREATOR" && <CheckCircle2 className="w-3.5 h-3.5 text-primary shrink-0" />}
+              {post.user.isVerified && <CheckCircle2 className="w-3.5 h-3.5 text-primary shrink-0" />}
               {post.user.level && <span className="text-[10px] font-bold bg-secondary/80 px-1.5 py-0.5 rounded text-muted-foreground shrink-0">Lv.{post.user.level}</span>}
               {post.user.badges?.map(b => (
                 <span key={b.id} className={cn("text-[10px] font-bold px-1.5 py-0.5 rounded shrink-0", b.color, b.glow && "animate-pulse shadow-[0_0_8px_currentColor]")}>

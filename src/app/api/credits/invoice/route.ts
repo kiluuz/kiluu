@@ -37,7 +37,7 @@ export async function POST(req: NextRequest) {
     const inv = await createStarsInvoice({
       site_user_id: user.id,
       kind: "CREDITS",
-      title: `DubAniX ${pkg.name}`,
+      title: `Kiluu ${pkg.name}`,
       description: `${pkg.credits}+${pkg.bonus} credits`,
       stars: pkg.starsPrice,
       payload,

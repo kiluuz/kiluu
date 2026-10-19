@@ -19,5 +19,20 @@
   "profile.watchTime": "Watch time",
   "profile.followers": "Followers",
   "profile.posts": "Posts",
-  "profile.hours": "h"
+  "profile.hours": "h",
+  "nav.home": "Home",
+  "nav.browse": "Discover",
+  "nav.schedule": "Schedule",
+  "nav.dubbing": "AI Dubbing",
+  "nav.community": "Community",
+  "nav.watch-together": "Watch Together",
+  "nav.library": "My Library",
+  "nav.gifts": "Gifts",
+  "nav.credits": "Get Credits",
+  "nav.studio": "Creator Studio",
+  "nav.bot-admin": "Bot Admin",
+  "nav.group.browse": "Browse",
+  "nav.group.my": "My Stuff",
+  "nav.group.creator": "Creator",
+  "theme.change": "Change theme"
 }

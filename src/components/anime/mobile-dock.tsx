@@ -15,7 +15,7 @@ import type { ViewName } from "./types";
    5 slots: Home | Discover | [raised AI Dub] | Library | Menu
    - sliding pill active indicator (spring, shared layoutId)
    - label only on the active tab
-   - raised center CTA with animated DubAniX waveform + UZ badge
+   - raised center CTA with animated Kiluu waveform + UZ badge
    - hide-on-scroll + hide in player / fullscreen / keyboard / modals
    - haptic press feedback, 44px targets, safe-area aware
    ============================================================ */
@@ -28,7 +28,7 @@ function haptic() {
   } catch { /* no-op */ }
 }
 
-/** 5-bar DubAniX waveform (same rhythm as the Logo mark: 1.3s eq, .15s stagger) */
+/** 5-bar Kiluu waveform (same rhythm as the Logo mark: 1.3s eq, .15s stagger) */
 function WaveformBars() {
   return (
     <span className="flex items-center justify-center gap-[3px] h-[22px]" aria-hidden="true">
@@ -116,7 +116,7 @@ export function MobileDock() {
   const byId = (id: ViewName) => items.find((i) => i.def.id === id)!;
   const home = byId("home");
   const discover = byId("browse");
-  const library = byId("library");
+  const community = byId("community");
   const dubbing = byId("dubbing");
 
   /* Menu slot mirrors the current in-menu page so the user always knows where they are */
@@ -223,7 +223,7 @@ export function MobileDock() {
           </div>
 
           {/* right pair */}
-          <DockTab icon={library.def.icon} label={library.def.shortLabel} active={library.active} onPress={() => navigate("library")} />
+          <DockTab icon={community.def.icon} label={community.def.shortLabel} active={community.active} onPress={() => navigate("community")} />
           <DockTab
             icon={menuSlot.icon}
             label={menuSlot.label}

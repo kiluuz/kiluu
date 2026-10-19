@@ -4,7 +4,7 @@ import { useId, useEffect, useRef, useState, useSyncExternalStore, type CSSPrope
 import { cn } from "@/lib/utils";
 import "./logo.css";
 
-/* ============ DUBANIX LOGO — exact port of the reference mark ============
+/* ============ KILUU LOGO — waveform mark ============
  * 64x64 viewBox, rounded square rx 17, orange gradient #ff4d1c -> #ffa23a.
  * 5 white rounded vertical bars forming a "D" made of a sound waveform
  * (flat left side, curved fading right side). 吹替 (fukikae) = "dubbing".
@@ -13,7 +13,7 @@ import "./logo.css";
 const BAR_H = [34, 34, 32, 26, 14] as const;
 const BAR_X = [14, 23, 32, 41, 50] as const;
 const BAR_O = [1, 1, 0.95, 0.8, 0.6] as const;
-const WORDMARK = "DubAni";
+const WORDMARK = "Kiluu";
 
 export type LogoState = "idle" | "playing" | "intro";
 
@@ -65,7 +65,7 @@ export function Logo({
   style,
   href,
   onClick,
-  "aria-label": ariaLabel = "DubAniX",
+  "aria-label": ariaLabel = "Kiluu",
 }: LogoProps) {
   const rawId = useId();
   const gid = `dbxg${rawId.replace(/[^a-zA-Z0-9_-]/g, "")}`;
@@ -169,9 +169,6 @@ export function Logo({
               </span>
             ))}
           </b>
-          <i className="dbx-x" style={{ "--dbx-li": WORDMARK.length } as CSSProperties} aria-hidden="true">
-            X
-          </i>
         </span>
       )}
     </>

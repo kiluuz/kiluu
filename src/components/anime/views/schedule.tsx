@@ -76,28 +76,28 @@ function formatDetailCountdown(ms: number): string {
 }
 
 function getSeasonName(season: string | null) {
-  if (season === "WINTER") return "Qish";
-  if (season === "SPRING") return "Bahor";
-  if (season === "SUMMER") return "Yoz";
-  if (season === "FALL") return "Kuz";
+  if (season === "WINTER") return "Winter";
+  if (season === "SPRING") return "Spring";
+  if (season === "SUMMER") return "Summer";
+  if (season === "FALL") return "Fall";
   return season || "";
 }
 
 function translateStatus(status: string) {
-  if (status === "RELEASING") return "Chiqmoqda";
-  if (status === "NOT_YET_RELEASED") return "Kutilmoqda";
-  if (status === "FINISHED") return "Tugallangan";
-  if (status === "CANCELLED") return "Bekor qilingan";
-  if (status === "HIATUS") return "Tanaffusda";
+  if (status === "RELEASING") return "Airing";
+  if (status === "NOT_YET_RELEASED") return "Upcoming";
+  if (status === "FINISHED") return "Finished";
+  if (status === "CANCELLED") return "Cancelled";
+  if (status === "HIATUS") return "On hiatus";
   return status;
 }
 
 function translateFormat(format: string) {
   const labels: Record<string, string> = {
-    TV: "TV serial",
-    TV_SHORT: "Qisqa TV serial",
-    MOVIE: "Film",
-    SPECIAL: "Maxsus qism",
+    TV: "TV series",
+    TV_SHORT: "Short TV series",
+    MOVIE: "Movie",
+    SPECIAL: "Special",
     OVA: "OVA",
     ONA: "ONA",
     MUSIC: "Musiqiy video",
@@ -156,14 +156,14 @@ export function ScheduleView() {
     let alive = true;
     fetch("/api/schedule/subscribe")
       .then(async (response) => {
-        if (!response.ok) throw new Error("Obunalarni yuklab bo'lmadi");
+        if (!response.ok) throw new Error("Could not load subscriptions");
         return response.json();
       })
       .then((data: { ids?: number[] }) => {
         if (alive) setSubscribedIds(new Set(data.ids || []));
       })
       .catch((error: unknown) => {
-        if (alive) toast.error(error instanceof Error ? error.message : "Obunalarni yuklab bo'lmadi");
+        if (alive) toast.error(error instanceof Error ? error.message : "Could not load subscriptions");
       });
     return () => { alive = false; };
   }, [user?.id]);
@@ -186,16 +186,16 @@ export function ScheduleView() {
         },
       );
       const data = await response.json();
-      if (!response.ok) throw new Error(data.error || "Eslatma sozlanmadi");
+      if (!response.ok) throw new Error(data.error || "Could not update reminder");
       setSubscribedIds((ids) => {
         const next = new Set(ids);
         if (data.subscribed) next.add(id);
         else next.delete(id);
         return next;
       });
-      toast.success(data.subscribed ? "Epizod eslatmasi yoqildi" : "Epizod eslatmasi o'chirildi");
+      toast.success(data.subscribed ? "Episode reminder enabled" : "Episode reminder cancelled");
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Eslatma sozlanmadi");
+      toast.error(error instanceof Error ? error.message : "Could not update reminder");
     } finally {
       setReminderBusyIds((ids) => {
         const next = new Set(ids);
@@ -219,10 +219,10 @@ export function ScheduleView() {
           setAnilistSchedule(d.schedule);
           setScheduleError(null);
         } else if (alive) {
-          setScheduleError(d?.error || "Jadval hozircha yuklanmadi.");
+          setScheduleError(d?.error || "The schedule is not available right now.");
         }
       })
-      .catch(() => { if (alive) setScheduleError("Jadval manbasiga ulanib bo'lmadi. Keyinroq qayta urinib ko'ring."); })
+      .catch(() => { if (alive) setScheduleError("Could not connect to the schedule source. Please try again later."); })
       .finally(() => { if (alive) setAnilistLoading(false); });
     return () => { alive = false; };
   }, []);
@@ -310,7 +310,7 @@ export function ScheduleView() {
               Global Jadval
             </h1>
             <p className="text-muted-foreground text-sm mt-2">
-              Keyingi 7 kundagi barcha anime chiqishlari
+              All anime releases in the next 7 days
             </p>
           </div>
           <div className="flex items-center gap-2 text-xs text-muted-foreground bg-card border rounded-full px-3.5 py-2">
@@ -323,7 +323,7 @@ export function ScheduleView() {
         <div className="mt-6 relative max-w-md">
           <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-muted-foreground" />
           <Input
-            placeholder="Kutilayotgan animeni qidiring..."
+            placeholder="Search upcoming anime..."
             value={searchQuery}
             onChange={(e) => {
               setSearchQuery(e.target.value);
@@ -352,7 +352,7 @@ export function ScheduleView() {
             </div>
           ) : searchResults?.length === 0 ? (
             <div className="text-center py-20 text-muted-foreground font-medium border rounded-2xl bg-card/30 border-dashed">
-              Hech qanday anime topilmadi
+              No anime found
             </div>
           ) : (
             <div className="space-y-3">
@@ -377,7 +377,7 @@ export function ScheduleView() {
                         </span>
                         {res.nextEpisode && (
                           <span className="font-bold text-primary px-2 py-0.5 rounded-full bg-primary/10">
-                            {res.nextEpisode.episode}-qism
+                            Episode {res.nextEpisode.episode}
                           </span>
                         )}
                       </div>
@@ -389,9 +389,9 @@ export function ScheduleView() {
                           <div className="text-[10px] font-bold text-primary mt-0.5">in {formatCountdown(msLeft)}</div>
                         </>
                       ) : res.status === "RELEASING" ? (
-                        <span className="text-xs font-bold text-amber-500">Tez kunda</span>
+                        <span className="text-xs font-bold text-amber-500">Coming soon</span>
                       ) : (
-                        <span className="text-xs font-bold text-muted-foreground">Noma'lum</span>
+                        <span className="text-xs font-bold text-muted-foreground">Unknown</span>
                       )}
                     </div>
                   </div>
@@ -593,7 +593,7 @@ export function ScheduleView() {
                   </div>
                   <div className="flex items-center gap-2 mt-1.5 text-[11px] text-muted-foreground flex-wrap">
                     <span className="font-bold text-primary px-1.5 py-0.5 rounded-md bg-primary/10">
-                      {entry.episode}-qism
+                      Episode {entry.episode}
                     </span>
                     {(seasonStr || entry.media.seasonYear) && (
                       <span className="font-bold text-emerald-400 px-1.5 py-0.5 rounded-md bg-emerald-400/10 flex items-center gap-1">
@@ -663,7 +663,7 @@ export function ScheduleView() {
                     size="sm"
                     variant="ghost"
                     className="rounded-full px-2.5"
-                    aria-label={subscribedIds.has(entry.media.anilistId) ? "Eslatmani o'chirish" : "Epizod chiqqanda eslatish"}
+                    aria-label={subscribedIds.has(entry.media.anilistId) ? "Cancel reminder" : "Notify me when the episode is released"}
                     aria-pressed={subscribedIds.has(entry.media.anilistId)}
                     disabled={reminderBusyIds.has(entry.media.anilistId)}
                     onClick={() => void toggleReminder(entry)}
@@ -690,7 +690,7 @@ export function ScheduleView() {
       </div>
 
       <p className="text-[10px] text-muted-foreground text-center mt-6">
-        Har soniyada yangilanadi
+        Updates every second
       </p>
         </>
       )}
@@ -720,8 +720,8 @@ export function ScheduleView() {
                 <div className="p-5 rounded-3xl border-2 border-primary/20 bg-primary/5 inline-block min-w-[280px] shadow-lg shadow-primary/5 relative overflow-hidden">
                   <div className="absolute top-0 left-0 w-full h-1 bg-primary/20" />
                   <div className="absolute top-0 left-0 h-1 bg-primary transition-all duration-1000" style={{ width: `${Math.max(0, Math.min(100, 100 - (((selectedSearchAnime.nextEpisode.airingAt * 1000) - now) / (7 * 24 * 60 * 60 * 1000)) * 100))}%` }} />
-                  <p className="text-xs font-black uppercase tracking-wider text-primary mb-1">Keyingi qism</p>
-                  <h3 className="text-3xl font-black mb-3">{selectedSearchAnime.nextEpisode.episode}-qism</h3>
+                  <p className="text-xs font-black uppercase tracking-wider text-primary mb-1">Next episode</p>
+                  <h3 className="text-3xl font-black mb-3">Episode {selectedSearchAnime.nextEpisode.episode}</h3>
                   <p className="text-xs text-muted-foreground font-semibold mb-1">Qolgan vaqt</p>
                   <div className="font-display text-2xl font-black tabular-nums text-foreground">
                     {formatDetailCountdown((selectedSearchAnime.nextEpisode.airingAt * 1000) - now)}
@@ -729,7 +729,7 @@ export function ScheduleView() {
                 </div>
               ) : (
                 <div className="p-5 rounded-2xl border border-dashed bg-secondary/30">
-                  <p className="font-bold text-muted-foreground">Keyingi qism sanasi noma'lum</p>
+                  <p className="font-bold text-muted-foreground">The next episode date is unknown</p>
                 </div>
               )}
             </div>

@@ -18,13 +18,13 @@ export async function GET(req: NextRequest) {
 
     const orderId = req.nextUrl.searchParams.get("orderId");
     if (!orderId) {
-      return NextResponse.json({ error: "orderId kerak" }, { status: 400 });
+      return NextResponse.json({ error: "orderId is required" }, { status: 400 });
     }
 
     const order = await db.order.findUnique({ where: { id: orderId } });
 
     if (!order) {
-      return NextResponse.json({ error: "Buyurtma topilmadi" }, { status: 404 });
+      return NextResponse.json({ error: "Order not found" }, { status: 404 });
     }
 
     // Security: ensure the order belongs to the requesting user

@@ -5,7 +5,7 @@ import { randomBytes } from "crypto";
 import { deleteR2Object, putR2Object, r2KeyFromPublicUrl } from "@/lib/r2";
 
 /**
- * DubAniX media pipeline — Midnight Cinema edition.
+ * Kiluu media pipeline — Midnight Cinema edition.
  * Magic-bytes validation, EXIF stripping, responsive variants, LQIP blur.
  */
 

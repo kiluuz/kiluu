@@ -6,6 +6,7 @@ import { getUserAchievementStates } from "@/lib/achievements";
 import { getXpTotal, levelFromXp } from "@/lib/xp";
 import { Prisma } from "@prisma/client";
 import { sqlTable } from "@/lib/sql-table";
+import { isVerifiedByFollowerCount } from "@/lib/verification";
 
 const ANIME_CARD = {
   id: true, slug: true, title: true, coverImage: true, bannerImage: true,
@@ -85,6 +86,7 @@ export async function GET(
         username: user.username,
         displayName: user.displayName,
         role: user.role,
+        isVerified: isVerifiedByFollowerCount(count(stats.followers)),
         avatarUrl: user.avatarUrl || null,
         bannerUrl: user.bannerUrl || null,
         bio: user.bio,
@@ -263,6 +265,7 @@ export async function GET(
       username: user.username,
       displayName: user.displayName,
       role: user.role,
+      isVerified: isVerifiedByFollowerCount(followerCount),
       avatarUrl: user.avatarUrl || null,
       bannerUrl: user.bannerUrl || null,
       bio: user.bio,

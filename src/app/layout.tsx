@@ -26,7 +26,7 @@ const spaceGrotesk = Space_Grotesk({
   weight: ["400", "500", "600", "700"],
 });
 
-/* ============ DUBANIX BRAND FONTS ============ */
+/* ============ KILUU BRAND FONTS ============ */
 const unbounded = Unbounded({
   variable: "--font-unbounded",
   subsets: ["latin", "latin-ext"],
@@ -83,10 +83,10 @@ const ptSerif = PT_Serif({
 
 export const metadata: Metadata = {
   metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000"),
-  title: "DubAniX — Stream, Collect & Exchange Anime",
+  title: "Kiluu — Stream, Collect & Exchange Anime",
   description:
     "Premium anime streaming universe. Watch free and exclusive animes, collect credits, trade with collectors, and host synced watch parties with friends. Voice it your way.",
-  keywords: ["anime", "streaming", "watch together", "anime exchange", "DubAniX", "anime dubbing"],
+  keywords: ["anime", "streaming", "watch together", "anime exchange", "Kiluu", "anime dubbing"],
   manifest: "/manifest.webmanifest",
   icons: {
     icon: [
@@ -96,8 +96,8 @@ export const metadata: Metadata = {
     apple: [{ url: "/apple-touch-icon.png", sizes: "180x180", type: "image/png" }],
   },
   openGraph: {
-    title: "DubAniX",
-    siteName: "DubAniX",
+    title: "Kiluu",
+    siteName: "Kiluu",
     description: "Stream, collect and exchange premium anime. Voice it your way.",
     images: [{ url: "/og-image.png", width: 1200, height: 630, type: "image/png" }],
     locale: "en_US",
@@ -105,7 +105,7 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: "summary_large_image",
-    title: "DubAniX",
+    title: "Kiluu",
     description: "Stream, collect and exchange premium anime. Voice it your way.",
     images: ["/og-image.png"],
   },

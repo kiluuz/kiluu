@@ -5,15 +5,17 @@ import { motion, useReducedMotion } from "framer-motion";
 import { useTheme } from "next-themes";
 import { toast } from "sonner";
 import {
-  Search, Coins, Plus, ChevronRight, Lock, Bell, Settings as SettingsIcon,
+  Search, Coins, Plus, ChevronRight, Lock, Settings as SettingsIcon,
   LogOut, LogIn, Sun, Moon, Monitor, Globe, Crown,
 } from "lucide-react";
 import { Drawer, DrawerContent, DrawerTitle, DrawerDescription } from "@/components/ui/drawer";
 import { useAppStore } from "./store";
-import { useResolvedNav, NAV_GROUP_LABELS, EXCHANGE_REQUIRED, type NavGroup, type ResolvedNavItem } from "./nav-config";
+import { useResolvedNav, EXCHANGE_REQUIRED, type NavGroup, type ResolvedNavItem } from "./nav-config";
 import { Avatar, formatCredits } from "./ui-bits";
 import { cn } from "@/lib/utils";
 import type { ViewName } from "./types";
+import { LOCALES, type Locale } from "@/lib/i18n";
+import { useI18n } from "@/components/i18n-provider";
 
 /* ============================================================
    NAV SHEET — "Menu" bottom sheet (mobile)
@@ -24,23 +26,13 @@ import type { ViewName } from "./types";
    Footer: theme / language / notifications / settings / log out.
    ============================================================ */
 
-const LANGS = [
+const LANGS: { code: Locale; name: string }[] = [
   { code: "uz", name: "O'zbekcha" },
-  { code: "ru", name: "Русский" },
   { code: "en", name: "English" },
+  { code: "ru", name: "Русский" },
   { code: "kk", name: "Қазақша" },
   { code: "ky", name: "Кыргызча" },
-] as const;
-type LangCode = (typeof LANGS)[number]["code"];
-
-function readLang(): LangCode {
-  try {
-    const v = localStorage.getItem("dubanix.lang");
-    return (LANGS.find((l) => l.code === v)?.code ?? "en") as LangCode;
-  } catch {
-    return "en";
-  }
-}
+];
 
 /** Mini progress ring — owned/20 toward Exchange unlock */
 function ProgressRing({ value, max }: { value: number; max: number }) {
@@ -149,9 +141,9 @@ function NavTile({ item, index, onGo }: { item: ResolvedNavItem; index: number; 
 export function NavSheet({ open, onOpenChange }: { open: boolean; onOpenChange: (open: boolean) => void }) {
   const { user, view, navigate } = useAppStore();
   const { theme, setTheme } = useTheme();
+  const { locale, setLocale, t } = useI18n();
   const items = useResolvedNav();
   const [langOpen, setLangOpen] = useState(false);
-  const [lang, setLang] = useState<LangCode>(() => (open ? readLang() : "en"));
 
   const close = useCallback(() => onOpenChange(false), [onOpenChange]);
 
@@ -168,19 +160,10 @@ export function NavSheet({ open, onOpenChange }: { open: boolean; onOpenChange: 
     const order = ["light", "dark", "system"] as const;
     const next = order[(order.indexOf((theme ?? "dark") as (typeof order)[number]) + 1) % order.length];
     setTheme(next);
-    toast.success(`Theme: ${next === "system" ? "System" : next === "dark" ? "Dark" : "Light"}`, { id: "theme-cycle" });
   }
 
-  function pickLang(code: LangCode) {
-    setLang(code);
-    try {
-      localStorage.setItem("dubanix.lang", code);
-    } catch { /* private mode */ }
-    const name = LANGS.find((l) => l.code === code)?.name ?? code;
-    toast.success(
-      code === "en" ? "Language set to English" : `${name} saved — full translation coming soon`,
-      { id: "lang-pick" }
-    );
+  function pickLang(code: Locale) {
+    setLocale(code);
   }
 
   async function logout() {
@@ -211,7 +194,7 @@ export function NavSheet({ open, onOpenChange }: { open: boolean; onOpenChange: 
       >
         <DrawerTitle className="sr-only">Navigation menu</DrawerTitle>
         <DrawerDescription className="sr-only">
-          All DubAniX destinations, your account and quick settings
+          All Kiluu destinations, your account and quick settings
         </DrawerDescription>
         <div className="flex flex-col h-full min-h-0">
           {/* ---- header: user card + credits ---- */}
@@ -265,7 +248,7 @@ export function NavSheet({ open, onOpenChange }: { open: boolean; onOpenChange: 
                 className="w-full flex items-center gap-3 rounded-2xl brand-gradient p-3 text-white font-bold text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring transition active:scale-[0.98]"
               >
                 <LogIn className="w-4.5 h-4.5" />
-                Sign in to DubAniX
+                Sign in to Kiluu
                 <ChevronRight className="w-4 h-4 ml-auto opacity-80" />
               </button>
             )}
@@ -289,9 +272,9 @@ export function NavSheet({ open, onOpenChange }: { open: boolean; onOpenChange: 
           <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain px-5 pb-4 no-scrollbar">
             {(["browse", "my", "creator"] as NavGroup[]).map((group) =>
               grouped[group].length === 0 ? null : (
-                <section key={group} className="mb-4" aria-label={NAV_GROUP_LABELS[group]}>
+                <section key={group} className="mb-4" aria-label={t(`nav.group.${group}`)}>
                   <p className="pb-2 text-[10.5px] font-bold uppercase tracking-[0.14em] text-muted-foreground/70">
-                    {NAV_GROUP_LABELS[group]}
+                    {t(`nav.group.${group}`)}
                   </p>
                   <div className="grid grid-cols-2 min-[400px]:grid-cols-3 gap-2">
                     {grouped[group].map((item) => (
@@ -311,10 +294,10 @@ export function NavSheet({ open, onOpenChange }: { open: boolean; onOpenChange: 
                   <button
                     key={l.code}
                     onClick={() => pickLang(l.code)}
-                    aria-pressed={lang === l.code}
+                    aria-pressed={locale === l.code}
                     className={cn(
                       "px-2.5 py-1.5 rounded-full text-[11px] font-bold border transition",
-                      lang === l.code
+                      locale === l.code
                         ? "bg-primary/15 border-primary/40 text-primary"
                         : "bg-card/50 border-border/70 text-muted-foreground hover:text-foreground"
                     )}
@@ -328,7 +311,7 @@ export function NavSheet({ open, onOpenChange }: { open: boolean; onOpenChange: 
               <button
                 onClick={cycleTheme}
                 className="flex-1 flex flex-col items-center justify-center gap-1 py-1.5 rounded-xl min-h-[44px] text-muted-foreground hover:text-foreground hover:bg-accent/60 transition outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                aria-label={`Theme: ${theme ?? "dark"}. Tap to change.`}
+                aria-label={t("theme.change")}
               >
                 {theme === "system" ? <Monitor className="w-[18px] h-[18px]" /> : theme === "light" ? <Sun className="w-[18px] h-[18px]" /> : <Moon className="w-[18px] h-[18px]" />}
                 <span className="text-[9.5px] font-bold capitalize">{theme ?? "dark"}</span>
@@ -340,16 +323,7 @@ export function NavSheet({ open, onOpenChange }: { open: boolean; onOpenChange: 
                 aria-label="Interface language"
               >
                 <Globe className="w-[18px] h-[18px]" />
-                <span className="text-[9.5px] font-bold uppercase">{lang}</span>
-              </button>
-              <button
-                onClick={() => toast.info("You're all caught up! Nothing new here.", { id: "notif" })}
-                className="flex-1 flex flex-col items-center justify-center gap-1 py-1.5 rounded-xl min-h-[44px] text-muted-foreground hover:text-foreground hover:bg-accent/60 transition outline-none focus-visible:ring-2 focus-visible:ring-ring relative"
-                aria-label="Notifications"
-              >
-                <Bell className="w-[18px] h-[18px]" />
-                <span className="absolute top-1.5 right-[calc(50%-13px)] w-1.5 h-1.5 rounded-full bg-emerald-500 live-dot" aria-hidden="true" />
-                <span className="text-[9.5px] font-bold">Alerts</span>
+                <span className="text-[9.5px] font-bold uppercase">{locale}</span>
               </button>
               <button
                 onClick={() => go("settings")}

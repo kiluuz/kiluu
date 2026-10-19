@@ -35,7 +35,7 @@ export function GiftsView() {
     fetch("/api/gifts")
       .then((r) => r.json())
       .then((d) => setGifts(d.gifts || []))
-      .catch(() => toast.error("Sovg'alar yuklanmadi"))
+      .catch(() => toast.error("Could not load gifts"))
       .finally(() => setLoading(false));
   };
 
@@ -68,7 +68,7 @@ export function GiftsView() {
       return;
     }
     if (!username.trim() || !animeId) {
-      toast.error("Username va anime tanlang");
+      toast.error("Choose a username and anime");
       return;
     }
     setSending(true);
@@ -80,11 +80,11 @@ export function GiftsView() {
       });
       const d = await res.json();
       if (!res.ok) {
-        toast.error(d.error || "Yuborilmadi");
+        toast.error(d.error || "Could not send the gift");
         return;
       }
       if (typeof d.credits === "number") updateUser({ credits: d.credits });
-      toast.success("Sovg'a yuborildi");
+      toast.success("Gift sent");
       setUsername("");
       load();
     } catch {
@@ -103,10 +103,10 @@ export function GiftsView() {
       });
       const d = await res.json();
       if (!res.ok) {
-        toast.error(d.error || "Xatolik");
+        toast.error(d.error || "Something went wrong");
         return;
       }
-      toast.success(action === "claim" ? "Sovg'a qabul qilindi" : "Rad etildi, kreditlar qaytdi");
+      toast.success(action === "claim" ? "Gift claimed" : "Gift declined; credits refunded");
       load();
     } catch {
       toast.error("Tarmoq xatosi");
@@ -118,7 +118,7 @@ export function GiftsView() {
       <div className="max-w-[720px] mx-auto px-4 py-16 text-center">
         <Gift className="w-10 h-10 mx-auto mb-3 text-primary" />
         <p className="font-bold text-lg mb-2">Sovg'alar</p>
-        <Button onClick={() => setAuthOpen(true)}>Kirish</Button>
+        <Button onClick={() => setAuthOpen(true)}>Sign in</Button>
       </div>
     );
   }
@@ -129,11 +129,11 @@ export function GiftsView() {
         <Gift className="w-6 h-6 text-primary" /> Sovg'alar
       </h1>
       <p className="text-sm text-muted-foreground mb-6">
-        Allaqachon o‘zingizda bo‘lsa ham, sovg‘a uchun kredit to‘lanadi. Qabul qilish 14 kun.
+        A gift costs credits even if you already own the anime. Gifts can be claimed within 14 days.
       </p>
 
       <div className="glass rounded-2xl p-4 mb-8 space-y-3">
-        <p className="text-sm font-bold">Yuborish</p>
+        <p className="text-sm font-bold">Send</p>
         <Input
           placeholder="@username"
           value={username}
@@ -145,7 +145,7 @@ export function GiftsView() {
           onChange={(e) => setAnimeId(e.target.value)}
           className="w-full rounded-xl border bg-background px-3 py-2 text-sm"
         >
-          <option value="">Anime tanlang</option>
+          <option value="">Choose an anime</option>
           {catalog.map((a) => (
             <option key={a.id} value={a.id}>
               {a.title} — {formatCredits(a.price)} kr
@@ -154,14 +154,14 @@ export function GiftsView() {
         </select>
         <Button disabled={sending} onClick={send} className="rounded-xl brand-gradient text-white">
           {sending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
-          Yuborish
+          Send
         </Button>
       </div>
 
       {loading ? (
         <Loader2 className="w-6 h-6 animate-spin mx-auto" />
       ) : gifts.length === 0 ? (
-        <p className="text-sm text-muted-foreground text-center py-10">Hali sovg‘a yo‘q</p>
+        <p className="text-sm text-muted-foreground text-center py-10">No gifts yet</p>
       ) : (
         <div className="space-y-3">
           {gifts.map((g) => (

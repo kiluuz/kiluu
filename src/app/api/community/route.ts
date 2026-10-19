@@ -7,6 +7,7 @@ import { rateLimit } from "@/lib/rate-limit";
 import { sanitizeText } from "@/lib/sanitize";
 import { awardXpInTransaction, getXpTotals, levelFromXp } from "@/lib/xp";
 import { evaluateAchievements } from "@/lib/achievements";
+import { isVerifiedByFollowerCount } from "@/lib/verification";
 
 const USER_FIELDS = {
   id: true,
@@ -84,6 +85,14 @@ export async function GET(req: NextRequest) {
     : [];
   const followedIds = new Set(followedAuthors.map((row) => row.followedId));
   const xpTotals = await getXpTotals(authors);
+  const followerCounts = authors.length
+    ? await db.follow.groupBy({
+        by: ["followedId"],
+        where: { followedId: { in: authors } },
+        _count: { _all: true },
+      })
+    : [];
+  const followerCountByAuthor = new Map(followerCounts.map((row) => [row.followedId, row._count._all]));
 
   return NextResponse.json({
     posts: posts.map((post) => ({
@@ -97,6 +106,7 @@ export async function GET(req: NextRequest) {
       bookmarked: bookmarkedIds.has(post.id),
       user: {
         ...post.user,
+        isVerified: isVerifiedByFollowerCount(followerCountByAuthor.get(post.userId) ?? 0),
         level: levelFromXp(xpTotals.get(post.userId) ?? 0).level,
         following: followedIds.has(post.userId),
       },
@@ -159,6 +169,7 @@ export async function POST(req: NextRequest) {
     );
     return { post, xpTotal };
   });
+  const followerCount = await db.follow.count({ where: { followedId: user.id } });
   after(async () => {
     try {
       await evaluateAchievements(user.id);
@@ -181,7 +192,12 @@ export async function POST(req: NextRequest) {
       awardCount: 0,
       liked: false,
       bookmarked: false,
-      user: { ...created.post.user, level: levelFromXp(created.xpTotal).level, following: false },
+      user: {
+        ...created.post.user,
+        isVerified: isVerifiedByFollowerCount(followerCount),
+        level: levelFromXp(created.xpTotal).level,
+        following: false,
+      },
     },
   }, { status: 201 });
 }

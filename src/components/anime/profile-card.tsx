@@ -134,7 +134,7 @@ export function ProfilePopupCard({
             <h3 className="font-display text-lg font-bold leading-tight truncate">
               {profile.displayName || profile.username}
             </h3>
-            <BadgeCheck className="w-4 h-4 text-[var(--user-accent)] shrink-0" />
+            {profile.isVerified && <BadgeCheck className="w-4 h-4 text-[var(--user-accent)] shrink-0" />}
             {profile.role === "CREATOR" && (
               <span
                 className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider"

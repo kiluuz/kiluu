@@ -216,7 +216,7 @@ export async function autoEnrichAnime(query: string): Promise<EnrichedAnimeData>
       altTitle: isBlackClover ? "Black Clover" : undefined,
       description: isBlackClover
         ? "Sehrgarlik dunyosida hech qanday sehrsiz tug'ilgan Asta eng buyuk Sehrgarlar Qiroli bo'lishga ahd qiladi! Qora Buqalar otryadi bilan aqlbovar qilmas janglar!"
-        : `${query} — qiziqarli va mashhur anime seriali. O'zbek tilida tomosha qiling.`,
+        : `${query} — an interesting and popular anime series.`,
       coverImage: cover,
       bannerImage: banner,
       genres: ["Action", "Adventure", "Fantasy", "Shounen"],

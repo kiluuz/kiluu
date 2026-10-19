@@ -8,7 +8,7 @@ import { cn } from "@/lib/utils";
 import type { BotAnime } from "./bot-hooks";
 
 function formatPrice(price: number) {
-  return new Intl.NumberFormat("uz-UZ").format(price) + " so'm";
+  return new Intl.NumberFormat("en-US").format(price) + " UZS";
 }
 
 // ─── Telegram Link Widget ────────────────────────────────────────────────────
@@ -26,7 +26,7 @@ export function TelegramLinkWidget({ onLinked }: { onLinked: () => void }) {
     setLinking(true);
     try {
       const res = await fetch("/api/bot/link-token", { method: "POST" });
-      if (!res.ok) throw new Error("Token olishda xatolik");
+      if (!res.ok) throw new Error("Could not get a link token");
       const data = await res.json();
       setLinkUrl(data.link);
 
@@ -55,7 +55,7 @@ export function TelegramLinkWidget({ onLinked }: { onLinked: () => void }) {
       
       startPolling();
     } catch (e: any) {
-      toast.error("Telegram ulash havolasini olishda xatolik yuz berdi.");
+      toast.error("Could not get the Telegram link");
     } finally {
       setLinking(false);
     }
@@ -83,7 +83,7 @@ export function TelegramLinkWidget({ onLinked }: { onLinked: () => void }) {
     pollRef.current = setInterval(async () => {
       if (Date.now() - startTime > maxPollTime) {
         stopPolling();
-        toast.error("Telegram ulash muddati tugadi. Qayta urinib ko'ring.");
+        toast.error("Telegram linking expired. Please try again.");
         return;
       }
       try {
@@ -97,7 +97,7 @@ export function TelegramLinkWidget({ onLinked }: { onLinked: () => void }) {
             const deliverRes = await fetch("/api/bot/deliver-purchases", { method: "POST" });
             const deliverData = await deliverRes.json();
             if (deliverData.delivered > 0) {
-              toast.success(`✅ ${deliverData.delivered} ta anime Telegram botga yuborildi!`);
+              toast.success(`✅ ${deliverData.delivered} anime sent to your Telegram bot!`);
             }
           } catch {
             // Delivery failure is non-fatal — user can still use the app
@@ -123,9 +123,9 @@ export function TelegramLinkWidget({ onLinked }: { onLinked: () => void }) {
         <div className="flex items-center gap-3">
           <Loader2 className="w-5 h-5 text-blue-500 animate-spin shrink-0" />
           <div>
-            <p className="font-bold text-sm">Telegram bog&apos;lanishini kutilmoqda...</p>
+            <p className="font-bold text-sm">Waiting for Telegram connection...</p>
             <p className="text-xs text-muted-foreground mt-0.5">
-              Telegramda <strong>/start</strong> tugmasini bosing yoki quyidagi buyruqni yuboring.
+              Tap <strong>/start</strong> in Telegram or send the command below.
             </p>
           </div>
         </div>
@@ -153,7 +153,7 @@ export function TelegramLinkWidget({ onLinked }: { onLinked: () => void }) {
         {startCommand && (
           <div className="p-3 rounded-xl bg-background/80 border border-border/60 space-y-2 mt-1">
             <div className="flex items-center justify-between text-xs font-semibold text-muted-foreground">
-              <span>Chatga quyidagi xabarni yuboring:</span>
+              <span>Send this message in the chat:</span>
               <Button
                 type="button"
                 size="sm"
@@ -162,12 +162,12 @@ export function TelegramLinkWidget({ onLinked }: { onLinked: () => void }) {
                   navigator.clipboard.writeText(startCommand);
                   setCopied(true);
                   setTimeout(() => setCopied(false), 2000);
-                  toast.success("Nusxalandi! Telegram bot chatiga yuboring.");
+                  toast.success("Copied! Send it to the Telegram bot chat.");
                 }}
                 className="h-6 px-2 text-[11px] gap-1 text-primary hover:text-primary"
               >
                 {copied ? <Check className="w-3 h-3 text-emerald-500" /> : <Copy className="w-3 h-3" />}
-                {copied ? "Nusxalandi" : "Nusxa olish"}
+                {copied ? "Copied" : "Copy"}
               </Button>
             </div>
             <div
@@ -175,7 +175,7 @@ export function TelegramLinkWidget({ onLinked }: { onLinked: () => void }) {
                 navigator.clipboard.writeText(startCommand);
                 setCopied(true);
                 setTimeout(() => setCopied(false), 2000);
-                toast.success("Nusxalandi! Telegram bot chatiga yuboring.");
+                toast.success("Copied! Send it to the Telegram bot chat.");
               }}
               className="cursor-pointer group flex items-center justify-between bg-secondary/80 hover:bg-secondary p-2.5 rounded-lg border border-border/40 transition"
             >
@@ -185,7 +185,7 @@ export function TelegramLinkWidget({ onLinked }: { onLinked: () => void }) {
               <Copy className="w-3.5 h-3.5 text-muted-foreground group-hover:text-primary shrink-0 ml-2" />
             </div>
             <p className="text-[11px] text-muted-foreground leading-tight">
-              💡 Telegram chatida ushbu buyruqni yuborsangiz (Enter), hisob darhol ulanadi va anime yuboriladi!
+              💡 Send this command in the Telegram chat and your account will be linked automatically.
             </p>
           </div>
         )}
@@ -203,7 +203,7 @@ export function TelegramLinkWidget({ onLinked }: { onLinked: () => void }) {
           className="rounded-xl w-full"
         >
           {linking ? <Loader2 className="w-4 h-4 animate-spin" /> : <Link2 className="w-4 h-4" />}
-          Havola eskirganmi? Yangisini olish
+          Link expired? Get a new one
         </Button>
       </div>
     );
@@ -217,12 +217,12 @@ export function TelegramLinkWidget({ onLinked }: { onLinked: () => void }) {
           <Link2 className="w-4 h-4" />
         </div>
         <div>
-          <p className="font-bold text-sm">Telegram hisobingizni ulang</p>
-          <p className="text-xs text-muted-foreground">Xarid qilingan animelar bot orqali yetkaziladi</p>
+          <p className="font-bold text-sm">Connect your Telegram account</p>
+          <p className="text-xs text-muted-foreground">Purchased anime is delivered through the bot</p>
         </div>
       </div>
       <p className="text-xs text-muted-foreground bg-background/60 p-2.5 rounded-xl border border-border/50">
-        ⚡ Tugmani bosing — <strong>Telegram ilovangiz</strong> ochiladi va <strong>/start</strong> ni bosing. Sayt bilan bot avtomatik bog&apos;lanadi!
+        ⚡ Tap the button to open <strong>Telegram</strong>, then tap <strong>/start</strong>. The site and bot will link automatically.
       </p>
       <Button
         onClick={startLinking}
@@ -258,22 +258,22 @@ export function LinkTelegramModal({
             <Send className="w-6 h-6" />
           </div>
           <div>
-            <h2 className="text-xl font-black leading-tight">Telegram hisobingizni ulang</h2>
-            <p className="text-sm text-muted-foreground">{animeTitle || "DubAniX Bot"}</p>
+            <h2 className="text-xl font-black leading-tight">Connect your Telegram account</h2>
+            <p className="text-sm text-muted-foreground">{animeTitle || "Kiluu Bot"}</p>
           </div>
         </div>
         <p className="text-sm text-muted-foreground mb-4 p-3 rounded-xl bg-secondary/40 border border-border/50">
-          Xarid qilgan anime videolaringiz Telegram bot orqali yetkaziladi. Botingizni <strong>bir marta</strong> bog&apos;lash kifoya!
+          Your purchased anime is delivered through the Telegram bot. You only need to link your account <strong>once</strong>.
         </p>
         <TelegramLinkWidget
           onLinked={() => {
-            toast.success("Telegram hisobingiz muvaffaqiyatli ulandi! ✅");
+            toast.success("Telegram account connected! ✅");
             onLinked?.();
             onClose();
           }}
         />
         <Button variant="ghost" className="w-full mt-3 text-muted-foreground text-sm" onClick={onClose}>
-          Bekor qilish
+          Cancel
         </Button>
       </div>
     </div>
@@ -322,7 +322,7 @@ export function CreditPurchaseModal({
       });
       const data = await res.json();
       if (!res.ok) {
-        setError(data.error || "Xarid amalga oshmadi");
+        setError(data.error || "Purchase failed");
         setStep("confirm");
         return;
       }
@@ -334,7 +334,7 @@ export function CreditPurchaseModal({
         setTimeout(onSuccess, 1400);
       }
     } catch {
-      setError("Tarmoq xatosi. Qayta urinib ko'ring.");
+      setError("Network error. Please try again.");
       setStep("confirm");
     }
   }
@@ -348,9 +348,9 @@ export function CreditPurchaseModal({
             <CheckCircle2 className="w-8 h-8 text-emerald-500" />
           </div>
           <div>
-            <h2 className="text-xl font-black mb-1">Xarid muvaffaqiyatli! 🎉</h2>
+            <h2 className="text-xl font-black mb-1">Purchase successful! 🎉</h2>
             <p className="text-sm text-muted-foreground">
-              {animeTitle} sizning kutubxonangizga qo&apos;shildi.
+              {animeTitle} has been added to your library.
             </p>
           </div>
         </div>
@@ -368,16 +368,16 @@ export function CreditPurchaseModal({
               <CheckCircle2 className="w-6 h-6 text-emerald-500" />
             </div>
             <div>
-              <h2 className="text-xl font-black leading-tight">Xarid amalga oshdi! ✅</h2>
+              <h2 className="text-xl font-black leading-tight">Purchase complete! ✅</h2>
               <p className="text-sm text-muted-foreground">{animeTitle}</p>
             </div>
           </div>
           <p className="text-sm text-muted-foreground mb-4 p-3 rounded-xl bg-secondary/40 border border-border/50">
-            Animeni Telegram botga olish uchun hisobingizni ulang — bir marta ulanish kifoya!
+            Link your account to receive anime through the Telegram bot. You only need to do this once.
           </p>
           <TelegramLinkWidget
             onLinked={() => {
-              toast.success("Telegram ulandi! Anime botga yuborilmoqda...");
+              toast.success("Telegram connected! Sending anime to the bot...");
               setStep("done");
               setTimeout(onSuccess, 1200);
             }}
@@ -387,7 +387,7 @@ export function CreditPurchaseModal({
             className="w-full mt-3 text-muted-foreground text-sm"
             onClick={() => { onSuccess(); }}
           >
-            Keyinroq ulash
+            Connect later
           </Button>
         </div>
       </div>
@@ -404,24 +404,24 @@ export function CreditPurchaseModal({
             <Coins className="w-6 h-6 text-primary" />
           </div>
           <div>
-            <h2 className="text-xl font-black leading-tight">Sotib olish</h2>
+            <h2 className="text-xl font-black leading-tight">Purchase</h2>
             <p className="text-sm text-muted-foreground">{animeTitle}</p>
           </div>
         </div>
 
         {/* Price row */}
         <div className="flex items-center justify-between p-4 rounded-2xl bg-secondary/50 mb-4">
-          <span className="text-sm font-semibold text-muted-foreground">Narx</span>
+          <span className="text-sm font-semibold text-muted-foreground">Price</span>
           <span className="text-2xl font-black text-primary flex items-center gap-1">
-            <Coins className="w-5 h-5" /> {price.toLocaleString()} kredit
+            <Coins className="w-5 h-5" /> {price.toLocaleString()} credits
           </span>
         </div>
 
         {/* Balance row */}
         <div className="flex items-center justify-between px-4 py-2.5 rounded-xl bg-secondary/30 mb-5 text-sm">
-          <span className="text-muted-foreground font-medium">Balansingiz</span>
+          <span className="text-muted-foreground font-medium">Your balance</span>
           <span className={cn("font-black", enough ? "text-emerald-400" : "text-rose-400")}>
-            {userCredits.toLocaleString()} kredit
+            {userCredits.toLocaleString()} credits
           </span>
         </div>
 
@@ -435,19 +435,19 @@ export function CreditPurchaseModal({
         {/* Not enough credits note */}
         {!enough && !error && (
           <p className="text-sm text-amber-400 mb-4 p-3 rounded-xl bg-amber-500/10 border border-amber-500/20">
-            Yetarli kredit yo&apos;q. {(price - userCredits).toLocaleString()} kredit kerak.
+            Not enough credits. You need {(price - userCredits).toLocaleString()} more.
           </p>
         )}
 
         {/* Info */}
         <div className="p-3 rounded-xl bg-blue-500/8 border border-blue-500/20 mb-5 space-y-1">
           <p className="text-xs font-semibold text-blue-400 flex items-center gap-1.5">
-            <Send className="w-3.5 h-3.5" /> Qanday ishlaydi?
+            <Send className="w-3.5 h-3.5" /> How it works
           </p>
           <ul className="text-xs text-muted-foreground space-y-1 ml-4 list-disc">
-            <li>Kredit balansingizdan yechiladi</li>
-            <li>Anime Telegram botingizga yuboriladi</li>
-            <li>Bir marta to&apos;lasangiz, barcha qismlar keladi</li>
+            <li>Deducted from your credit balance</li>
+            <li>Anime will be sent to your Telegram bot</li>
+            <li>One payment unlocks all episodes</li>
           </ul>
         </div>
 
@@ -458,7 +458,7 @@ export function CreditPurchaseModal({
             onClick={onClose}
             disabled={step === "buying"}
           >
-            Bekor qilish
+            Cancel
           </Button>
           <Button
             className="flex-1 rounded-2xl brand-gradient text-white font-bold gap-2"
@@ -470,7 +470,7 @@ export function CreditPurchaseModal({
             ) : (
               <Coins className="w-4 h-4" />
             )}
-            {step === "buying" ? "Amalga oshmoqda..." : "Kredit bilan sotib ol"}
+            {step === "buying" ? "Processing..." : "Buy with credits"}
           </Button>
         </div>
       </div>
@@ -517,7 +517,7 @@ export function PaymentModal({
         return;
       }
 
-      if (!checkoutRes.ok) throw new Error(checkout.error || "Checkout xatolik");
+      if (!checkoutRes.ok) throw new Error(checkout.error || "Checkout failed");
 
       setOrderId(checkout.orderId);
       setInvoiceLink(checkout.invoiceLink);
@@ -529,7 +529,7 @@ export function PaymentModal({
       setStep("waiting");
       startPolling(checkout.orderId);
     } catch (e: any) {
-      toast.error(e.message || "To'lovda xatolik yuz berdi");
+      toast.error(e.message || "Payment failed");
     } finally {
       setLoading(false);
     }
@@ -542,7 +542,7 @@ export function PaymentModal({
     pollRef.current = setInterval(async () => {
       if (Date.now() - start > MAX) {
         clearInterval(pollRef.current!);
-        toast.error("To'lov muddati tugadi. Agar to'lovni amalga oshirgan bo'lsangiz, sahifani yangilang.");
+        toast.error("Payment timed out. If you completed the payment, refresh the page.");
         onClose();
         return;
       }
@@ -585,16 +585,16 @@ export function PaymentModal({
             </div>
           </div>
           <p className="text-sm text-muted-foreground mb-4 p-3 rounded-xl bg-secondary/40 border border-border/50">
-            Anime videolarini Telegram orqali olish uchun sayt bilan botingizni <strong>bir marta</strong> bog&apos;lash kerak. Bu atigi 5 soniya!
+            Link your site and bot <strong>once</strong> to receive anime through Telegram. It only takes a few seconds.
           </p>
           <TelegramLinkWidget
             onLinked={() => {
-              toast.success("Telegram ulandi! Endi to\u2018lovga o\u2018tishingiz mumkin.");
+              toast.success("Telegram connected! You can continue to payment.");
               setStep("confirm");
             }}
           />
           <Button variant="ghost" className="w-full mt-3 text-muted-foreground text-sm" onClick={onClose}>
-            Bekor qilish
+            Cancel
           </Button>
         </div>
       </div>
@@ -618,7 +618,7 @@ export function PaymentModal({
 
           {/* Price */}
           <div className="flex items-center justify-between p-4 rounded-2xl bg-secondary/50 mb-5">
-            <span className="text-sm font-semibold text-muted-foreground">Narx</span>
+            <span className="text-sm font-semibold text-muted-foreground">Price</span>
             <span className="text-2xl font-black text-primary">{formatPrice(anime.price)}</span>
           </div>
 
@@ -630,8 +630,8 @@ export function PaymentModal({
             </p>
             <ul className="text-xs text-muted-foreground space-y-1 ml-5 list-disc">
               <li>To'lov Telegram orqali amalga oshiriladi</li>
-              <li>Anime to'g'ridan-to'g'ri botga yuboriladi</li>
-              <li>Bir marta to'lasangiz, barcha qismlar keladi</li>
+              <li>Anime is sent directly to your bot</li>
+              <li>One payment unlocks all episodes</li>
             </ul>
           </div>
 
@@ -642,7 +642,7 @@ export function PaymentModal({
               onClick={onClose}
               disabled={loading}
             >
-              Bekor qilish
+              Cancel
             </Button>
             <Button
               className="flex-1 rounded-2xl brand-gradient text-white font-bold gap-2"
@@ -672,22 +672,22 @@ export function PaymentModal({
               <Loader2 className="w-8 h-8 text-yellow-400 animate-spin" />
             </div>
             <div>
-              <h2 className="text-lg font-black mb-1">To'lov kutilmoqda...</h2>
+              <h2 className="text-lg font-black mb-1">Waiting for payment...</h2>
               <p className="text-sm text-muted-foreground">
                 Telegram orqali Stars to'lovini amalga oshiring.
-                <br />To'lovdan so'ng sahifa avtomatik yangilanadi.
+                <br />This page will update automatically after payment.
               </p>
             </div>
             {invoiceLink && (
               <a href={invoiceLink} target="_blank" rel="noopener noreferrer" className="w-full">
                 <Button variant="outline" className="w-full rounded-2xl gap-2">
                   <ExternalLink className="w-4 h-4" />
-                  Telegramda ochish
+                  Open in Telegram
                 </Button>
               </a>
             )}
             <Button variant="ghost" size="sm" className="text-muted-foreground" onClick={onClose}>
-              Bekor qilish
+              Cancel
             </Button>
           </div>
         </div>
@@ -700,9 +700,9 @@ export function PaymentModal({
     return (
       <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
         <div className="w-full max-w-md glass-strong rounded-3xl p-6 shadow-2xl animate-in slide-in-from-bottom-4 sm:zoom-in-95 duration-300">
-          <h2 className="text-xl font-black mb-2">To'lov muvaffaqiyatli! ✅</h2>
+          <h2 className="text-xl font-black mb-2">Payment successful! ✅</h2>
           <p className="text-sm text-muted-foreground mb-5">
-            Animeni olish uchun Telegram hisobingizni ulang. Ulanganingizdan so'ng anime avtomatik botga yuboriladi.
+            Connect your Telegram account to receive anime. Once linked, anime is sent to your bot automatically.
           </p>
           <TelegramLinkWidget
             onLinked={() => {
@@ -711,7 +711,7 @@ export function PaymentModal({
             }}
           />
           <Button variant="ghost" className="w-full mt-3 text-muted-foreground" onClick={() => onSuccess(true)}>
-            Keyinroq ulash
+            Connect later
           </Button>
         </div>
       </div>
@@ -727,9 +727,9 @@ export function PaymentModal({
             <CheckCircle2 className="w-8 h-8 text-emerald-500" />
           </div>
           <div>
-            <h2 className="text-xl font-black mb-1">Xarid muvaffaqiyatli! 🎉</h2>
+            <h2 className="text-xl font-black mb-1">Purchase successful! 🎉</h2>
             <p className="text-sm text-muted-foreground">
-              Anime Telegram botingizga yuborilmoqda...
+              Sending anime to your Telegram bot...
             </p>
           </div>
         </div>

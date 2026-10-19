@@ -19,5 +19,20 @@
   "profile.watchTime": "Ko‘rish vaqti",
   "profile.followers": "Kuzatuvchilar",
   "profile.posts": "Postlar",
-  "profile.hours": "soat"
+  "profile.hours": "soat",
+  "nav.home": "Bosh sahifa",
+  "nav.browse": "Kashf etish",
+  "nav.schedule": "Jadval",
+  "nav.dubbing": "AI dublyaj",
+  "nav.community": "Hamjamiyat",
+  "nav.watch-together": "Birga tomosha qilish",
+  "nav.library": "Kutubxonam",
+  "nav.gifts": "Sovg'alar",
+  "nav.credits": "Kredit olish",
+  "nav.studio": "Ijodkor studiyasi",
+  "nav.bot-admin": "Bot boshqaruvi",
+  "nav.group.browse": "Ko'rish",
+  "nav.group.my": "Mening bo'limim",
+  "nav.group.creator": "Ijodkor",
+  "theme.change": "Mavzuni o'zgartirish"
 }

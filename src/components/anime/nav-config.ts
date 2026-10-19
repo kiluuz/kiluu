@@ -6,6 +6,7 @@ import {
 } from "lucide-react";
 import { useAppStore } from "./store";
 import type { ViewName } from "./types";
+import { useI18n } from "@/components/i18n-provider";
 
 /* ============================================================
    NAVIGATION CONFIG — single source of truth
@@ -94,6 +95,7 @@ export function useResolvedNav(): ResolvedNavItem[] {
   const view = useAppStore((s) => s.view);
   const user = useAppStore((s) => s.user);
   const scheduleAirsToday = useAppStore((s) => s.scheduleAirsToday);
+  const { t } = useI18n();
   const isCreator = user?.role === "CREATOR" || user?.role === "ADMIN";
   const isAdmin = user?.role === "ADMIN";
   const owned = user?.ownedCount ?? 0;
@@ -105,7 +107,18 @@ export function useResolvedNav(): ResolvedNavItem[] {
       (!!def.adminOnly && !!user && !isAdmin);
     const badgeText = def.badge === "soon" ? "Soon" : undefined;
     const dot = def.id === "schedule" ? scheduleAirsToday : undefined;
-    return { def, active, badgeText, locked, ownedCount: owned, dot };
+    return {
+      def: {
+        ...def,
+        label: t(`nav.${def.id}`),
+        shortLabel: t(`nav.${def.id}`),
+      },
+      active,
+      badgeText,
+      locked,
+      ownedCount: owned,
+      dot,
+    };
   });
 }
 

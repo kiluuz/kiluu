@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { createSession, hashPassword, toPublicUser } from "@/lib/auth";
+import { hashPassword } from "@/lib/auth";
 import { rateLimit } from "@/lib/rate-limit";
 import { rateKey } from "@/lib/client-ip";
 import { log } from "@/lib/logger";
+import { sendVerificationEmail } from "@/lib/email";
 import { z } from "zod";
 
 const Body = z.object({
@@ -11,6 +12,10 @@ const Body = z.object({
   username: z.string().regex(/^[a-zA-Z0-9_]{3,20}$/),
   password: z.string().min(6).max(200),
 });
+
+function generateOtp(): string {
+  return String(Math.floor(100000 + Math.random() * 900000));
+}
 
 export async function POST(req: NextRequest) {
   if (!rateLimit(rateKey(req, "register"), 5, 60_000)) {
@@ -24,17 +29,34 @@ export async function POST(req: NextRequest) {
     const { email, username, password } = parsed.data;
 
     const [existingEmail, existingUsername] = await Promise.all([
-      db.user.findUnique({ where: { email: email.toLowerCase() }, select: { id: true } }),
+      db.user.findUnique({ where: { email: email.toLowerCase() }, select: { id: true, emailVerified: true } }),
       db.user.findUnique({ where: { username }, select: { id: true } }),
     ]);
+
+    // Agar email bor lekin tasdiqlanmagan bo'lsa — yangi OTP yuboramiz
     if (existingEmail) {
-      return NextResponse.json({ error: "An account with this email already exists" }, { status: 409 });
+      if (existingEmail.emailVerified) {
+        return NextResponse.json({ error: "An account with this email already exists" }, { status: 409 });
+      }
+      // Tasdiqlangmagan — OTP yangilash
+      const code = generateOtp();
+      const exp = new Date(Date.now() + 10 * 60 * 1000); // 10 daqiqa
+      await db.user.update({
+        where: { id: existingEmail.id },
+        data: { verifyCode: code, verifyCodeExp: exp },
+      });
+      await sendVerificationEmail({ to: email, username, code });
+      return NextResponse.json({ requiresVerification: true, email: email.toLowerCase() }, { status: 200 });
     }
+
     if (existingUsername) {
       return NextResponse.json({ error: "This username is already taken" }, { status: 409 });
     }
 
-    const user = await db.$transaction(async (tx) => {
+    const code = generateOtp();
+    const exp = new Date(Date.now() + 10 * 60 * 1000);
+
+    await db.$transaction(async (tx) => {
       const created = await tx.user.create({
         data: {
           email: email.toLowerCase(),
@@ -44,6 +66,9 @@ export async function POST(req: NextRequest) {
           displayName: username,
           role: "user",
           locale: "uz",
+          emailVerified: false,
+          verifyCode: code,
+          verifyCodeExp: exp,
         },
       });
       await tx.creditTransaction.create({
@@ -58,8 +83,8 @@ export async function POST(req: NextRequest) {
       return created;
     });
 
-    await createSession(user.id);
-    return NextResponse.json({ user: { ...toPublicUser(user), ownedCount: 0 } }, { status: 201 });
+    await sendVerificationEmail({ to: email, username, code });
+    return NextResponse.json({ requiresVerification: true, email: email.toLowerCase() }, { status: 201 });
   } catch (e) {
     log.error("register failed", { err: String(e) });
     return NextResponse.json({ error: "Registration failed" }, { status: 500 });

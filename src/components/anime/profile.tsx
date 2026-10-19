@@ -543,7 +543,7 @@ function ProfileIdentity({ profile, onEdit }: { profile: PublicProfile; onEdit?:
                 <Crown className="w-3 h-3" /> Creator
               </span>
             )}
-            <BadgeCheck className="w-5 h-5 text-[var(--user-accent)]" aria-label="Verified" />
+            {profile.isVerified && <BadgeCheck className="w-5 h-5 text-[var(--user-accent)]" aria-label="Verified" />}
           </div>
           <div className="flex items-center gap-2 flex-wrap mt-1 justify-center sm:justify-start">
             <span className="text-sm text-muted-foreground">@{profile.username}</span>

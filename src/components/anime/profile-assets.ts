@@ -1,4 +1,4 @@
-/* ============ DubAniX profile asset catalog — Midnight Cinema ============ */
+/* ============ Kiluu profile asset catalog — Midnight Cinema ============ */
 
 /** Scenic anime-style preset banners (free gallery) */
 export const BANNER_PRESETS = [

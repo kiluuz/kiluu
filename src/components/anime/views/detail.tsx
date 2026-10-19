@@ -226,8 +226,8 @@ export function DetailView() {
             id: `ep-${anime.slug}-${num}`,
             animeId: anime.id,
             number: num,
-            title: `${anime.title} ${num}-qism`,
-            description: `${anime.title} serialining ${num}-qismi`,
+            title: `${anime.title} Episode ${num}`,
+            description: `${anime.title} Episode ${num}`,
             videoUrl: "telegram",
             duration: 1440,
             createdAt: new Date().toISOString(),
@@ -250,10 +250,10 @@ export function DetailView() {
       const res = await fetch(`/api/notify/${anime.id}`, { method });
       if (res.ok) {
         setNotifySubscribed(!notifySubscribed);
-        toast.success(notifySubscribed ? "Eslatma bekor qilindi" : "🔔 Anime chiqqanda xabar olasiz!");
+        toast.success(notifySubscribed ? "Reminder cancelled" : "🔔 You will be notified when the anime is released!");
       }
     } catch {
-      toast.error("Xatolik yuz berdi");
+      toast.error("Something went wrong");
     } finally {
       setNotifyBusy(false);
     }
@@ -299,7 +299,7 @@ export function DetailView() {
   function share() {
     const url = typeof window !== "undefined" ? window.location.href : "";
     if (typeof navigator !== "undefined" && navigator.share) {
-      navigator.share({ title: anime.title, text: `Watch ${anime.title} on DubAniX!`, url }).catch(() => {});
+      navigator.share({ title: anime.title, text: `Watch ${anime.title} on Kiluu!`, url }).catch(() => {});
     } else if (typeof navigator !== "undefined" && navigator.clipboard) {
       navigator.clipboard.writeText(url);
       toast.success("Link copied to clipboard!");
@@ -312,8 +312,8 @@ export function DetailView() {
       return;
     }
     if (!canWatchLocally) {
-      toast.error("Sotib olish zarur", {
-        action: { label: "Sotib olish", onClick: buy },
+      toast.error("Purchase required", {
+        action: { label: "Buy", onClick: buy },
       });
       return;
     }
@@ -343,8 +343,8 @@ export function DetailView() {
       const data = await res.json();
       toast.success(
         episodeNumber
-          ? `✅ ${episodeNumber}-qism Telegram botingizga yuborildi!`
-          : "✅ Anime Telegram botingizga yuborildi!"
+          ? `✅ Episode ${episodeNumber} was sent to your Telegram bot!`
+          : "✅ The anime was sent to your Telegram bot!"
       );
       botStatus.refresh();
 
@@ -357,7 +357,7 @@ export function DetailView() {
         }
       }, 1500);
     } catch {
-      toast.error("Anime yuborishda xatolik yuz berdi");
+      toast.error("Could not send the anime");
     } finally {
       setDelivering(false);
     }
@@ -369,8 +369,8 @@ export function DetailView() {
     try {
       // Check credits
       if ((user.credits ?? 0) < price) {
-        toast.error(`Kredit yetarli emas. Yana ${price - (user.credits ?? 0)} kredit kerak.`, {
-          action: { label: "Kredit olish", onClick: () => setShowCreditModal(true) },
+        toast.error(`Not enough credits. You need ${price - (user.credits ?? 0)} more.`, {
+          action: { label: "Get credits", onClick: () => setShowCreditModal(true) },
         });
         setEpisodeBuying(false);
         return;
@@ -384,12 +384,12 @@ export function DetailView() {
       if (!res.ok) {
         if (d.alreadyOwned) {
           // Already bought — just deliver
-          toast.info("Bu qismni allaqachon sotib olgansiz, Telegramga yuborilmoqda...");
+          toast.info("You already own this episode. Sending it to Telegram...");
           setEpisodePurchaseModal(null);
           await handleWatchTelegram(episodeNumber);
           return;
         }
-        toast.error(d.error || "Xarid amalga oshmadi");
+        toast.error(d.error || "Purchase failed");
         setEpisodeBuying(false);
         return;
       }
@@ -397,13 +397,13 @@ export function DetailView() {
       if (typeof d.credits === "number") {
         updateUser({ credits: d.credits });
       }
-      toast.success(`✅ ${episodeNumber}-qism sotib olindi!`);
+      toast.success(`✅ Episode ${episodeNumber} purchased!`);
       setEpisodePurchaseModal(null);
       botStatus.refresh();
       // Deliver to Telegram
       await handleWatchTelegram(episodeNumber);
     } catch {
-      toast.error("Xarid amalga oshmadi");
+      toast.error("Purchase failed");
     } finally {
       setEpisodeBuying(false);
     }
@@ -435,7 +435,7 @@ export function DetailView() {
                 <Badge className="bg-primary/90 border-0 font-bold gap-1 text-primary-foreground"><BadgeCheck className="w-3 h-3" /> OWNED</Badge>
               ) : botAnime ? (
                 <Badge className="bg-amber-500/90 border-0 font-bold gap-1">
-                  {new Intl.NumberFormat("uz-UZ").format(botAnime.price)} so'm
+                  {new Intl.NumberFormat("en-US").format(botAnime.price)} UZS
                 </Badge>
               ) : (
                 <Badge className="bg-amber-500/90 border-0 font-bold gap-1">
@@ -453,11 +453,11 @@ export function DetailView() {
                 </Badge>
               ) : anime.status === "UPCOMING" ? (
                 <Badge className="bg-sky-500/15 text-sky-400 border border-sky-500/30 font-bold gap-1.5 px-2.5 py-0.5">
-                  TEZ KUNDA (UPCOMING)
+                  UPCOMING
                 </Badge>
               ) : (
                 <Badge variant="outline" className="font-semibold text-muted-foreground border-border/80 px-2.5 py-0.5">
-                  TUGALLANGAN (COMPLETED)
+                  COMPLETED
                 </Badge>
               )}
             </div>
@@ -474,7 +474,7 @@ export function DetailView() {
               <span className="text-muted-foreground">{anime.year}</span>
               <span className="text-muted-foreground">·</span>
               <span className="text-muted-foreground flex items-center gap-1">
-                <Package className="w-3.5 h-3.5" /> {totalEpisodesCount} {totalEpisodesCount === 1 ? "qism" : "qismlar"}
+                <Package className="w-3.5 h-3.5" /> {totalEpisodesCount} {totalEpisodesCount === 1 ? "episode" : "episodes"}
               </span>
               <span className="text-muted-foreground">·</span>
               <span className="text-muted-foreground flex items-center gap-1">
@@ -505,8 +505,8 @@ export function DetailView() {
                 <div className="absolute top-0 left-0 w-full h-1 bg-primary/20" />
                 <div className="absolute top-0 left-0 h-1 bg-primary transition-all duration-1000" style={{ width: `${Math.max(0, Math.min(100, 100 - ((anilistEntry.airingAt * 1000 - now) / (7 * 24 * 60 * 60 * 1000)) * 100))}%` }} />
                 <div>
-                  <p className="text-xs font-black uppercase tracking-wider text-primary mb-1 flex items-center gap-1.5"><Clock3 className="w-3.5 h-3.5" /> Keyingi qism</p>
-                  <h3 className="text-2xl font-black">{anilistEntry.episode}-qism</h3>
+                  <p className="text-xs font-black uppercase tracking-wider text-primary mb-1 flex items-center gap-1.5"><Clock3 className="w-3.5 h-3.5" /> Next episode</p>
+                  <h3 className="text-2xl font-black">Episode {anilistEntry.episode}</h3>
                 </div>
                 <div className="text-right">
                   <p className="text-xs text-muted-foreground font-semibold mb-1">Qolgan vaqt</p>
@@ -546,7 +546,7 @@ export function DetailView() {
               ) : isUpcoming ? (
                 <div className="flex items-center gap-2 flex-wrap">
                   <Button size="lg" disabled className="h-12 px-7 rounded-full bg-secondary/80 text-muted-foreground font-bold cursor-not-allowed">
-                    <Bell className="w-5 h-5 mr-2" /> Tez kunda
+                    <Bell className="w-5 h-5 mr-2" /> Coming soon
                   </Button>
                   <Button
                     size="lg"
@@ -563,9 +563,9 @@ export function DetailView() {
                     {notifyBusy ? (
                       <Loader2 className="w-4 h-4 animate-spin" />
                     ) : notifySubscribed ? (
-                      <><BellOff className="w-4 h-4 mr-2" /> Bekor qilish</>
+                      <><BellOff className="w-4 h-4 mr-2" /> Cancel</>
                     ) : (
-                      <><Bell className="w-4 h-4 mr-2" /> Eslatma</>
+                      <><Bell className="w-4 h-4 mr-2" /> Remind me</>
                     )}
                   </Button>
                   {anime.releaseDate && (
@@ -586,12 +586,12 @@ export function DetailView() {
                       {delivering ? (
                         <>
                           <Loader2 className="w-5 h-5 mr-2 animate-spin" />
-                          Yuborilmoqda...
+                          Sending...
                         </>
                       ) : (
                         <>
                           <Play className="w-5 h-5 mr-2 fill-current" />
-                          Ko&apos;rish (Telegram)
+                          Watch on Telegram
                         </>
                       )}
                     </Button>
@@ -603,7 +603,7 @@ export function DetailView() {
                         onClick={() => setShowLinkModal(true)}
                         className="h-12 px-5 rounded-full font-bold border-amber-500/40 text-amber-500 hover:bg-amber-500/10 shadow-sm"
                       >
-                        <Send className="w-4 h-4 mr-2" /> Telegramni ulash
+                        <Send className="w-4 h-4 mr-2" /> Connect Telegram
                       </Button>
                     )}
                   </div>
@@ -613,7 +613,7 @@ export function DetailView() {
                       <div className="flex items-center gap-2.5">
                         <span className="text-base shrink-0">⚠️</span>
                         <span className="text-muted-foreground leading-snug">
-                          Bot animeni tashlab berishi uchun saytdagi <strong>«Telegramni ulash»</strong> tugmasini bosing!
+                          To receive anime from the bot, select <strong>“Connect Telegram”</strong> on the site.
                         </span>
                       </div>
                       <Button
@@ -621,7 +621,7 @@ export function DetailView() {
                         onClick={() => setShowLinkModal(true)}
                         className="h-8 px-4 rounded-xl text-xs font-bold brand-gradient text-white shrink-0"
                       >
-                        Ulash
+                        Connect
                       </Button>
                     </div>
                   )}
@@ -633,7 +633,7 @@ export function DetailView() {
                     disabled
                     className="h-12 px-7 rounded-full bg-secondary/80 text-muted-foreground font-bold cursor-not-allowed"
                   >
-                    <Bell className="w-5 h-5 mr-2" /> Qismlar yo‘q
+                    <Bell className="w-5 h-5 mr-2" /> No episodes
                   </Button>
                   <Button
                     size="lg"
@@ -650,9 +650,9 @@ export function DetailView() {
                     {notifyBusy ? (
                       <Loader2 className="w-4 h-4 animate-spin" />
                     ) : notifySubscribed ? (
-                      <><BellOff className="w-4 h-4 mr-2" /> Bekor qilish</>
+                      <><BellOff className="w-4 h-4 mr-2" /> Cancel</>
                     ) : (
-                      <><Bell className="w-4 h-4 mr-2" /> Xabardor qiling</>
+                      <><Bell className="w-4 h-4 mr-2" /> Notify me</>
                     )}
                   </Button>
                 </div>
@@ -663,7 +663,7 @@ export function DetailView() {
                   className="h-12 px-7 rounded-full brand-gradient hover:opacity-90 text-white font-bold shadow-xl shadow-primary/30"
                 >
                   <Coins className="w-5 h-5 mr-2" />
-                  To&apos;liq xarid — {(selectedVersion?.price ?? anime.price).toLocaleString()} kredit
+                  Buy full anime — {(selectedVersion?.price ?? anime.price).toLocaleString()} credits
                 </Button>
               ) : (
                 <Button
@@ -676,7 +676,7 @@ export function DetailView() {
                   className="h-12 px-6 rounded-full font-bold border-primary/40 text-primary hover:bg-primary/10 shadow-sm"
                 >
                   <Tv className="w-5 h-5 mr-2" />
-                  Qismlarni tanlash
+                  Choose episodes
                 </Button>
               )}
               <Button
@@ -727,15 +727,15 @@ export function DetailView() {
             <Separator className="my-7" />
             <div id="episodes-section" className="flex items-center justify-between mb-4">
               <h2 className="text-lg font-bold flex items-center gap-2">
-                <Tv className="w-5 h-5 text-primary" /> Qismlar (Episodes)
+                <Tv className="w-5 h-5 text-primary" /> Episodes
               </h2>
-              <span className="text-xs text-muted-foreground">{totalEpisodesCount} jami</span>
+              <span className="text-xs text-muted-foreground">{totalEpisodesCount} total</span>
             </div>
 
             {displayEpisodes.length === 0 ? (
               <div className="rounded-2xl border border-dashed p-8 text-center text-muted-foreground">
                 <Clapperboard className="w-8 h-8 mx-auto mb-2 opacity-50" />
-                <p className="text-sm font-medium">Hozircha qismlar yuklanmagan — tez kunda!</p>
+                <p className="text-sm font-medium">No episodes have been added yet.</p>
               </div>
             ) : (
               <div className="space-y-2.5">
@@ -813,7 +813,7 @@ export function DetailView() {
                         <p className="text-[11px] text-muted-foreground/70 mt-1 flex items-center gap-1">
                           <Clock3 className="w-3 h-3" /> {Math.max(1, Math.round((ep.duration || 1440) / 60))} min
                           {locked && epPrice > 0 && (
-                            <span className="ml-2 text-primary font-semibold">• Sotib olish: {epPrice} 💰</span>
+                            <span className="ml-2 text-primary font-semibold">• Buy: {epPrice} 💰</span>
                           )}
                         </p>
                       </div>
@@ -837,7 +837,7 @@ export function DetailView() {
                   <div className="text-left min-w-0">
                     <p className="font-bold text-sm truncate flex items-center gap-1.5">
                       {anime.creator.displayName}
-                      {anime.creator.role === "CREATOR" && (
+                      {anime.creator.isVerified && (
                         <span title="Verified Creator"><BadgeCheck className="w-3.5 h-3.5 text-primary" /></span>
                       )}
                     </p>
@@ -857,7 +857,7 @@ export function DetailView() {
                 {
                   icon: <Sparkles className="w-4 h-4 text-primary" />,
                   label: "Status",
-                  value: anime.status === "ONGOING" ? "Efirda (Chiqmoqda)" : anime.status === "UPCOMING" ? "Tez kunda" : "Tugallangan (Completed)",
+                  value: anime.status === "ONGOING" ? "Ongoing" : anime.status === "UPCOMING" ? "Upcoming" : "Completed",
                 },
               ].map((row) => (
                 <div key={row.label} className="flex items-center justify-between text-sm">
@@ -945,7 +945,7 @@ export function DetailView() {
             setJustPurchased(true);
             updateUser({ credits: (user?.credits ?? 0) - (selectedVersion?.price ?? anime.price) });
             botStatus.refresh();
-            toast.success("Xarid muvaffaqiyatli!");
+            toast.success("Purchase successful!");
           }}
         />
       )}
@@ -957,7 +957,7 @@ export function DetailView() {
         onClose={() => setShowLinkModal(false)}
         onLinked={() => {
           botStatus.refresh();
-          toast.success("✅ Telegram ulandi! Anime botingizga yuborilmoqda...");
+          toast.success("✅ Telegram connected! Sending the anime to your bot...");
         }}
       />
 
@@ -971,8 +971,8 @@ export function DetailView() {
                 <Tv className="w-6 h-6 text-primary" />
               </div>
               <div>
-                <p className="text-xs text-muted-foreground font-semibold uppercase tracking-wider">Qismni sotib olish</p>
-                <h3 className="font-bold text-base leading-tight">{episodePurchaseModal.number}-qism</h3>
+                <p className="text-xs text-muted-foreground font-semibold uppercase tracking-wider">Buy episode</p>
+                <h3 className="font-bold text-base leading-tight">Episode {episodePurchaseModal.number}</h3>
               </div>
             </div>
 
@@ -980,20 +980,20 @@ export function DetailView() {
             <div className="bg-secondary/50 rounded-2xl p-4 mb-5 space-y-2">
               <p className="text-sm font-semibold truncate">{episodePurchaseModal.title}</p>
               <div className="flex items-center justify-between text-sm">
-                <span className="text-muted-foreground">Narxi</span>
+                <span className="text-muted-foreground">Price</span>
                 <span className="font-black text-lg text-primary flex items-center gap-1">
-                  <Coins className="w-4 h-4" /> {episodePurchaseModal.price} kredit
+                  <Coins className="w-4 h-4" /> {episodePurchaseModal.price} credits
                 </span>
               </div>
               <div className="flex items-center justify-between text-sm">
                 <span className="text-muted-foreground">Sizda</span>
                 <span className={`font-bold ${(user?.credits ?? 0) >= episodePurchaseModal.price ? "text-emerald-500" : "text-rose-500"}`}>
-                  {user?.credits ?? 0} kredit
+                  {user?.credits ?? 0} credits
                 </span>
               </div>
               {(user?.credits ?? 0) < episodePurchaseModal.price && (
                 <p className="text-xs text-rose-500 font-medium pt-1">
-                  ⚠️ Kredit yetarli emas. Yana {episodePurchaseModal.price - (user?.credits ?? 0)} kredit kerak.
+                  ⚠️ Not enough credits. You need {episodePurchaseModal.price - (user?.credits ?? 0)} more.
                 </p>
               )}
             </div>
@@ -1006,14 +1006,14 @@ export function DetailView() {
                 onClick={() => setEpisodePurchaseModal(null)}
                 disabled={episodeBuying}
               >
-                Bekor qilish
+                Cancel
               </Button>
               {(user?.credits ?? 0) < episodePurchaseModal.price ? (
                 <Button
                   className="flex-1 rounded-2xl h-11 brand-gradient text-white font-bold"
                   onClick={() => { setEpisodePurchaseModal(null); setShowCreditModal(true); }}
                 >
-                  <Coins className="w-4 h-4 mr-1.5" /> Kredit olish
+                  <Coins className="w-4 h-4 mr-1.5" /> Get credits
                 </Button>
               ) : (
                 <Button
@@ -1022,9 +1022,9 @@ export function DetailView() {
                   disabled={episodeBuying}
                 >
                   {episodeBuying ? (
-                    <><Loader2 className="w-4 h-4 mr-1.5 animate-spin" /> Sotib olinmoqda...</>
+                    <><Loader2 className="w-4 h-4 mr-1.5 animate-spin" /> Purchasing...</>
                   ) : (
-                    <><ShoppingCart className="w-4 h-4 mr-1.5" /> Sotib olish</>
+                    <><ShoppingCart className="w-4 h-4 mr-1.5" /> Buy</>
                   )}
                 </Button>
               )}

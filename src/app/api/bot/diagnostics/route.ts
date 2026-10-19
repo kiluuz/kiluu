@@ -83,12 +83,12 @@ export async function GET() {
 
   let diagnosis = "";
   if (isServerOnline && isApiKeyValid) {
-    diagnosis = "Hammasi to'g'ri sozlangan va ishlamoqda! ✅";
+    diagnosis = "Everything is configured correctly and working! ✅";
   } else if (isServerOnline && !isApiKeyValid) {
     diagnosis =
-      "Bot serveri (Render) online ishlamoqda, lekin X-API-Key noto'g'ri. Render dagi loyihangiz Environment Variables bo'limidagi API_KEY ni tekshiring.";
+      "The bot server (Render) is online, but the X-API-Key is invalid. Check API_KEY under Environment Variables in your Render project.";
   } else {
-    diagnosis = "Bot serveri (Render) offline yoki qotib qolgan.";
+    diagnosis = "The bot server (Render) is offline or unresponsive.";
   }
 
   return NextResponse.json({

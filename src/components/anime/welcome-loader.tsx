@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { Logo } from "./logo";
 import "./welcome-loader.css";
 
-/* ============ DUBANIX WELCOME PRELOADER — exact port of the reference ============
+/* ============ KILUU WELCOME PRELOADER ============
  * Full-screen white overlay above everything; the word "Welcome" cycles through
  * 8 languages, each in its own typeface, with an orange -> violet -> teal
  * gradient. Letter-by-letter rise/fall (blur-to-sharp + 3D rotateX) for
@@ -13,8 +13,7 @@ import "./welcome-loader.css";
  *
  * Shown once per page load (sessionStorage flag, cleared on pagehide so a
  * hard refresh re-shows it, while in-app navigation never does).
- * Dismissed when the app is ready — but never before the first word has
- * finished animating in (min display ~1.2s).
+ * The full multilingual welcome finishes within two seconds.
  */
 
 const WL_FLAG = "dubanix-welcome-shown";
@@ -38,10 +37,11 @@ const WL_LANGS: WLLang[] = [
   { t: "Кош келиңиз", f: "var(--font-ptserif), 'PT Serif', serif", s: 0.86, w: 400 },
 ];
 
-const HOLD = 1500;                       /* each word stays ~1.5s */
-const TOTAL = HOLD * WL_LANGS.length + 400;
-const MIN_DISPLAY = 1200;                /* never hide before the first word finished animating in */
-const FADE_MS = 500;
+const HOLD = 200;
+const TOTAL = HOLD * WL_LANGS.length;
+const MIN_DISPLAY = TOTAL;
+const HARD_DISPLAY = 1750;
+const FADE_MS = 250;
 
 export function WelcomeLoader({ appReady }: { appReady: boolean }) {
   const [mounted, setMounted] = useState(false);
@@ -83,11 +83,11 @@ export function WelcomeLoader({ appReady }: { appReady: boolean }) {
     document.body.style.overflow = "hidden";
 
     let idx = 0;
-    let startAt = performance.now();
+    const startAt = performance.now();
     let cycleTimer: ReturnType<typeof setInterval> | undefined;
     let swapTimer: ReturnType<typeof setTimeout> | undefined;
     let raf = 0;
-    let pollTimer: ReturnType<typeof setInterval> | undefined;
+    let readinessTimer: ReturnType<typeof setInterval> | undefined;
     let fadeTimer: ReturnType<typeof setTimeout> | undefined;
     let hardTimeout: ReturnType<typeof setTimeout> | undefined;
     let dismissed = false;
@@ -107,7 +107,7 @@ export function WelcomeLoader({ appReady }: { appReady: boolean }) {
         s.style.setProperty("--i", String(k));
         s.style.fontSize = `calc(clamp(44px, 10.5vw, 128px) * ${d.s})`;
         s.textContent = parts[k] === " " ? "\u00a0" : parts[k];
-        if (d.whole) s.style.animationDuration = ".8s";
+        if (d.whole) s.style.animationDuration = ".08s";
         word.appendChild(s);
       }
       void word.offsetWidth; /* restart animations */
@@ -122,7 +122,7 @@ export function WelcomeLoader({ appReady }: { appReady: boolean }) {
       swapTimer = setTimeout(() => {
         idx = (idx + 1) % WL_LANGS.length;
         show(idx);
-      }, 450);
+      }, 80);
     }
 
     /* ---- reference tick(): eased progress line ---- */
@@ -141,7 +141,7 @@ export function WelcomeLoader({ appReady }: { appReady: boolean }) {
       if (hardTimeout) clearTimeout(hardTimeout);
       if (cycleTimer) clearInterval(cycleTimer);
       if (swapTimer) clearTimeout(swapTimer);
-      if (pollTimer) clearInterval(pollTimer);
+      if (readinessTimer) clearInterval(readinessTimer);
       cancelAnimationFrame(raf);
       setFading(true);
       fadeTimer = setTimeout(() => {
@@ -155,13 +155,13 @@ export function WelcomeLoader({ appReady }: { appReady: boolean }) {
     cycleTimer = setInterval(next, HOLD);
     tick();
 
-    /* Hard safety timeout: dismiss after 3.5s no matter what */
-    hardTimeout = setTimeout(dismiss, 3500);
+    /* Keep the welcome screen, including its fade, within two seconds. */
+    hardTimeout = setTimeout(dismiss, HARD_DISPLAY);
 
     /* Poll: dismiss when app is ready and minimum display has elapsed */
-    pollTimer = setInterval(() => {
+    readinessTimer = setInterval(() => {
       const elapsed = performance.now() - startAt;
-      if (elapsed >= 3500 || (readyRef.current && elapsed >= MIN_DISPLAY)) {
+      if (readyRef.current && elapsed >= MIN_DISPLAY) {
         dismiss();
       }
     }, 100);
@@ -170,7 +170,7 @@ export function WelcomeLoader({ appReady }: { appReady: boolean }) {
       if (hardTimeout) clearTimeout(hardTimeout);
       if (cycleTimer) clearInterval(cycleTimer);
       if (swapTimer) clearTimeout(swapTimer);
-      if (pollTimer) clearInterval(pollTimer);
+      if (readinessTimer) clearInterval(readinessTimer);
       if (fadeTimer) clearTimeout(fadeTimer);
       cancelAnimationFrame(raf);
       document.body.style.overflow = prevOverflow;
@@ -196,7 +196,7 @@ export function WelcomeLoader({ appReady }: { appReady: boolean }) {
     <div
       className={`wl-root${fading ? " wl-fading" : ""}`}
       role="status"
-      aria-label="Loading DubAniX (bosib o'tkazib yuborish mumkin)"
+      aria-label="Loading Kiluu (click to skip)"
       aria-live="polite"
       onClick={() => {
         setFading(true);
@@ -208,8 +208,8 @@ export function WelcomeLoader({ appReady }: { appReady: boolean }) {
       <div className="wl-blob wl-b3" aria-hidden="true" />
 
       <div className="wl-stack">
-        {/* DubAniX brand intro — mark scales in, bars grow, wordmark letters rise, then idle */}
-        <Logo variant="full" theme="light" size={34} state="intro" aria-label="DubAniX" />
+        {/* Kiluu brand intro — mark and wordmark animate in. */}
+        <Logo variant="full" theme="light" size={34} state="intro" aria-label="Kiluu" />
         <div className="wl-stage">
           <div className="wl-word" ref={wordRef} />
         </div>

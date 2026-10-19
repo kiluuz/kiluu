@@ -22,7 +22,7 @@ export async function POST(req: NextRequest) {
     const { anime_slug } = body as { anime_slug?: string };
 
     if (!anime_slug || !/^[a-z0-9_-]+$/i.test(anime_slug)) {
-      return NextResponse.json({ error: "anime_slug noto'g'ri" }, { status: 400 });
+      return NextResponse.json({ error: "Invalid anime_slug" }, { status: 400 });
     }
 
     // ── Verify anime exists and get price from Bot API (never trust client) ──
@@ -50,16 +50,16 @@ export async function POST(req: NextRequest) {
           title: localAnime.title,
         };
       } else {
-        return NextResponse.json({ error: "Anime katalogda topilmadi" }, { status: 404 });
+        return NextResponse.json({ error: "Anime not found in the catalog" }, { status: 404 });
       }
     }
 
     if (!botAnime?.is_active) {
-      return NextResponse.json({ error: "Anime hozirda mavjud emas" }, { status: 400 });
+      return NextResponse.json({ error: "Anime is currently unavailable" }, { status: 400 });
     }
 
     if (typeof botAnime.price !== "number" || botAnime.price < 0) {
-      return NextResponse.json({ error: "Narx noto'g'ri" }, { status: 400 });
+      return NextResponse.json({ error: "Invalid price" }, { status: 400 });
     }
 
     // ── Check if user has linked their Telegram account with the bot ───────
@@ -71,7 +71,7 @@ export async function POST(req: NextRequest) {
     if (!userStatus?.linked) {
       return NextResponse.json(
         {
-          error: "Telegram hisobingiz hali ulanmagan! Avval «Botni ulash» orqali Telegram akkauntingizni ulang.",
+          error: "Your Telegram account is not connected. Connect your Telegram account first.",
           needsLink: true,
         },
         { status: 400 }
@@ -121,8 +121,8 @@ export async function POST(req: NextRequest) {
       return NextResponse.json(
         {
           error: isNotLinked
-            ? "Telegram hisobingiz ulanmagan. Avval «Botni ulash» tugmasini bosing."
-            : `Invoice yaratishda xatolik: ${err?.message || "Bot javob bermayapti"}`,
+            ? "Your Telegram account is not connected. Connect it before continuing."
+            : `Could not create the invoice: ${err?.message || "The bot is not responding"}`,
           needsLink: isNotLinked,
         },
         { status: 503 }

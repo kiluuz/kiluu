@@ -60,7 +60,7 @@ export function SettingsView() {
           ))}
         </div>
         <p className="text-[11px] text-muted-foreground mt-3">
-          DubAniX looks best in dark mode — but light mode is here when you need it ☀️
+          Kiluu looks best in dark mode — but light mode is here when you need it ☀️
         </p>
       </section>
 
@@ -104,11 +104,11 @@ export function SettingsView() {
       {/* About */}
       <section className="glass rounded-2xl p-5">
         <h2 className="font-bold text-sm flex items-center gap-2 mb-3">
-          <Info className="w-4 h-4 text-primary" /> About DubAniX
+          <Info className="w-4 h-4 text-primary" /> About Kiluu
         </h2>
         <div className="space-y-2 text-xs text-muted-foreground leading-relaxed">
           <p>
-            DubAniX is a premium anime streaming universe — watch free and purchased animes,
+            Kiluu is a premium anime streaming universe — watch free and purchased animes,
             collect credits, send gifts, and host synced watch parties.
           </p>
           <p className="flex items-center gap-1.5">

@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useQueries, useQueryClient } from "@tanstack/react-query";
-import { Users, Send, Flame, Trophy, UserCheck, Bell, Check } from "lucide-react";
+import { Users, Send, Flame, Trophy, UserCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -39,10 +39,6 @@ export function CommunityView() {
   const [cursor, setCursor] = useState<string | null>(null);
   const [loadingMore, setLoadingMore] = useState(false);
   const [stats, setStats] = useState<CommunityStats | null>(null);
-  const [notifications, setNotifications] = useState<{ id: string; type: string; title: string; body: string; readAt: string | null; createdAt: string }[]>([]);
-  const [unreadNotifications, setUnreadNotifications] = useState(0);
-  const [notificationsUserId, setNotificationsUserId] = useState<string | null>(null);
-  const [showNotifications, setShowNotifications] = useState(false);
   const [animes, setAnimes] = useState<AnimeSummary[]>([]);
   const [openComments, setOpenComments] = useState<Record<string, boolean>>({});
   const [commentInputs, setCommentInputs] = useState<Record<string, string>>({});
@@ -177,25 +173,6 @@ export function CommunityView() {
     const timer = window.setInterval(load, 30_000);
     return () => { alive = false; window.clearInterval(timer); };
   }, []);
-
-  useEffect(() => {
-    if (!user) return;
-    let alive = true;
-    const load = () => fetch("/api/community/notifications", { cache: "no-store" })
-      .then(async (response) => {
-        const data = await response.json();
-        if (!response.ok) throw new Error(data.error || "Could not load notifications");
-        if (alive) {
-          setNotifications(data.notifications || []);
-          setUnreadNotifications(data.unread || 0);
-          setNotificationsUserId(user.id);
-        }
-      })
-      .catch(() => { if (alive) toast.error("Could not load notifications"); });
-    void load();
-    const timer = window.setInterval(load, 20_000);
-    return () => { alive = false; window.clearInterval(timer); };
-  }, [user]);
 
   useEffect(() => {
     if (!user) return;
@@ -455,24 +432,6 @@ export function CommunityView() {
     toast.success("Post deleted");
   }
 
-  async function markNotificationRead(id?: string) {
-    try {
-      const response = await fetch("/api/community/notifications", {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(id ? { id } : { all: true }),
-      });
-      const data = await response.json();
-      if (!response.ok) throw new Error(data.error || "Could not update notification");
-      setNotifications((previous) => previous.map((item) => id && item.id !== id ? item : { ...item, readAt: new Date().toISOString() }));
-      setUnreadNotifications((count) => id ? Math.max(0, count - 1) : 0);
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Could not update notification");
-    }
-  }
-
-  const visibleNotifications = notificationsUserId === user?.id ? notifications : [];
-  const visibleUnreadCount = notificationsUserId === user?.id ? unreadNotifications : 0;
   const visibleModerationReports =
     user?.role === "ADMIN" && moderationUserId === user.id ? moderationReports : null;
 
@@ -513,30 +472,6 @@ export function CommunityView() {
             {stats && <div className="flex flex-col"><span className="text-muted-foreground">Online</span><span>{stats.online}</span></div>}
             {stats && <div className="w-px h-6 bg-border" />}
             <div className="flex flex-col"><span className="text-muted-foreground">Posts Today</span><span>{stats?.postsToday ?? "—"}</span></div>
-          </div>
-          <div className="relative">
-            <Button variant="outline" size="icon" aria-label="Notifications" onClick={() => setShowNotifications((open) => !open)}>
-              <Bell className="w-4 h-4" />
-              {visibleUnreadCount > 0 && <span className="absolute -right-1 -top-1 min-w-5 h-5 rounded-full bg-primary px-1 text-[10px] font-bold leading-5 text-white">{visibleUnreadCount}</span>}
-            </Button>
-            {showNotifications && (
-              <div className="absolute right-0 top-12 z-30 w-80 max-h-96 overflow-y-auto rounded-2xl border bg-background p-3 shadow-xl">
-                <div className="flex items-center justify-between p-2">
-                  <strong className="text-sm">Notifications</strong>
-                  {visibleUnreadCount > 0 && <button onClick={() => markNotificationRead()} className="text-xs text-primary">Mark all read</button>}
-                </div>
-                {!visibleNotifications.length ? <p className="p-3 text-xs text-muted-foreground">{user ? "No notifications yet." : "Sign in to see notifications."}</p> : visibleNotifications.map((notification) => (
-                  <button
-                    key={notification.id}
-                    onClick={() => notification.readAt ? undefined : markNotificationRead(notification.id)}
-                    className={cn("block w-full rounded-xl p-3 text-left text-xs hover:bg-secondary/50", !notification.readAt && "bg-primary/5")}
-                  >
-                    <span className="font-bold">{notification.title}</span>
-                    <span className="mt-1 block text-muted-foreground">{notification.body}</span>
-                  </button>
-                ))}
-              </div>
-            )}
           </div>
         </div>
       </div>

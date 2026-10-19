@@ -7,6 +7,7 @@ import { canDeleteCommunityPost, COMMUNITY_CATEGORIES } from "@/lib/community";
 import { rateLimit } from "@/lib/rate-limit";
 import { sanitizeText } from "@/lib/sanitize";
 import { getXpTotal, levelFromXp } from "@/lib/xp";
+import { isVerifiedByFollowerCount } from "@/lib/verification";
 
 export async function GET(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -30,13 +31,17 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
   if (!post) return NextResponse.json({ error: "Post not found" }, { status: 404 });
   const xpTotal = await getXpTotal(post.userId);
   const viewer = await getCurrentUser();
-  const [liked, bookmarked, following] = viewer && viewer.id !== post.userId
-    ? await Promise.all([
+  const [viewerCounts, followerCount] = await Promise.all([
+    viewer && viewer.id !== post.userId
+      ? Promise.all([
         db.postLike.count({ where: { userId: viewer.id, postId: id } }),
         db.postBookmark.count({ where: { userId: viewer.id, postId: id } }),
         db.follow.count({ where: { followerId: viewer.id, followedId: post.userId } }),
-      ])
-    : [0, 0, 0];
+      ]).then((counts) => counts)
+      : Promise.resolve([0, 0, 0] as const),
+    db.follow.count({ where: { followedId: post.userId } }),
+  ]);
+  const [liked, bookmarked, following] = viewerCounts;
   return NextResponse.json({
     post: {
       ...post,
@@ -49,6 +54,7 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
       bookmarked: bookmarked > 0,
       user: {
         ...post.user,
+        isVerified: isVerifiedByFollowerCount(followerCount),
         level: levelFromXp(xpTotal).level,
         following: following > 0,
       },

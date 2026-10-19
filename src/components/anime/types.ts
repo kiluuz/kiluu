@@ -132,6 +132,7 @@ export interface AnimeDetail extends AnimeSummary {
     avatarUrl: string | null;
     accentColor: string;
     role: string;
+    isVerified?: boolean;
   } | null;
   versions?: AnimeVersionCard[];
 }
@@ -181,6 +182,7 @@ export interface CommunityPost {
     avatarUrl: string | null;
     accentColor: string;
     role: string;
+    isVerified?: boolean;
     level?: number;
     following?: boolean;
     badges?: { id: string; label: string; color: string; glow?: boolean }[];
@@ -254,6 +256,7 @@ export interface PublicProfile {
   username: string;
   displayName: string | null;
   role: string;
+  isVerified?: boolean;
   avatarUrl: string | null;
   bannerUrl: string | null;
   bio: string | null;

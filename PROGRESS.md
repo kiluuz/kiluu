@@ -233,3 +233,22 @@ Shartlar bo‘yicha: ma’lumotlar DB dan keladi; profil o‘zgarishlari saqlana
 - `.env.example` contains empty credential placeholders. R2 and Cloudflare Stream secret values previously present in that sample were removed; rotate those keys before production use.
 - Verification: `npm test` — 34 passed, including R2 HLS URL validation, Worker signature/playlist rewriting, and transactional/idempotent party-credit debit. `npx tsc --noEmit`, targeted ESLint, `npx prisma validate`, JavaScript syntax checks, and `git diff --check` passed.
 - Deployment is still pending: no R2 endpoint was contacted, the Cloudflare Worker has not been deployed or bound to the future `.uz` media domain, and the new Prisma migration has not been applied to production.
+
+## Kiluu brendingi, welcome loader va navbar bildirishnomalari (2026-10-18)
+
+- Saytning ko‘rinadigan brend nomlari logotip, sahifa metadata/PWA manifesti, kirish va onboarding, Creator Studio, community qoidalari, sozlamalar, anime ulashish matni, rasmiy anime versiyasi va Stars invoice yuzalarida Kiluu bilan almashtirildi. Eski Telegram bot username’i hamda localStorage kalitlari moslikni saqlash uchun o‘zgartirilmadi.
+- Welcome loader endi 8 ta tilni ketma-ket ko‘rsatadi; app tayyor bo‘lsa kamida to‘liq til aylanishidan keyin yopiladi, tayyor bo‘lmasa ham fade bilan birga ko‘pi bilan 2 soniyada yopiladi.
+- Community sahifasidagi qo‘ng‘iroqcha olib tashlandi. Navbar qo‘ng‘iroqchasi DB notification API’ga ulanib, o‘qilmaganlar soni, bildirishnomalar ro‘yxati va bittasini yoki barchasini o‘qilgan deb belgilashni ko‘rsatadi. API XP `LEVEL_UP` bildirishnomalarini ham qaytaradi; navbar qo‘ng‘iroqchasi kichik ekranlarda ham ko‘rinadi, mobile menu’dagi soxta Alerts tugmasi olib tashlandi.
+- Хувилбарын дараагийн шалгалт: targeted ESLint, TypeScript, тестүүд, `git diff --check` болон локал браузерын welcome/navbar шалгалт.
+
+## Tasdiqlangan belgi chegarasi (2026-10-18)
+
+- Tasdiq belgisi endi server hisoblagan follower soniga bog‘landi: faqat kamida 1 000 followerli profil, community posti va anime creatorida ko‘rinadi. Followerlar ro‘yxati maxfiy bo‘lsa ham, mezon yashirilgan real DB soni bilan baholanadi.
+- Tekshiruv: 999, 1 000 va 1 001 chegaraviy testi qo‘shildi; `npm test` — 38 ta test o‘tdi, `npx tsc --noEmit`, o‘zgargan fayllar ESLint’i va `git diff --check` muvaffaqiyatli.
+
+## Til tanlovi, English matnlari va mobil dock (2026-10-18)
+
+- Mavzuni almashtirgandagi `Theme: dark/light/system` toast olib tashlandi. Til tanlovi endi i18n provider’ni o‘zgartiradi, localStorage’da saqlanadi va HTML `lang` atributini yangilaydi; “full translation coming soon” toast yo‘q qilindi.
+- Til lug‘atlari uz/en/ru/kk/ky uchun kengaytirildi; profil bo‘limlari, nav elementlari va guruh nomlari tanlangan tilga ulandi. Inglizcha interfeysda topilgan o‘zbekcha communityga tegishli bo‘lmagan website/API matnlari inglizchalashtirildi.
+- Mobil pastki dock’dagi My Library o‘rniga Community tab qo‘yildi; Library menu orqali saqlanib qoldi.
+- i18n smoke test qo‘shildi. Yakuniy tekshiruv: `npm test` — 39/39 o‘tdi; `npx tsc --noEmit`, tarjima/navigatsiya fayllari ESLint’i, locale JSON parse va `git diff --check` muvaffaqiyatli. Kengroq ESLint tanlangan eski fayllardagi avvaldan mavjud React effect/immutability qoidalarini ham ko‘rsatadi.

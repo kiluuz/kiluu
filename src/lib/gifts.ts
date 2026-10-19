@@ -4,6 +4,7 @@ import { awardXpInTransaction } from "./xp";
 import { evaluateAchievements } from "./achievements";
 import { grantPurchase } from "./bot-api";
 import { officialVersionId, userOwnsVersion } from "./owns";
+import { sendGiftNotificationEmail } from "./email";
 
 export function giftExpiryDate(from = new Date()) {
   const d = new Date(from);
@@ -157,6 +158,38 @@ export async function sendGift(opts: {
   if (version.creatorId && version.creatorId !== sender.id) {
     await evaluateAchievements(version.creatorId);
   }
+
+  // Recipient ga notification va email yuborish
+  if (recipient) {
+    try {
+      await db.notification.create({
+        data: {
+          userId: recipient.id,
+          type: "gift_received",
+          title: "Sizga sovg'a keldi! 🎁",
+          body: `@${sender.username} sizga "${anime.title}" animeni sovg'a qildi`,
+          dataJson: JSON.stringify({
+            giftId: gift.id,
+            animeId: anime.id,
+            animeSlug: anime.slug,
+            animeTitle: anime.title,
+            senderUsername: sender.username,
+          }),
+        },
+      });
+      // Email ham yuboramiz (background, xato bo'lsa bloklmasin)
+      sendGiftNotificationEmail({
+        to: recipient.email,
+        recipientUsername: recipient.username,
+        senderUsername: sender.username,
+        animeTitle: anime.title,
+        message: opts.message,
+      }).catch((err) => console.error("Gift email failed:", err));
+    } catch (err) {
+      console.error("Gift notification failed:", err);
+    }
+  }
+
   return gift;
 }
 
