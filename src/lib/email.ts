@@ -1,30 +1,39 @@
 // src/lib/email.ts
-// Brevo (Sendinblue) SMTP orqali email yuborish
-// Bepul: 300 email/kun, domen tasdiqsiz (faqat sender email tasdiqlash kerak)
-
-import nodemailer from "nodemailer";
+// Brevo HTTP API orqali email yuborish (SMTP emas)
+// Bepul: 300 email/kun, BREVO_API_KEY env kerak
 
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || "https://kiluu.vercel.app";
+const BREVO_API_KEY = process.env.BREVO_API_KEY;
+const SENDER_EMAIL = process.env.BREVO_SENDER_EMAIL || "kiluusupport@gmail.com";
+const SENDER_NAME = "Kiluu";
 
-// Email yuborish imkoniyati bormi?
 export function isEmailEnabled(): boolean {
-  return !!(process.env.BREVO_SMTP_USER && process.env.BREVO_SMTP_KEY);
+  return !!BREVO_API_KEY;
 }
 
-function createTransport() {
-  const user = process.env.BREVO_SMTP_USER; // Brevo accaunt emailingiz
-  const pass = process.env.BREVO_SMTP_KEY;  // Brevo SMTP Key (parol emas!)
-  if (!user || !pass) return null;
-  return nodemailer.createTransport({
-    host: "smtp-relay.brevo.com",
-    port: 587,
-    secure: false,
-    auth: { user, pass },
+async function sendBrevoEmail(opts: {
+  to: string;
+  subject: string;
+  html: string;
+}): Promise<void> {
+  const res = await fetch("https://api.brevo.com/v3/smtp/email", {
+    method: "POST",
+    headers: {
+      "api-key": BREVO_API_KEY!,
+      "Content-Type": "application/json",
+      "accept": "application/json",
+    },
+    body: JSON.stringify({
+      sender: { name: SENDER_NAME, email: SENDER_EMAIL },
+      to: [{ email: opts.to }],
+      subject: opts.subject,
+      htmlContent: opts.html,
+    }),
   });
-}
-
-function getFromEmail(): string {
-  return process.env.EMAIL_FROM || `Kiluu <${process.env.BREVO_SMTP_USER}>`;
+  if (!res.ok) {
+    const err = await res.text();
+    throw new Error(`Brevo API error: ${err}`);
+  }
 }
 
 export async function sendVerificationEmail(opts: {
@@ -32,8 +41,7 @@ export async function sendVerificationEmail(opts: {
   username: string;
   code: string;
 }): Promise<void> {
-  const transport = createTransport();
-  if (!transport) {
+  if (!BREVO_API_KEY) {
     console.log(`[EMAIL DEV] OTP for ${opts.to}: ${opts.code}`);
     return;
   }
@@ -76,8 +84,7 @@ export async function sendVerificationEmail(opts: {
 </body>
 </html>`;
 
-  await transport.sendMail({
-    from: getFromEmail(),
+  await sendBrevoEmail({
     to: opts.to,
     subject: `${opts.code} — Kiluu email tasdiqlash`,
     html,
@@ -91,8 +98,7 @@ export async function sendGiftNotificationEmail(opts: {
   animeTitle: string;
   message?: string | null;
 }): Promise<void> {
-  const transport = createTransport();
-  if (!transport) {
+  if (!BREVO_API_KEY) {
     console.log(`[EMAIL DEV] Gift: ${opts.senderUsername} -> ${opts.to}: ${opts.animeTitle}`);
     return;
   }
@@ -129,8 +135,7 @@ export async function sendGiftNotificationEmail(opts: {
 </body>
 </html>`;
 
-  await transport.sendMail({
-    from: getFromEmail(),
+  await sendBrevoEmail({
     to: opts.to,
     subject: `🎁 @${opts.senderUsername} sizga "${opts.animeTitle}" sovg'a qildi — Kiluu`,
     html,
