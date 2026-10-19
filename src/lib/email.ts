@@ -141,3 +141,64 @@ export async function sendGiftNotificationEmail(opts: {
     html,
   }).catch((err) => console.error("Gift email failed:", err));
 }
+
+export async function sendNewAnimeEmail(opts: {
+  to: string;
+  username: string;
+  animeTitle: string;
+  animeSlug: string;
+  coverImage?: string | null;
+  kind?: string; // 'new_anime' | 'new_version'
+}): Promise<void> {
+  if (!BREVO_API_KEY) {
+    console.log(`[EMAIL DEV] New anime notify: ${opts.animeTitle} → ${opts.to}`);
+    return;
+  }
+
+  const animeUrl = `${SITE_URL}/anime/${opts.animeSlug}`;
+  const isNewVersion = opts.kind === "new_version";
+  const headline = isNewVersion
+    ? `"${opts.animeTitle}" uchun yangi versiya chiqdi!`
+    : `"${opts.animeTitle}" Kiluu da paydo bo'ldi!`;
+  const subtext = isNewVersion
+    ? `Siz kuzatayotgan anime yangi dublyaj versiyasiga ega bo'ldi.`
+    : `Siz kuzatayotgan anime endi platforma'da mavjud. Tomosha qiling!`;
+
+  const html = `
+<!DOCTYPE html>
+<html lang="uz">
+<head><meta charset="UTF-8"><title>${opts.animeTitle} — Kiluu</title></head>
+<body style="margin:0;padding:0;background:#0f0f0f;font-family:'Segoe UI',Arial,sans-serif;">
+  <div style="max-width:480px;margin:40px auto;background:#1a1a1a;border-radius:16px;overflow:hidden;border:1px solid #2a2a2a;">
+    <div style="background:linear-gradient(135deg,#f97316,#ef4444);padding:32px;text-align:center;">
+      <h1 style="color:#fff;margin:0;font-size:28px;font-weight:800;">Kiluu</h1>
+      <p style="color:rgba(255,255,255,0.85);margin:8px 0 0;font-size:13px;">Anime streaming platform</p>
+    </div>
+    ${opts.coverImage ? `<div style="text-align:center;background:#111;padding:20px 0;">
+      <img src="${opts.coverImage}" alt="${opts.animeTitle}" style="width:120px;height:160px;object-fit:cover;border-radius:10px;border:2px solid #f97316;" />
+    </div>` : ""}
+    <div style="padding:32px;">
+      <div style="text-align:center;margin-bottom:8px;font-size:28px;">${isNewVersion ? "🎬" : "✨"}</div>
+      <h2 style="color:#fff;margin:0 0 12px;font-size:20px;font-weight:700;text-align:center;">${headline}</h2>
+      <p style="color:#aaa;margin:0 0 24px;font-size:14px;line-height:1.6;text-align:center;">${subtext}</p>
+      <div style="text-align:center;">
+        <a href="${animeUrl}" style="display:inline-block;background:linear-gradient(135deg,#f97316,#ef4444);color:#fff;text-decoration:none;padding:14px 36px;border-radius:10px;font-weight:700;font-size:15px;">
+          Tomosha qilish →
+        </a>
+      </div>
+    </div>
+    <div style="padding:20px 32px;border-top:1px solid #2a2a2a;text-align:center;">
+      <p style="color:#444;margin:0;font-size:11px;">
+        © 2025 Kiluu • <a href="${SITE_URL}/settings" style="color:#666;text-decoration:none;">Bildirishnomalarni boshqarish</a>
+      </p>
+    </div>
+  </div>
+</body>
+</html>`;
+
+  await sendBrevoEmail({
+    to: opts.to,
+    subject: `${isNewVersion ? "🎬" : "✨"} ${headline} — Kiluu`,
+    html,
+  }).catch((err) => console.error("New anime email failed:", err));
+}

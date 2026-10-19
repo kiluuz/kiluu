@@ -114,11 +114,18 @@ export function LoginView() {
         toast.error(data.error || "Registration failed");
         return;
       }
-      // OTP bosqichiga o'tish
-      setOtpStep({ email });
-      setOtpCode("");
-      setResendCooldown(60);
-      toast.success("Tasdiqlash kodi emailingizga yuborildi!");
+      if (data.requiresVerification) {
+        // OTP bosqichiga o'tish
+        setOtpStep({ email });
+        setOtpCode("");
+        setResendCooldown(60);
+        toast.success("Tasdiqlash kodi emailingizga yuborildi!");
+      } else if (data.user) {
+        // Email sozlanmagan — to'g'ridan-to'g'ri kirish
+        setUser(data.user as AuthUser);
+        toast.success("Akkount yaratildi! Kiluu ga xush kelibsiz ✦");
+        navigate("home");
+      }
     } catch {
       toast.error("Network error. Please try again.");
     } finally {
