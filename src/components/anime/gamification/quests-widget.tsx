@@ -21,9 +21,11 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useAppStore } from "../store";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import { useI18n } from "@/components/i18n-provider";
 
 interface QuestItem {
   id: string;
+  key?: string;
   title: string;
   description?: string;
   category: string;
@@ -45,8 +47,47 @@ interface StreakStatus {
   daysToNextMilestone: number;
 }
 
+function getLocalizedQuest(q: QuestItem, t: (key: string, values?: Record<string, string | number>) => string) {
+  const map: Record<string, { titleKey: string; descKey: string }> = {
+    "Watch 1 episode": { titleKey: "quests.template.watch_1.title", descKey: "quests.template.watch_1.desc" },
+    "1 ta epizod tomosha qil": { titleKey: "quests.template.watch_1.title", descKey: "quests.template.watch_1.desc" },
+    "Join the conversation": { titleKey: "quests.template.chat_5.title", descKey: "quests.template.chat_5.desc" },
+    "Chatda 5 ta xabar yoz": { titleKey: "quests.template.chat_5.title", descKey: "quests.template.chat_5.desc" },
+    "Leave a comment": { titleKey: "quests.template.comment_1.title", descKey: "quests.template.comment_1.desc" },
+    "Postga fikr bildir": { titleKey: "quests.template.comment_1.title", descKey: "quests.template.comment_1.desc" },
+    "Spread the love": { titleKey: "quests.template.like_3.title", descKey: "quests.template.like_3.desc" },
+    "3 ta postga like bos": { titleKey: "quests.template.like_3.title", descKey: "quests.template.like_3.desc" },
+    "Daily Login": { titleKey: "quests.template.login_1.title", descKey: "quests.template.login_1.desc" },
+    "Kunlik kirish mukofotini ol": { titleKey: "quests.template.login_1.title", descKey: "quests.template.login_1.desc" },
+    "Rate an Anime": { titleKey: "quests.template.rate_1.title", descKey: "quests.template.rate_1.desc" },
+    "Animega real baho ber": { titleKey: "quests.template.rate_1.title", descKey: "quests.template.rate_1.desc" },
+    "Vote in Weekly Poll": { titleKey: "quests.template.poll_1.title", descKey: "quests.template.poll_1.desc" },
+    "Hafta animesiga ovoz ber": { titleKey: "quests.template.poll_1.title", descKey: "quests.template.poll_1.desc" },
+    "Anime Marathon": { titleKey: "quests.template.marathon_10.title", descKey: "quests.template.marathon_10.desc" },
+    "Haftalik marafon: 10 ta epizod": { titleKey: "quests.template.marathon_10.title", descKey: "quests.template.marathon_10.desc" },
+    "Community Star": { titleKey: "quests.template.community_2.title", descKey: "quests.template.community_2.desc" },
+    "Jamoat yulduzi: 2 ta post yarat": { titleKey: "quests.template.community_2.title", descKey: "quests.template.community_2.desc" },
+    "Generous Soul": { titleKey: "quests.template.gift_1.title", descKey: "quests.template.gift_1.desc" },
+    "Do'stingga sovg'a yubor": { titleKey: "quests.template.gift_1.title", descKey: "quests.template.gift_1.desc" },
+    "Invite a Friend": { titleKey: "quests.template.referral_1.title", descKey: "quests.template.referral_1.desc" },
+    "Do'stingni taklif qil": { titleKey: "quests.template.referral_1.title", descKey: "quests.template.referral_1.desc" },
+  };
+
+  const lookup = (q.key && map[q.key]) || map[q.title];
+  if (lookup) {
+    const title = t(lookup.titleKey);
+    const desc = t(lookup.descKey);
+    return {
+      title: title !== lookup.titleKey ? title : q.title,
+      description: desc !== lookup.descKey ? desc : (q.description || ""),
+    };
+  }
+  return { title: q.title, description: q.description || "" };
+}
+
 export function QuestsWidget({ compact = false }: { compact?: boolean }) {
   const { user, setAuthOpen } = useAppStore();
+  const { t } = useI18n();
 
   const [streak, setStreak] = useState<StreakStatus | null>(null);
   const [dailyQuests, setDailyQuests] = useState<QuestItem[]>([]);
@@ -96,7 +137,7 @@ export function QuestsWidget({ compact = false }: { compact?: boolean }) {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error);
 
-      toast.success(data.message || "Kunlik mukofot qabul qilindi!");
+      toast.success(t("quests.streakSuccess"));
       fetchData();
     } catch (e: any) {
       toast.error(e.message || "Xatolik yuz berdi");
@@ -117,7 +158,7 @@ export function QuestsWidget({ compact = false }: { compact?: boolean }) {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error);
 
-      toast.success(data.message || "Vazifa mukofoti berildi!");
+      toast.success(t("quests.claimSuccess"));
       fetchData();
     } catch (e: any) {
       toast.error(e.message || "Xatolik");
@@ -138,7 +179,7 @@ export function QuestsWidget({ compact = false }: { compact?: boolean }) {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error);
 
-      toast.info(data.message || "Vazifa yangilandi");
+      toast.info(t("quests.rerollSuccess"));
       fetchData();
     } catch (e: any) {
       toast.error(e.message || "Xatolik");
@@ -153,12 +194,12 @@ export function QuestsWidget({ compact = false }: { compact?: boolean }) {
         <div className="w-12 h-12 rounded-2xl bg-primary/10 text-primary mx-auto flex items-center justify-center text-2xl">
           🔥
         </div>
-        <h3 className="font-black text-base">Kunlik Vazifalar va Streak</h3>
+        <h3 className="font-black text-base">{t("quests.title")}</h3>
         <p className="text-xs text-muted-foreground">
-          Har kuni kirib mukofotlar oling, vazifalarni bajaring va darajangizni oshiring!
+          {t("quests.empty")}
         </p>
         <Button onClick={() => setAuthOpen(true)} className="rounded-xl font-bold text-xs">
-          Hisobga kirish
+          {t("quests.signIn")}
         </Button>
       </div>
     );
@@ -177,7 +218,7 @@ export function QuestsWidget({ compact = false }: { compact?: boolean }) {
           <div>
             <div className="flex items-center gap-2">
               <h4 className="font-black text-base flex items-center gap-1.5">
-                {streak?.streakCount || 0} Kunlik Streak
+                {t("quests.streak", { count: streak?.streakCount || 0 })}
               </h4>
               {streak && streak.streakFreezeCount > 0 && (
                 <Badge
@@ -191,8 +232,11 @@ export function QuestsWidget({ compact = false }: { compact?: boolean }) {
             </div>
             <p className="text-[11px] text-muted-foreground">
               {streak?.hasClaimedToday
-                ? "Bugungi kirish qayd etildi! Ertaga davom eting."
-                : `Keyingi marra: ${streak?.nextMilestone} kun (${streak?.daysToNextMilestone} kun qoldi)`}
+                ? t("quests.streakClaimedToday")
+                : t("quests.streakNextMilestone", {
+                    milestone: streak?.nextMilestone || 7,
+                    days: streak?.daysToNextMilestone || 7,
+                  })}
             </p>
           </div>
         </div>
@@ -212,11 +256,11 @@ export function QuestsWidget({ compact = false }: { compact?: boolean }) {
             <Loader2 className="w-4 h-4 animate-spin" />
           ) : streak?.hasClaimedToday ? (
             <>
-              <Check className="w-3.5 h-3.5 mr-1" /> Bugun olingan
+              <Check className="w-3.5 h-3.5 mr-1" /> {t("quests.claimedToday")}
             </>
           ) : (
             <>
-              <Sparkles className="w-3.5 h-3.5 mr-1.5" /> Kunlik mukofot
+              <Sparkles className="w-3.5 h-3.5 mr-1.5" /> {t("quests.dailyReward")}
             </>
           )}
         </Button>
@@ -226,16 +270,16 @@ export function QuestsWidget({ compact = false }: { compact?: boolean }) {
       <div className="flex items-center justify-between pt-1">
         <div className="flex items-center gap-2">
           <Trophy className="w-4 h-4 text-primary" />
-          <h3 className="font-black text-sm">Vazifalar</h3>
+          <h3 className="font-black text-sm">{t("quests.title")}</h3>
         </div>
 
         <Tabs value={activeTab} onValueChange={(v: any) => setActiveTab(v)}>
           <TabsList className="h-8 rounded-xl bg-secondary/50 p-0.5 text-xs">
             <TabsTrigger value="daily" className="rounded-lg px-3 text-[11px] font-bold">
-              Kunlik ({dailyQuests.filter((q) => q.status === "completed").length}/{dailyQuests.length})
+              {t("quests.dailyTab")} ({dailyQuests.filter((q) => q.status === "completed").length}/{dailyQuests.length})
             </TabsTrigger>
             <TabsTrigger value="weekly" className="rounded-lg px-3 text-[11px] font-bold">
-              Haftalik ({weeklyQuests.filter((q) => q.status === "completed").length}/{weeklyQuests.length})
+              {t("quests.weeklyTab")} ({weeklyQuests.filter((q) => q.status === "completed").length}/{weeklyQuests.length})
             </TabsTrigger>
           </TabsList>
         </Tabs>
@@ -250,7 +294,7 @@ export function QuestsWidget({ compact = false }: { compact?: boolean }) {
         </div>
       ) : currentQuests.length === 0 ? (
         <div className="text-center py-8 text-muted-foreground text-xs">
-          Hozircha faol vazifalar yo'q
+          {t("quests.empty")}
         </div>
       ) : (
         <div className="space-y-2.5">
@@ -258,6 +302,7 @@ export function QuestsWidget({ compact = false }: { compact?: boolean }) {
             const isCompleted = q.progress >= q.targetCount;
             const isClaimed = q.status === "claimed";
             const pct = Math.min(100, Math.round((q.progress / q.targetCount) * 100));
+            const loc = getLocalizedQuest(q, t);
 
             return (
               <div
@@ -274,16 +319,16 @@ export function QuestsWidget({ compact = false }: { compact?: boolean }) {
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
-                      <h4 className="font-bold text-xs truncate">{q.title}</h4>
+                      <h4 className="font-bold text-xs truncate">{loc.title}</h4>
                       {q.difficulty === "hard" && (
                         <Badge className="text-[9px] h-4 px-1 bg-rose-500/15 text-rose-500 border-rose-500/30">
-                          Qiyin
+                          {t("quests.hard")}
                         </Badge>
                       )}
                     </div>
-                    {q.description && (
+                    {loc.description && (
                       <p className="text-[11px] text-muted-foreground mt-0.5 line-clamp-1">
-                        {q.description}
+                        {loc.description}
                       </p>
                     )}
                   </div>
@@ -320,7 +365,7 @@ export function QuestsWidget({ compact = false }: { compact?: boolean }) {
                 <div className="flex items-center justify-between gap-3 pt-0.5">
                   <div className="flex-1">
                     <div className="flex items-center justify-between text-[10px] text-muted-foreground mb-1">
-                      <span>Progress</span>
+                      <span>{t("quests.progress")}</span>
                       <span className="font-semibold">
                         {q.progress} / {q.targetCount}
                       </span>
@@ -338,7 +383,7 @@ export function QuestsWidget({ compact = false }: { compact?: boolean }) {
 
                   {isClaimed ? (
                     <Badge variant="outline" className="text-[10px] h-6 px-2 text-muted-foreground border-border">
-                      <Check className="w-3 h-3 mr-1" /> Bajarildi
+                      <Check className="w-3 h-3 mr-1" /> {t("quests.claimed")}
                     </Badge>
                   ) : isCompleted ? (
                     <Button
@@ -350,12 +395,12 @@ export function QuestsWidget({ compact = false }: { compact?: boolean }) {
                       {claimingQuestId === q.id ? (
                         <Loader2 className="w-3 h-3 animate-spin" />
                       ) : (
-                        "Qabul qilish"
+                        t("quests.claimReward")
                       )}
                     </Button>
                   ) : (
                     <span className="text-[10px] text-muted-foreground font-semibold shrink-0">
-                      Bajarilmoqda...
+                      {t("quests.inProgress")}
                     </span>
                   )}
                 </div>

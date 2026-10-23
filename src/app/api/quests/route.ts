@@ -14,6 +14,7 @@ export async function GET() {
 
     const formattedDaily = dailyQuests.map((q) => ({
       id: q.id,
+      key: q.template.title,
       title: q.template.titleUz || q.template.title,
       description: q.template.description,
       category: q.template.category,
@@ -28,6 +29,7 @@ export async function GET() {
 
     const formattedWeekly = weeklyQuests.map((q) => ({
       id: q.id,
+      key: q.template.title,
       title: q.template.titleUz || q.template.title,
       description: q.template.description,
       category: q.template.category,
