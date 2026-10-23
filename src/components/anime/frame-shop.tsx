@@ -105,7 +105,9 @@ function refreshOwnership() {
   framesPromise = null;
 }
 
-function FramePreview({ frame, className }: { frame: FrameCardData; className?: string }) {
+function FramePreview({ frame, previewName, className }: { frame: FrameCardData; previewName?: string; className?: string }) {
+  const { user } = useAppStore();
+  const nameText = previewName || user?.displayName || user?.username || "Kiluu";
   if (frame.type === "avatar") {
     const config = frameById(frame.id);
     return (
@@ -143,18 +145,17 @@ function FramePreview({ frame, className }: { frame: FrameCardData; className?: 
         decoding="async"
       />
       <span
-        className="absolute z-[1] flex min-w-0 items-center overflow-hidden text-[9px] font-bold leading-none"
+        className="absolute z-[1] flex min-w-0 items-center justify-center overflow-hidden text-[9px] font-bold leading-none"
         style={{
           left: `${safe.left}%`,
           right: `${safe.right}%`,
           top: `${safe.top}%`,
           bottom: `${safe.bottom}%`,
-          justifyContent: frame.textAlign === "left" ? "flex-start" : frame.textAlign === "right" ? "flex-end" : "center",
-          textAlign: frame.textAlign,
+          textAlign: "center",
           color: frame.textColor ?? config?.textColor,
         }}
       >
-        <span className="max-w-full overflow-hidden text-ellipsis whitespace-nowrap">Marlon</span>
+        <span className="block w-full max-w-full overflow-hidden text-ellipsis text-center whitespace-nowrap">{nameText}</span>
       </span>
       </span>
     </div>
@@ -166,12 +167,14 @@ function FrameCard({
   action,
   busy,
   isSelected,
+  previewName,
   canUnequip = false,
 }: {
   frame: FrameCardData;
   action: () => void;
   busy: boolean;
   isSelected: boolean;
+  previewName?: string;
   canUnequip?: boolean;
 }) {
   return (
@@ -179,7 +182,7 @@ function FrameCard({
       "flex min-w-0 flex-col overflow-visible rounded-2xl border bg-card/60 p-3 transition",
       isSelected ? "border-primary shadow-md shadow-primary/10" : "hover:border-primary/50",
     )}>
-      <FramePreview frame={frame} className="mb-2" />
+      <FramePreview frame={frame} previewName={previewName} className="mb-2" />
       <h3 className="truncate text-xs font-bold" title={frame.name}>{frame.name}</h3>
       <p className="mt-0.5 text-[10px] capitalize text-muted-foreground">{frame.rarity}</p>
       <div className="mt-2 min-h-10 flex-1">
@@ -221,10 +224,12 @@ export function FramePicker({
   type,
   selectedId,
   onSelect,
+  previewName,
 }: {
   type: FrameType;
   selectedId: string | null;
   onSelect: (id: string | null) => void;
+  previewName?: string;
 }) {
   const { user, updateUser } = useAppStore();
   const [data, setData] = useState<FrameResponse | null>(null);
@@ -282,6 +287,7 @@ export function FramePicker({
               action={() => void select(frame)}
               busy={busyId === frame.id}
               isSelected={selectedId === frame.id}
+              previewName={previewName}
             />
           </div>
         ))}

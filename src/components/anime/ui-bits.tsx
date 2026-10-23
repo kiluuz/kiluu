@@ -341,22 +341,21 @@ function NameFramePlate({
         <span
           data-safe-text-area={config.slug}
           ref={safeRef}
-          className="absolute z-[1] flex min-w-0 items-center overflow-hidden leading-none"
+          className="absolute z-[1] flex min-w-0 items-center justify-center overflow-hidden leading-none"
           style={{
             left: `${safe.left}%`,
             right: `${safe.right}%`,
             top: `${safe.top}%`,
             bottom: `${safe.bottom}%`,
-            justifyContent: config.textAlign === "left" ? "flex-start" : config.textAlign === "right" ? "flex-end" : "center",
             fontSize: `${fontSize}px`,
-            textAlign: config.textAlign ?? "center",
+            textAlign: "center",
             whiteSpace: "nowrap",
             outline: debug ? "1px dashed #ff00e6" : undefined,
             background: debug ? "rgba(255, 0, 230, 0.16)" : undefined,
           }}
         >
           <span
-            className="block min-w-0 max-w-full overflow-hidden text-ellipsis whitespace-nowrap"
+            className="block w-full min-w-0 max-w-full overflow-hidden text-ellipsis text-center whitespace-nowrap"
             style={{
               textShadow: ["winter-flame", "scarlet-shatter"].includes(config.slug) ? "0 1px 2px var(--background)" : undefined,
             }}

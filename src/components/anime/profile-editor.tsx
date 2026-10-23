@@ -733,6 +733,7 @@ export function ProfileEditor({
                   type="name"
                   selectedId={draft.equippedNameFrameId}
                   onSelect={(id) => set("equippedNameFrameId", id ?? "")}
+                  previewName={draft.displayName || initial.displayName || initial.username}
                 />
               </div>
               <div>
