@@ -132,14 +132,16 @@ export default {
       console.error("Schedule cron failed:", e);
     }
 
-    // Kunlik va retention tozalash
-    try {
-      await fetch(`${siteUrl}/api/cron/daily-reset`, {
-        method: "POST",
-        headers,
-      });
-    } catch (e) {
-      console.error("Daily reset cron failed:", e);
+    // Kunlik va retention tozalash (har soatda 1 marta yetarli)
+    if (new Date().getUTCMinutes() === 0) {
+      try {
+        await fetch(`${siteUrl}/api/cron/daily-reset`, {
+          method: "POST",
+          headers,
+        });
+      } catch (e) {
+        console.error("Daily reset cron failed:", e);
+      }
     }
   },
 };

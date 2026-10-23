@@ -54,6 +54,7 @@ export function CommunityView() {
   const [commentInputs, setCommentInputs] = useState<Record<string, string>>({});
   const [replyTargets, setReplyTargets] = useState<Record<string, string | null>>({});
   const scrolledShareId = useRef("");
+  const likingPostsRef = useRef<Set<string>>(new Set());
   const [moderationReports, setModerationReports] = useState<CommunityReport[] | null>(null);
   const [moderationUserId, setModerationUserId] = useState<string | null>(null);
   const openPostIds = Object.keys(openComments).filter((postId) => openComments[postId]);
@@ -271,6 +272,22 @@ export function CommunityView() {
       setAuthOpen(true);
       return;
     }
+    if (likingPostsRef.current.has(postId)) return;
+    likingPostsRef.current.add(postId);
+
+    // Optimistik yangilash — UI zudlik bilan javob beradi va qaytib olinmaydi
+    setPosts((prev) =>
+      prev.map((p) => {
+        if (p.id !== postId) return p;
+        const nextLiked = !p.liked;
+        return {
+          ...p,
+          liked: nextLiked,
+          likeCount: Math.max(0, p.likeCount + (nextLiked ? 1 : -1)),
+        };
+      })
+    );
+
     try {
       const res = await fetch(`/api/community/${postId}/like`, { method: "POST" });
       const d = await res.json();
@@ -279,7 +296,21 @@ export function CommunityView() {
         prev.map((p) => (p.id === postId ? { ...p, liked: d.liked, likeCount: d.likeCount } : p))
       );
     } catch (error) {
+      // Xatolik yuz bersa optimistik o'zgarishni bekor qilish
+      setPosts((prev) =>
+        prev.map((p) => {
+          if (p.id !== postId) return p;
+          const nextLiked = !p.liked;
+          return {
+            ...p,
+            liked: nextLiked,
+            likeCount: Math.max(0, p.likeCount + (nextLiked ? 1 : -1)),
+          };
+        })
+      );
       toast.error(error instanceof Error ? error.message : "Could not update like");
+    } finally {
+      likingPostsRef.current.delete(postId);
     }
   }
 

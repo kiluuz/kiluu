@@ -29,7 +29,7 @@ export async function emitEvent(
   let questsUpdated = 0;
 
   // 1. Anti-abuse tekshiruvlari
-  if (type === "post_created" || type === "comment_created" || type === "chat_message_sent") {
+  if (type === "post_created" || type === "comment_created") {
     const text = String(payload.content || payload.body || "").trim();
     if (text.length < 3) {
       return { xpAwarded: 0, questsUpdated: 0 }; // Juda qisqa, hisoblanmaydi
@@ -42,6 +42,19 @@ export async function emitEvent(
       return { xpAwarded: 0, questsUpdated: 0 };
     }
     recentContentCache.set(cacheKey, now);
+  } else if (type === "chat_message_sent") {
+    const text = String(payload.content || payload.body || "").trim();
+    if (text.length < 1) {
+      return { xpAwarded: 0, questsUpdated: 0 };
+    }
+    const cacheKey = `${userId}:${type}:${text.toLowerCase().slice(0, 50)}`;
+    const now = Date.now();
+    const last = recentContentCache.get(cacheKey);
+    if (last && now - last < 3_000) {
+      // 3 soniya ichida bir xil xabarni takrorlash — spam
+      return { xpAwarded: 0, questsUpdated: 0 };
+    }
+    recentContentCache.set(cacheKey, now);
   }
 
   if (type === "like_given" || type === "like_received") {
@@ -49,6 +62,17 @@ export async function emitEvent(
     if (payload.authorId && payload.authorId === userId) {
       return { xpAwarded: 0, questsUpdated: 0 };
     }
+  }
+
+  if (type === "like_given" && payload.postId) {
+    // Ayni bitta postga bir necha marta like/unlike qilib quest oshirishni oldini olish
+    const cacheKey = `${userId}:like_given:${payload.postId}`;
+    const now = Date.now();
+    const last = recentContentCache.get(cacheKey);
+    if (last && now - last < 24 * 60 * 60_000) {
+      return { xpAwarded: 0, questsUpdated: 0 };
+    }
+    recentContentCache.set(cacheKey, now);
   }
 
   // 2. XP berish va Kunlik XP Limiti tekshiruvi

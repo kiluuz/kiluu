@@ -254,6 +254,13 @@ export async function processQuestsForEvent(
   eventType: string,
   increment: number = 1
 ): Promise<number> {
+  // Foydalanuvchining bugungi vazifalari mavjudligini ta'minlash
+  try {
+    await getOrAssignUserQuests(userId);
+  } catch (err) {
+    console.error("Failed to ensure user quests before processing:", err);
+  }
+
   const activeQuests = await db.userQuest.findMany({
     where: {
       userId,
@@ -381,9 +388,20 @@ export async function rerollDailyQuest(userId: string, userQuestId: string): Pro
     return { success: false, message: "Bajarib olingan vazifani almashtirib bo'lmaydi" };
   }
 
-  // Mavjud boshqa template'lar orasidan tasodifiy tanlash
+  // Foydalanuvchida bugun mavjud barcha kunlik vazifalar ID'larini olish (takrorlanish va xatolikni oldini olish)
+  const userCurrentQuests = await db.userQuest.findMany({
+    where: { userId, periodKey: quest.periodKey },
+    select: { templateId: true },
+  });
+  const currentTemplateIds = userCurrentQuests.map((q) => q.templateId);
+
+  // Mavjud boshqa template'lar orasidan tasodifiy tanlash (foydalanuvchida hali yo'q bo'lgan)
   const allDailies = await db.questTemplate.findMany({
-    where: { type: "daily", isActive: true, id: { not: quest.templateId } },
+    where: {
+      type: "daily",
+      isActive: true,
+      id: { notIn: currentTemplateIds },
+    },
   });
 
   if (allDailies.length === 0) {

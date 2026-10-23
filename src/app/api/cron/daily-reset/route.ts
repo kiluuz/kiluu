@@ -26,9 +26,15 @@ export async function POST(req: NextRequest) {
       results.weeklyPollResolved = pollRes;
     }
 
-    // 2. Kechki streak eslatmasi (soat 19:00 dan keyin): Bugun kirmagan va streak'i bor userlarga Bot orqali eslatma
+    // 2. Kechki streak eslatmasi (faqat soat 19:00 dan 22:00 gacha Toshkent vaqti bilan): Bugun kirmagan va streak'i bor userlarga Bot orqali kuniga FAZAT 1 MARTA eslatma
     const botToken = process.env.TELEGRAM_BOT_TOKEN || process.env.BOT_TOKEN;
-    if (botToken) {
+    const tashkentHour = parseInt(
+      new Intl.DateTimeFormat("en-US", { timeZone: "Asia/Tashkent", hour: "numeric", hour12: false }).format(now),
+      10
+    );
+    const isEveningReminderWindow = tashkentHour >= 19 && tashkentHour <= 22;
+
+    if (botToken && isEveningReminderWindow) {
       const candidatesForReminder = await db.user.findMany({
         where: {
           telegramId: { not: null },
@@ -49,10 +55,23 @@ export async function POST(req: NextRequest) {
         take: 100, // Batch limit
       });
 
+      const startOfTodayUtc = new Date(now);
+      startOfTodayUtc.setUTCHours(0, 0, 0, 0);
+
       let remindersSent = 0;
       for (const u of candidatesForReminder) {
         if (!u.telegramId) continue;
         try {
+          // Bugun foydalanuvchiga eslatma yuborilganligini tekshirish (takrorlanish va har minutda xabar borishini 100% oldini olish)
+          const alreadySent = await db.notification.findFirst({
+            where: {
+              userId: u.id,
+              type: "STREAK_REMINDER",
+              createdAt: { gte: startOfTodayUtc },
+            },
+          });
+          if (alreadySent) continue;
+
           const freezeText = u.streakFreezeCount > 0
             ? `🧊 Sizda ${u.streakFreezeCount} ta streak muzlatgichi bor.`
             : `⚠️ Diqqat: Sizda streak muzlatgichi yo'q, bugun kirmasangiz streak 0 ga tushadi!`;
@@ -62,11 +81,22 @@ export async function POST(req: NextRequest) {
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
               chat_id: u.telegramId,
-              text: `🔥 <b>DubAniX Streak Eslatmasi!</b>\n\nSizning <b>${u.streakCount} kunlik</b> faol streak'ingiz uzilib qolishiga oz qoldi!\nBugungi kunlik mukofotingizni oling va streak'ni davom ettiring.\n\n${freezeText}\n\n👉 <a href="https://kiluu.vercel.app">DubAniX ga kirish</a>`,
+              text: `🔥 <b>Kiluu Streak Eslatmasi!</b>\n\nSizning <b>${u.streakCount} kunlik</b> faol streak'ingiz uzilib qolishiga oz qoldi!\nBugungi kunlik mukofotingizni oling va streak'ni davom ettiring.\n\n${freezeText}\n\n👉 <a href="https://kiluu.uz">Kiluu platformasiga kirish</a>`,
               parse_mode: "HTML",
             }),
             signal: AbortSignal.timeout(3000),
           });
+
+          // Eslatma yuborilganini qayd qilish (bugun qayta yuborilmasligi uchun)
+          await db.notification.create({
+            data: {
+              userId: u.id,
+              type: "STREAK_REMINDER",
+              title: "Streak Eslatmasi",
+              body: `${u.streakCount} kunlik streak saqlab qolindi`,
+            },
+          });
+
           remindersSent++;
         } catch (e) {
           console.warn("Failed to send streak reminder to:", u.id, e);
