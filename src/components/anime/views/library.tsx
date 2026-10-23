@@ -13,6 +13,7 @@ import { AnimeCard, FramedAvatar, NameWithFrame, formatDuration, formatCredits }
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { useI18n } from "@/components/i18n-provider";
+import { getCached, isStale, fetchWithCache } from "@/lib/client-cache";
 
 interface LibraryData {
   owned: (AnimeSummary & { purchasedAt: string; episodeCount: number })[];
@@ -51,8 +52,9 @@ interface Leaderboards {
 export function LibraryView() {
   const { t } = useI18n();
   const { user, setAuthOpen, navigate } = useAppStore();
-  const [data, setData] = useState<LibraryData | null>(null);
-  const [loading, setLoading] = useState(true);
+  const libraryCacheKey = `/api/library:${user?.id || "anon"}`;
+  const [data, setData] = useState<LibraryData | null>(() => getCached<LibraryData>(libraryCacheKey));
+  const [loading, setLoading] = useState(() => !getCached<LibraryData>(libraryCacheKey));
   const [botStatus, setBotStatus] = useState<{ linked: boolean; purchases: string[] } | null>(null);
   const [botAnimes, setBotAnimes] = useState<any[]>([]);
   const [botLoading, setBotLoading] = useState(false);
@@ -64,21 +66,23 @@ export function LibraryView() {
 
   useEffect(() => {
     if (!user) return;
-    fetch("/api/library")
-      .then((r) => r.json())
+    if (data && !isStale(libraryCacheKey)) {
+      return;
+    }
+    fetchWithCache<LibraryData>("/api/library")
       .then(setData)
-      .catch(() => toast.error(t("library.loadError")))
+      .catch(() => {
+        if (!data) toast.error(t("library.loadError"));
+      })
       .finally(() => setLoading(false));
 
     // Load bot status
     setBotLoading(true);
-    fetch("/api/bot/status")
-      .then(r => r.json())
+    fetchWithCache<{ linked: boolean; purchases: string[] }>("/api/bot/status", { ttlMs: 60 * 1000 })
       .then(async (statusData) => {
         setBotStatus(statusData);
         if (statusData.purchases?.length > 0) {
-          const catalogRes = await fetch("/api/bot/catalog");
-          const catalog = await catalogRes.json();
+          const catalog = await fetchWithCache<any[]>("/api/bot/catalog", { ttlMs: 5 * 60 * 1000 });
           const purchased = Array.isArray(catalog)
             ? catalog.filter((a: any) => statusData.purchases.includes(a.slug))
             : [];
@@ -87,7 +91,7 @@ export function LibraryView() {
       })
       .catch(() => {})
       .finally(() => setBotLoading(false));
-  }, [user, t]);
+  }, [user, t, data, libraryCacheKey]);
 
   useEffect(() => {
     fetch("/api/leaderboards")

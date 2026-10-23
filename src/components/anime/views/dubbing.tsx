@@ -6,47 +6,60 @@ import { Button } from "@/components/ui/button";
 import { useAppStore } from "../store";
 import { toast } from "sonner";
 import { useI18n } from "@/components/i18n-provider";
+import { getCached, isStale, fetchWithCache, setCached } from "@/lib/client-cache";
 
 export function DubbingView() {
   const { user, navigate } = useAppStore();
   const { t } = useI18n();
-  const [joined, setJoined] = useState(false);
+  const cacheKey = `/api/dubbing/waitlist:${user?.id || "anon"}`;
+  const [joined, setJoined] = useState(() => {
+    const cached = getCached<{ joined?: boolean }>(cacheKey);
+    return Boolean(cached?.joined);
+  });
   const [loading, setLoading] = useState(false);
   const isJoined = Boolean(user && joined);
 
   useEffect(() => {
     if (!user) return;
+    if (getCached(cacheKey) && !isStale(cacheKey)) return;
     let active = true;
-    fetch("/api/dubbing/waitlist")
-      .then(async (response) => {
-        if (!response.ok) throw new Error("Could not load your waitlist status");
-        return response.json();
-      })
-      .then((data: { joined?: boolean }) => {
-        if (active) setJoined(Boolean(data.joined));
+    fetchWithCache<{ joined?: boolean }>("/api/dubbing/waitlist")
+      .then((data) => {
+        if (active) {
+          setJoined(Boolean(data.joined));
+          setCached(cacheKey, data);
+        }
       })
       .catch((error: unknown) => {
-        if (active) toast.error(error instanceof Error ? error.message : "Could not load your waitlist");
-      })
+        if (active && !getCached(cacheKey)) {
+          toast.error(error instanceof Error ? error.message : "Could not load your waitlist");
+        }
+      });
     return () => { active = false; };
-  }, [user?.id]);
+  }, [user?.id, cacheKey]);
 
   async function toggleWaitlist() {
     if (!user) {
       navigate("login");
       return;
     }
-    setLoading(true);
+    const nextJoined = !isJoined;
+    // Optimistic update
+    setJoined(nextJoined);
+    setCached(cacheKey, { joined: nextJoined });
+    toast.success(nextJoined ? "You joined the waitlist" : "You left the waitlist");
+
     try {
-      const response = await fetch("/api/dubbing/waitlist", { method: isJoined ? "DELETE" : "POST" });
+      const response = await fetch("/api/dubbing/waitlist", { method: nextJoined ? "POST" : "DELETE" });
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || "The request could not be completed");
       setJoined(Boolean(data.joined));
-      toast.success(data.joined ? "You joined the waitlist" : "You left the waitlist");
+      setCached(cacheKey, data);
     } catch (error) {
+      // Revert if error
+      setJoined(!nextJoined);
+      setCached(cacheKey, { joined: !nextJoined });
       toast.error(error instanceof Error ? error.message : "The request could not be completed");
-    } finally {
-      setLoading(false);
     }
   }
 
@@ -55,7 +68,7 @@ export function DubbingView() {
       <h1 className="sr-only">{t("nav.dubbing")}</h1>
       <section className="relative overflow-hidden rounded-3xl border bg-card p-7 text-center shadow-xl sm:p-12">
         <div className="absolute inset-x-0 top-0 h-1 brand-gradient" />
-        <div className="mb-4 inline-flex items-center gap-1.5 rounded-full border border-amber-500/30 bg-amber-500/10 px-3 py-1 text-xs font-black uppercase tracking-wider text-amber-600">
+        <div className="mb-4 inline-flex items-center gap-1.5 rounded-full border border-primary/30 bg-primary/10 px-3 py-1 text-xs font-black uppercase tracking-wider text-primary">
           <Clock3 className="h-3.5 w-3.5" /> {t("dubbing.soon")}
         </div>
         <div className="mx-auto mt-7 grid max-w-xl gap-3 text-left sm:grid-cols-2">

@@ -11,6 +11,7 @@ import { AnimeCard } from "../ui-bits";
 import { cn } from "@/lib/utils";
 import { useI18n } from "@/components/i18n-provider";
 import { genreTranslationKey } from "@/lib/i18n";
+import { getCached, isStale, fetchWithCache } from "@/lib/client-cache";
 
 const GENRES = [
   "Action", "Adventure", "Comedy", "Drama", "Fantasy", "Sci-Fi", "Romance",
@@ -22,34 +23,56 @@ const TYPES = ["TV", "MOVIE", "OVA"];
 export function BrowseView() {
   const { view, navigate } = useAppStore();
   const { t } = useI18n();
-  const [animes, setAnimes] = useState<AnimeSummary[]>([]);
-  const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [genre, setGenre] = useState<string>(view.filters?.genre || "ALL");
   const [type, setType] = useState("ALL");
   const [sort, setSort] = useState(view.filters?.sort || "trending");
   const [freeOnly, setFreeOnly] = useState(view.filters?.free === "1");
 
-  // Debounced fetch
+  const initialUrl = useMemo(() => {
+    const p = new URLSearchParams();
+    if (genre !== "ALL") p.set("genre", genre);
+    if (type !== "ALL") p.set("type", type);
+    if (sort) p.set("sort", sort);
+    if (freeOnly) p.set("free", "1");
+    return `/api/animes?${p.toString()}`;
+  }, [genre, type, sort, freeOnly]);
+
+  const [animes, setAnimes] = useState<AnimeSummary[]>(() => {
+    const cached = getCached<{ animes: AnimeSummary[] }>(initialUrl);
+    return cached?.animes || [];
+  });
+  const [loading, setLoading] = useState(() => !getCached<{ animes: AnimeSummary[] }>(initialUrl));
+
+  // Debounced fetch with smart cache
   useEffect(() => {
-    setLoading(true);
+    const params = new URLSearchParams();
+    if (search.trim()) params.set("search", search.trim());
+    if (genre !== "ALL") params.set("genre", genre);
+    if (type !== "ALL") params.set("type", type);
+    if (sort) params.set("sort", sort);
+    if (freeOnly) params.set("free", "1");
+    const url = `/api/animes?${params.toString()}`;
+
+    const cached = getCached<{ animes: AnimeSummary[] }>(url);
+    if (cached && !isStale(url)) {
+      setAnimes(cached.animes || []);
+      setLoading(false);
+      return;
+    }
+
+    if (!cached) setLoading(true);
+
     const t = setTimeout(async () => {
       try {
-        const params = new URLSearchParams();
-        if (search.trim()) params.set("search", search.trim());
-        if (genre !== "ALL") params.set("genre", genre);
-        if (type !== "ALL") params.set("type", type);
-        if (sort) params.set("sort", sort);
-        if (freeOnly) params.set("free", "1");
-        const res = await fetch(`/api/animes?${params}`);
-        const data = await res.json();
+        const data = await fetchWithCache<{ animes: AnimeSummary[] }>(url);
         setAnimes(data.animes || []);
       } catch {
-        setAnimes([]);
+        if (!cached) setAnimes([]);
       } finally {
         setLoading(false);
       }
-    }, 350);
+    }, search ? 350 : 0);
     return () => clearTimeout(t);
   }, [search, genre, type, sort, freeOnly]);
 

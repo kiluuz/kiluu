@@ -48,7 +48,8 @@ function DockTab({ icon: Icon, label, active, dot, onPress }: DockTabProps) {
       {active && (
         <motion.span
           layoutId="dock-active-pill"
-          className="absolute inset-[3px] rounded-[18px] bg-primary/15 border border-primary/30"
+          className="absolute inset-[3px] rounded-[18px]"
+          style={{ background: "rgba(215,38,61,0.13)", border: "1px solid rgba(215,38,61,0.28)" }}
           transition={SPRING}
         />
       )}
@@ -56,8 +57,9 @@ function DockTab({ icon: Icon, label, active, dot, onPress }: DockTabProps) {
         <Icon
           className={cn(
             "w-[22px] h-[22px] transition-colors",
-            active ? "text-primary drop-shadow-[0_0_8px_var(--glow)]" : "text-muted-foreground"
+            active ? "drop-shadow-[0_0_8px_rgba(215,38,61,0.6)]" : "text-muted-foreground"
           )}
+          style={active ? { color: "#d7263d" } : undefined}
           strokeWidth={active ? 2.5 : 2}
           fill={active ? "currentColor" : "none"}
           fillOpacity={active ? 0.18 : 0}

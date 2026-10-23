@@ -17,6 +17,7 @@ import { useI18n } from "@/components/i18n-provider";
 import { ChatPanel } from "../chat/chat-panel";
 import { ClubsView } from "../clubs/clubs-view";
 import { ReferralView } from "./referral-view";
+import { getCached, setCached, isStale } from "@/lib/client-cache";
 
 const CATEGORIES: ("All" | PostType)[] = ["All", "Theories", "Reviews", "Discussions", "Memes", "Fan Art", "Recommendations", "UZ Dubbing", "Watch Parties"];
 
@@ -35,12 +36,15 @@ export function CommunityView() {
   const queryClient = useQueryClient();
   const openProfile = useOpenProfile();
 
-  const [posts, setPosts] = useState<CommunityPost[]>([]);
   const [communityMode, setCommunityMode] = useState<"feed" | "clubs" | "referral">("feed");
   const [tab, setTab] = useState("latest");
   const [activeCategory, setActiveCategory] = useState("All");
   const feedKey = `${user?.id ?? "anonymous"}:${tab}:${activeCategory}`;
-  const [loadedFeed, setLoadedFeed] = useState("");
+  const [posts, setPosts] = useState<CommunityPost[]>(() => {
+    const cached = getCached<CommunityPost[]>(`community:${feedKey}`);
+    return cached || [];
+  });
+  const [loadedFeed, setLoadedFeed] = useState(() => (getCached(`community:${feedKey}`) ? feedKey : ""));
   const loading = loadedFeed !== feedKey;
   const [cursor, setCursor] = useState<string | null>(null);
   const [loadingMore, setLoadingMore] = useState(false);
@@ -94,6 +98,7 @@ export function CommunityView() {
         if (!response.ok) throw new Error(data.error || "Failed to load community");
         if (!alive) return;
         const incoming = (data.posts || []) as CommunityPost[];
+        setCached(`community:${feedKey}`, incoming);
         setPosts((previous) => {
           if (initial) return incoming;
           const fresh = new Map(incoming.map((post) => [post.id, post]));
@@ -364,6 +369,14 @@ export function CommunityView() {
 
   async function toggleFollow(post: CommunityPost) {
     if (!user) return setAuthOpen(true);
+    const nextFollowing = !post.user.following;
+    // 1. Instant optimistic UI update
+    setPosts((previous) => previous.map((item) => item.user.id === post.user.id
+      ? { ...item, user: { ...item.user, following: nextFollowing } }
+      : item));
+    toast.success(nextFollowing ? `Following @${post.user.username}` : "Unfollowed");
+
+    // 2. Network request in background
     try {
       const response = await fetch(`/api/community/users/${post.user.id}/follow`, { method: "POST" });
       const data = await response.json();
@@ -372,6 +385,10 @@ export function CommunityView() {
         ? { ...item, user: { ...item.user, following: data.following } }
         : item));
     } catch (error) {
+      // Revert if error
+      setPosts((previous) => previous.map((item) => item.user.id === post.user.id
+        ? { ...item, user: { ...item.user, following: !nextFollowing } }
+        : item));
       toast.error(error instanceof Error ? error.message : "Could not update follow");
     }
   }

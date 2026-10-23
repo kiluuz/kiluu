@@ -13,29 +13,35 @@ import { genreTranslationKey } from "@/lib/i18n";
 import { QuestsWidget } from "../gamification/quests-widget";
 import { WeeklyPollCard } from "../gamification/weekly-poll-card";
 import { SeasonalEventBanner } from "../gamification/seasonal-event-banner";
+import { getCached, isStale, fetchWithCache } from "@/lib/client-cache";
 
 export function HomeView() {
   const { navigate, user, setAuthOpen } = useAppStore();
   const { t } = useI18n();
-  const [data, setData] = useState<HomeData | null>(null);
+  const cacheKey = `/api/home:${user?.id || "anon"}`;
+  const [data, setData] = useState<HomeData | null>(() => getCached<HomeData>(cacheKey));
   const [heroIdx, setHeroIdx] = useState(0);
   const preferenceKey = user?.favoriteGenres.join(",") ?? "";
 
   useEffect(() => {
     let alive = true;
-    fetch("/api/home")
-      .then((r) => r.json())
+    // If we have fresh cached data, don't query the server on page switch
+    if (data && !isStale(cacheKey)) {
+      return;
+    }
+    fetchWithCache<HomeData>("/api/home", { ttlMs: 3 * 60 * 1000 })
       .then((d) => {
         if (alive && d) {
-          setHeroIdx(0);
           setData(d);
         }
       })
-      .catch(() => toast.error(t("home.loadError")));
+      .catch(() => {
+        if (!data) toast.error(t("home.loadError"));
+      });
     return () => {
       alive = false;
     };
-  }, [user?.id, preferenceKey, t]);
+  }, [user?.id, preferenceKey, t, cacheKey]);
 
   // Hero auto-rotate
   useEffect(() => {

@@ -52,16 +52,24 @@ export function ProfilePopupCard({
 
   async function toggleFollow() {
     if (!user) { useAppStore.getState().setAuthOpen(true); return; }
-    setBusy(true);
+    const nextFollowing = !following;
+    // 1. Instant optimistic UI update
+    setFollowing(nextFollowing);
+    onFollowChange?.(nextFollowing);
+    toast.success(nextFollowing ? `Following @${profile.username}` : "Unfollowed");
+
+    // 2. Perform network request in background
     try {
-      const res = await fetch(`/api/users/${profile.username}/favorite`, { method: following ? "DELETE" : "POST" });
-      if (res.ok) {
-        setFollowing(!following);
-        onFollowChange?.(!following);
-        toast.success(following ? "Unfollowed" : `Following @${profile.username}`);
-      } else toast.error("Failed to update follow");
-    } finally {
-      setBusy(false);
+      const res = await fetch(`/api/users/${profile.username}/favorite`, { method: nextFollowing ? "POST" : "DELETE" });
+      if (!res.ok) {
+        setFollowing(!nextFollowing);
+        onFollowChange?.(!nextFollowing);
+        toast.error("Failed to update follow");
+      }
+    } catch {
+      setFollowing(!nextFollowing);
+      onFollowChange?.(!nextFollowing);
+      toast.error("Failed to update follow");
     }
   }
 

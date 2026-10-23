@@ -84,7 +84,7 @@ function NavTile({ item, index, onGo }: { item: ResolvedNavItem; index: number; 
           </span>
         )}
         {isCreatorBadge && !locked && (
-          <span className="flex items-center gap-0.5 text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-amber-500/15 text-amber-500 border border-amber-500/30">
+          <span className="flex items-center gap-0.5 text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-primary/15 text-primary border border-primary/30">
             <Crown className="w-2.5 h-2.5" /> {t("settings.creator")}
           </span>
         )}
@@ -181,7 +181,7 @@ export function NavSheet({ open, onOpenChange }: { open: boolean; onOpenChange: 
                     <span className="flex items-center gap-1.5 min-w-0">
                       <span className="text-[11.5px] text-muted-foreground truncate">@{user.username}</span>
                       {user.role === "CREATOR" && (
-                        <span className="flex items-center gap-0.5 text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-amber-500/15 text-amber-500 border border-amber-500/30 shrink-0">
+                        <span className="flex items-center gap-0.5 text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-primary/15 text-primary border border-primary/30 shrink-0">
                           <Crown className="w-2.5 h-2.5" /> Creator
                         </span>
                       )}

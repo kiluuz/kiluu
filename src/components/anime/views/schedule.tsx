@@ -10,6 +10,7 @@ import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import type { ScheduleItem } from "../types";
 import { useI18n } from "@/components/i18n-provider";
+import { getCached, isStale, fetchWithCache } from "@/lib/client-cache";
 
 // AniList types
 interface AniListEntry {
@@ -109,7 +110,10 @@ function translateFormat(format: string, t: (key: string) => string) {
 export function ScheduleView() {
   const { t, locale } = useI18n();
   const { navigate, user } = useAppStore();
-  const [items, setItems] = useState<ScheduleItem[] | null>(null);
+  const [items, setItems] = useState<ScheduleItem[] | null>(() => {
+    const cached = getCached<{ schedule: ScheduleItem[] }>("/api/schedule");
+    return cached?.schedule || null;
+  });
   const [day, setDay] = useState<number>(() => new Date().getDay());
   const [now, setNow] = useState(() => Date.now());
   const [anilistSchedule, setAnilistSchedule] = useState<Record<string, AniListEntry[]> | null>(null);
@@ -151,14 +155,18 @@ export function ScheduleView() {
 
   useEffect(() => {
     let alive = true;
-    fetch("/api/schedule")
-      .then((r) => r.json())
+    if (items && !isStale("/api/schedule")) {
+      return;
+    }
+    fetchWithCache<{ schedule: ScheduleItem[] }>("/api/schedule")
       .then((d) => {
         if (alive) setItems(d.schedule || []);
       })
-      .catch(() => toast.error("Failed to load schedule"));
+      .catch(() => {
+        if (!items) toast.error("Failed to load schedule");
+      });
     return () => { alive = false; };
-  }, [user?.id]);
+  }, [user?.id, items]);
 
   useEffect(() => {
     if (!user) return;
