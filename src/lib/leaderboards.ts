@@ -12,6 +12,7 @@ type RankedUser = {
   equippedAvatarFrameId: string | null;
   equippedNameFrameId: string | null;
   accentColor: string;
+  accentTo?: string | null;
   score: number;
   level: number;
 };
@@ -53,7 +54,7 @@ export async function getLeaderboards(): Promise<Leaderboards> {
         )
         SELECT u.id, u.username, u."displayName", u."avatarUrl", u."avatarFrame",
           u."equipped_avatar_frame_id" AS "equippedAvatarFrameId",
-          u."equipped_name_frame_id" AS "equippedNameFrameId", u."accentColor",
+          u."equipped_name_frame_id" AS "equippedNameFrameId", u."accentColor", u."accentTo",
           COUNT(DISTINCT owned."animeId") AS "animeCount"
         FROM owned
         JOIN ${sqlTable("User")} u ON u.id = owned."userId"
@@ -71,12 +72,13 @@ export async function getLeaderboards(): Promise<Leaderboards> {
         equippedAvatarFrameId: string | null;
         equippedNameFrameId: string | null;
         accentColor: string;
+        accentTo?: string | null;
         postCount: number;
         likeCount: number;
       }>>(Prisma.sql`
         SELECT u.id, u.username, u."displayName", u."avatarUrl", u."avatarFrame",
           u."equipped_avatar_frame_id" AS "equippedAvatarFrameId",
-          u."equipped_name_frame_id" AS "equippedNameFrameId", u."accentColor",
+          u."equipped_name_frame_id" AS "equippedNameFrameId", u."accentColor", u."accentTo",
           COUNT(DISTINCT p.id) AS "postCount", COUNT(DISTINCT l.id) AS "likeCount"
         FROM ${sqlTable("User")} u
         LEFT JOIN ${sqlTable("Post")} p ON p."userId" = u.id AND p.hidden = false
@@ -95,11 +97,12 @@ export async function getLeaderboards(): Promise<Leaderboards> {
         equippedAvatarFrameId: string | null;
         equippedNameFrameId: string | null;
         accentColor: string;
+        accentTo?: string | null;
         animeCount: number | bigint;
       }>>(Prisma.sql`
         SELECT u.id, u.username, u."displayName", u."avatarUrl", u."avatarFrame",
           u."equipped_avatar_frame_id" AS "equippedAvatarFrameId",
-          u."equipped_name_frame_id" AS "equippedNameFrameId", u."accentColor",
+          u."equipped_name_frame_id" AS "equippedNameFrameId", u."accentColor", u."accentTo",
           COUNT(a.id) AS "animeCount"
         FROM ${sqlTable("Anime")} a
         JOIN ${sqlTable("User")} u ON u.id = a."creatorId"

@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useQueries, useQueryClient } from "@tanstack/react-query";
-import { Send, Flame, Trophy, UserCheck, Shield, MessageSquare, Newspaper, Gift } from "lucide-react";
+import { Send, Flame, Trophy, UserCheck, Shield, MessageSquare, Newspaper, Gift, Globe } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -36,7 +36,7 @@ export function CommunityView() {
   const openProfile = useOpenProfile();
 
   const [posts, setPosts] = useState<CommunityPost[]>([]);
-  const [communityMode, setCommunityMode] = useState<"feed" | "chat" | "clubs" | "referral">("feed");
+  const [communityMode, setCommunityMode] = useState<"feed" | "clubs" | "referral">("feed");
   const [tab, setTab] = useState("latest");
   const [activeCategory, setActiveCategory] = useState("All");
   const feedKey = `${user?.id ?? "anonymous"}:${tab}:${activeCategory}`;
@@ -473,18 +473,7 @@ export function CommunityView() {
                 : "text-muted-foreground hover:text-foreground"
             )}
           >
-            <Newspaper className="w-4 h-4" /> Lenta
-          </button>
-          <button
-            onClick={() => setCommunityMode("chat")}
-            className={cn(
-              "flex items-center gap-2 px-4 py-2 rounded-xl text-xs sm:text-sm font-bold transition-all",
-              communityMode === "chat"
-                ? "bg-background text-foreground shadow-sm"
-                : "text-muted-foreground hover:text-foreground"
-            )}
-          >
-            <MessageSquare className="w-4 h-4" /> Global Chat
+            <Globe className="w-4 h-4 text-primary" /> Global
           </button>
           <button
             onClick={() => setCommunityMode("clubs")}
@@ -517,15 +506,7 @@ export function CommunityView() {
         </div>
       </div>
 
-      {communityMode === "chat" ? (
-        <div className="max-w-4xl mx-auto">
-          <ChatPanel
-            roomId="global"
-            title="Global zal (Umumiy chat)"
-            subtitle="Barcha anime muxlislari uchun real-time muloqot zali"
-          />
-        </div>
-      ) : communityMode === "clubs" ? (
+      {communityMode === "clubs" ? (
         <ClubsView />
       ) : communityMode === "referral" ? (
         <div className="max-w-4xl mx-auto">
