@@ -4,6 +4,7 @@ import { ACHIEVEMENT_SEEDS } from "./achievements-catalog";
 import { sqlTable } from "./sql-table";
 import { awardXpInTransaction } from "./xp";
 import { log } from "./logger";
+import { calculateLevel } from "./level-utils";
 
 type Condition = {
   type?: string;
@@ -120,8 +121,11 @@ function maxWatchStreak(dates: Date[], timezone: string | null): number {
 }
 
 async function getUserStats(userId: string): Promise<UserStats | null> {
-  const [user, purchases, orders, gifts, followerCount] = await Promise.all([
-    db.user.findUnique({ where: { id: userId }, select: { createdAt: true, timezone: true, credits: true, username: true } }),
+  const [user, purchases, orders, gifts, followerCount, xpTotal] = await Promise.all([
+    db.user.findUnique({
+      where: { id: userId },
+      select: { createdAt: true, timezone: true, credits: true, username: true, streakCount: true },
+    }),
     db.purchase.findMany({
       where: { userId, episodeNumber: 0 },
       select: {
@@ -139,6 +143,7 @@ async function getUserStats(userId: string): Promise<UserStats | null> {
       select: { recipientId: true, recipientUsername: true, createdAt: true },
     }),
     db.follow.count({ where: { followedId: userId } }),
+    db.xpEvent.aggregate({ where: { userId }, _sum: { amount: true } }),
   ]);
   const [posts, comments, awardsGiven, watchEvents, completedProgress] = await Promise.all([
     db.post.findMany({
@@ -270,7 +275,9 @@ async function getUserStats(userId: string): Promise<UserStats | null> {
         const hour = datePart(event.createdAt, user.timezone, "hour");
         return hour >= 2 && hour < 5;
       })),
-      streak: maxWatchStreak(watchEvents.map((event) => event.createdAt), user.timezone),
+      level: calculateLevel(xpTotal._sum.amount || 0).level,
+      streak: Math.max(user.streakCount || 0, maxWatchStreak(watchEvents.map((event) => event.createdAt), user.timezone)),
+      login_streak: user.streakCount || 0,
       completed_series: fullyCompleted,
       parties_hosted: partiesHosted,
       party_guests: partyMembers,

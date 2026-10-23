@@ -49,6 +49,12 @@ let ownershipPromise: Promise<FrameOwnershipResponse> | null = null;
 let framesPromise: Promise<FrameResponse> | null = null;
 
 const MISSION_REQUIREMENTS: Record<string, string> = {
+  "mission_level_15": "15-darajaga yeting (Reach Level 15)",
+  "mission_level_50": "50-darajaga yeting (Reach Level 50)",
+  "mission_streak_30": "30 kunlik streak (30-day login streak)",
+  "mission_streak_50": "50 kunlik streak (50-day login streak)",
+  "mission_streak_70": "70 kunlik streak (70-day login streak)",
+  "mission_streak_100": "100 kunlik streak (100-day login streak)",
   "frame-easy": "Watch 3 episodes and publish your first post",
   "frame-medium": "Watch 25 episodes, reach 10 followers, and publish 10 posts",
   "frame-hard": "Watch 100 episodes, reach 50 followers, join 5 Watch Together rooms, and keep a 30-day streak",

@@ -961,8 +961,8 @@ export function ProfileEditor({
           </EditorSection>
         </div>
 
-        {/* RIGHT — LIVE PREVIEW */}
-        <div className="min-h-0 overflow-y-auto bg-ink-2/50 fancy-scroll">
+        {/* RIGHT — LIVE PREVIEW (Desktop only, hidden on mobile) */}
+        <div className="hidden lg:block min-h-0 overflow-y-auto bg-ink-2/50 fancy-scroll">
           <div className="sticky top-0 z-10 glass-strong border-b px-4 py-2 flex items-center gap-2">
             <span className="text-[11px] font-black uppercase tracking-wider text-muted-foreground mr-2">Live preview</span>
             <div className="flex rounded-full border bg-card p-0.5">
