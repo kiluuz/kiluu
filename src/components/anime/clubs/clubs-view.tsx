@@ -572,8 +572,8 @@ export function ClubsView() {
   return (
     <div className="space-y-6">
       {/* Header & Search */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-        <div>
+      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4">
+        <div className="hidden sm:block">
           <h2 className="text-2xl font-black flex items-center gap-2">
             <Shield className="w-6 h-6 text-primary" /> Klublar va Jamiyatlar
           </h2>
