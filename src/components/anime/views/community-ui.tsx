@@ -29,7 +29,7 @@ export function RightSidebar({ user, stats }: { user: AuthUser | null; stats: Co
           <div className="flex items-center gap-3">
             <FramedAvatar user={user} size={48} />
             <div className="min-w-0" style={{ marginLeft: avatarNameGap(user, 48) }}>
-              <NameWithFrame user={user} className="font-bold leading-tight" avatarSize={0} height={26} />
+              <NameWithFrame user={user} className="font-bold leading-tight" avatarSize={0} height={36} />
               <p className="text-xs text-muted-foreground">@{user.username}</p>
             </div>
           </div>
@@ -84,7 +84,7 @@ export function RightSidebar({ user, stats }: { user: AuthUser | null; stats: Co
               <div key={contributor.id} className="flex items-center gap-3">
                 <FramedAvatar user={contributor} size={32} />
                 <div className="flex-1 min-w-0">
-                  <NameWithFrame user={contributor} height={26} className="text-sm font-bold truncate" avatarSize={32} />
+                  <NameWithFrame user={contributor} height={32} className="text-sm font-bold truncate" avatarSize={32} />
                   <p className="text-[11px] text-primary">Lv.{contributor.level} · {contributor.postCount} posts · {contributor.likeCount} likes</p>
                 </div>
               </div>
@@ -355,7 +355,7 @@ export function PostCard({
           <div className="min-w-0" style={{ marginLeft: avatarNameGap(post.user, 44) }}>
             <div className="flex items-center gap-1.5 flex-wrap">
               <button className="min-w-0 max-w-full overflow-visible font-bold hover:text-primary transition text-sm" onClick={() => openProfile(post.user.username)}>
-                <NameWithFrame user={post.user} className="text-sm" height={26} avatarSize={0} />
+                <NameWithFrame user={post.user} className="text-sm" height={36} avatarSize={0} />
               </button>
               {post.user.isVerified && <CheckCircle2 className="w-3.5 h-3.5 text-primary shrink-0" />}
               {post.user.level && <span className="text-[10px] font-bold bg-secondary/80 px-1.5 py-0.5 rounded text-muted-foreground shrink-0">Lv.{post.user.level}</span>}

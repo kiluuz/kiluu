@@ -180,8 +180,12 @@ export function nameFrameContentInset(user: FramedUser, height: number): number 
   const aspectRatio = config.imageWidth / config.imageHeight;
   const safeWidthRatio = ((100 - config.safe.left - config.safe.right) / 100) * aspectRatio;
   const safeHeightRatio = (100 - config.safe.top - config.safe.bottom) / 100;
-  const minReadableHeight = Math.max(68 / safeWidthRatio, (config.maxFontPx ?? 22) / safeHeightRatio);
-  const plateHeight = height >= 36 ? Math.max(height, minReadableHeight) : height;
+  const minLegibleHeight = Math.max(
+    36,
+    ((config.minFontPx ?? 12) + 2) / safeHeightRatio,
+    65 / safeWidthRatio
+  );
+  const plateHeight = Math.max(height || 36, minLegibleHeight);
   return plateHeight * aspectRatio * 0.04;
 }
 
@@ -308,8 +312,12 @@ function NameFramePlate({
   // Reserve enough plate space for a readable short name at the configured maximum font size.
   const safeWidthRatio = ((100 - safe.left - safe.right) / 100) * aspectRatio;
   const safeHeightRatio = (100 - safe.top - safe.bottom) / 100;
-  const minReadableHeight = Math.max(68 / safeWidthRatio, (config.maxFontPx ?? 22) / safeHeightRatio);
-  const plateHeight = height >= 36 ? Math.max(height, minReadableHeight) : height;
+  const minLegibleHeight = Math.max(
+    36,
+    ((config.minFontPx ?? 12) + 2) / safeHeightRatio,
+    65 / safeWidthRatio
+  );
+  const plateHeight = Math.max(height || 36, minLegibleHeight);
   const plateWidth = plateHeight * aspectRatio;
   return (
     <span
