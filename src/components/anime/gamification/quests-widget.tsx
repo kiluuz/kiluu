@@ -276,10 +276,10 @@ export function QuestsWidget({ compact = false }: { compact?: boolean }) {
         <Tabs value={activeTab} onValueChange={(v: any) => setActiveTab(v)}>
           <TabsList className="h-8 rounded-xl bg-secondary/50 p-0.5 text-xs">
             <TabsTrigger value="daily" className="rounded-lg px-3 text-[11px] font-bold">
-              {t("quests.dailyTab")} ({dailyQuests.filter((q) => q.status === "completed").length}/{dailyQuests.length})
+              {t("quests.dailyTab")} ({dailyQuests.filter((q) => q.status === "completed" || q.status === "claimed" || q.progress >= q.targetCount).length}/{dailyQuests.length})
             </TabsTrigger>
             <TabsTrigger value="weekly" className="rounded-lg px-3 text-[11px] font-bold">
-              {t("quests.weeklyTab")} ({weeklyQuests.filter((q) => q.status === "completed").length}/{weeklyQuests.length})
+              {t("quests.weeklyTab")} ({weeklyQuests.filter((q) => q.status === "completed" || q.status === "claimed" || q.progress >= q.targetCount).length}/{weeklyQuests.length})
             </TabsTrigger>
           </TabsList>
         </Tabs>
