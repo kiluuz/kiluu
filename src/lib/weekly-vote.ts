@@ -29,6 +29,51 @@ export async function getOrCreateCurrentWeeklyPoll() {
     },
   });
 
+  if (poll && poll.status === "active" && poll.candidates.length < 10) {
+    const existingIds = new Set(poll.candidates.map((c) => c.animeId));
+    const newAnimes = await db.anime.findMany({
+      where: {
+        id: { notIn: Array.from(existingIds) },
+        hidden: false,
+        moderationStatus: "APPROVED",
+      },
+      orderBy: { createdAt: "desc" },
+      take: 10 - poll.candidates.length,
+      select: { id: true },
+    });
+    if (newAnimes.length > 0) {
+      await db.weeklyAnimeCandidate.createMany({
+        data: newAnimes.map((a) => ({
+          pollId: poll!.id,
+          animeId: a.id,
+          votesCount: 0,
+        })),
+        skipDuplicates: true,
+      });
+      poll = await db.weeklyAnimePoll.findUnique({
+        where: { id: poll.id },
+        include: {
+          candidates: {
+            include: {
+              anime: {
+                select: {
+                  id: true,
+                  title: true,
+                  coverImage: true,
+                  rating: true,
+                  price: true,
+                  creator: {
+                    select: { username: true, displayName: true },
+                  },
+                },
+              },
+            },
+          },
+        },
+      });
+    }
+  }
+
   if (!poll) {
     const now = new Date();
     // Haftaning dushanba kuni boshlanishi

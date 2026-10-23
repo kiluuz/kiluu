@@ -2,13 +2,14 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Trophy, Star, Check, Sparkles, Clock, Crown, Loader2 } from "lucide-react";
+import { Trophy, Star, Check, Sparkles, Clock, Crown, Loader2, ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useAppStore } from "../store";
 import { SmartImage } from "../ui-bits";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import { useI18n } from "@/components/i18n-provider";
 
 interface Candidate {
   id: string;
@@ -35,6 +36,7 @@ interface PollData {
 
 export function WeeklyPollCard() {
   const { user, setAuthOpen, navigate } = useAppStore();
+  const { t } = useI18n();
   const [poll, setPoll] = useState<PollData | null>(null);
   const [loading, setLoading] = useState(true);
   const [votingAnimeId, setVotingAnimeId] = useState<string | null>(null);
@@ -69,17 +71,53 @@ export function WeeklyPollCard() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error);
 
-      toast.success(data.message || "Ovozingiz qabul qilindi!");
+      toast.success(data.message || t("weeklyPoll.voted"));
       setPoll((prev) => (prev ? { ...prev, myVoteAnimeId: animeId } : prev));
     } catch (e: any) {
-      toast.error(e.message || "Ovoz berishda xatolik");
+      toast.error(e.message || "Error");
     } finally {
       setVotingAnimeId(null);
     }
   };
 
-  if (loading || !poll || poll.candidates.length === 0) {
+  if (loading) {
     return null;
+  }
+
+  // Bo'sh holat: Yangi hafta boshlanishi va ovoz berishga chaqiriq (5 ta tilda)
+  if (!poll || poll.candidates.length === 0) {
+    return (
+      <div className="glass rounded-3xl border border-amber-500/30 bg-gradient-to-r from-amber-500/10 via-secondary/20 to-transparent p-5 sm:p-6 shadow-sm">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+          <div className="space-y-1.5 max-w-xl">
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="p-2 rounded-xl bg-amber-500/15 text-amber-500">
+                <Trophy className="w-5 h-5 text-amber-500" />
+              </span>
+              <h3 className="font-black text-base sm:text-lg">
+                {t("weeklyPoll.emptyTitle")}
+              </h3>
+              <Badge variant="outline" className="text-[10px] border-amber-500/40 text-amber-500 font-bold bg-amber-500/5">
+                {t("weeklyPoll.emptyBadge")}
+              </Badge>
+            </div>
+            <p className="text-xs sm:text-sm text-muted-foreground leading-relaxed">
+              {t("weeklyPoll.emptyDesc")}
+            </p>
+          </div>
+          <div className="flex items-center gap-2 shrink-0 w-full sm:w-auto">
+            <Button
+              size="sm"
+              onClick={() => navigate("studio")}
+              className="w-full sm:w-auto rounded-xl brand-gradient text-white font-bold gap-1.5 shadow-md hover:opacity-90"
+            >
+              <Sparkles className="w-3.5 h-3.5" />
+              {t("weeklyPoll.addAnimeBtn")}
+            </Button>
+          </div>
+        </div>
+      </div>
+    );
   }
 
   return (
@@ -89,19 +127,19 @@ export function WeeklyPollCard() {
         <div>
           <div className="flex items-center gap-2">
             <Trophy className="w-5 h-5 text-amber-500" />
-            <h3 className="font-black text-base sm:text-lg">Hafta Animesi (Ovoz berish)</h3>
+            <h3 className="font-black text-base sm:text-lg">{t("weeklyPoll.title")}</h3>
             <Badge variant="outline" className="text-[10px] border-amber-500/30 text-amber-500">
-              {poll.isClosed ? "Yakunlangan" : "Ovoz berish faol"}
+              {poll.isClosed ? t("weeklyPoll.closed") : t("weeklyPoll.active")}
             </Badge>
           </div>
           <p className="text-xs text-muted-foreground mt-0.5">
-            O'zingizga yoqqan animega ovoz bering. Dushanba kuni g'olib aniqlanadi va to'g'ri topganlarga mukofot beriladi!
+            {t("weeklyPoll.desc")}
           </p>
         </div>
 
         {poll.myVoteAnimeId && (
           <Badge className="bg-emerald-500/15 text-emerald-500 border-emerald-500/30 text-xs px-2.5 py-1 gap-1">
-            <Check className="w-3.5 h-3.5" /> Siz ovoz bergansiz
+            <Check className="w-3.5 h-3.5" /> {t("weeklyPoll.voted")}
           </Badge>
         )}
       </div>
@@ -126,7 +164,7 @@ export function WeeklyPollCard() {
             >
               {isWinner && (
                 <div className="absolute top-2 left-2 z-10 bg-amber-500 text-amber-950 font-black text-[10px] px-2 py-0.5 rounded-md flex items-center gap-1 shadow-md">
-                  <Crown className="w-3 h-3" /> G'olib!
+                  <Crown className="w-3 h-3" /> {t("weeklyPoll.winner")}
                 </div>
               )}
 
@@ -157,7 +195,7 @@ export function WeeklyPollCard() {
                       {c.percentage !== null ? `${c.percentage}%` : "—"}
                     </div>
                     <span className="text-[10px] text-muted-foreground">
-                      {c.votesCount || 0} ovoz
+                      {c.votesCount || 0} {t("weeklyPoll.votes")}
                     </span>
                   </div>
                 ) : isMyVote ? (
@@ -167,7 +205,7 @@ export function WeeklyPollCard() {
                     disabled
                     className="w-full h-7 text-[10px] rounded-lg border-emerald-500/40 text-emerald-500 bg-emerald-500/10 font-bold"
                   >
-                    <Check className="w-3 h-3 mr-1" /> Berildi
+                    <Check className="w-3 h-3 mr-1" /> {t("weeklyPoll.votedBtn")}
                   </Button>
                 ) : (
                   <Button
@@ -179,7 +217,7 @@ export function WeeklyPollCard() {
                     {votingAnimeId === c.id ? (
                       <Loader2 className="w-3 h-3 animate-spin" />
                     ) : (
-                      "Ovoz berish"
+                      t("weeklyPoll.voteBtn")
                     )}
                   </Button>
                 )}

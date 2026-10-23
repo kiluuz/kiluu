@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { getCurrentUser } from "@/lib/auth";
+import { emitEvent } from "@/lib/events";
 
 export async function POST(
   req: NextRequest,
@@ -38,9 +39,21 @@ export async function POST(
     _count: { _all: true },
   });
 
+  const avgRating = stats._avg.rating ? Number(stats._avg.rating.toFixed(2)) : 0;
+  await db.anime.update({
+    where: { id: anime.id },
+    data: { rating: avgRating },
+  });
+
+  try {
+    await emitEvent({ id: user.id }, "rating_given", { animeId: anime.id, rating });
+  } catch {
+    // Ignore event bus errors
+  }
+
   return NextResponse.json({
     myRating: rating,
     ratingCount: stats._count._all,
-    communityRating: stats._avg.rating,
+    communityRating: avgRating,
   });
 }

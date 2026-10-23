@@ -379,5 +379,18 @@
   "watch.previous": "Мурунку",
   "watch.nextEpisode": "Кийинки бөлүм",
   "watch.upNext": "Кийинкиси",
-  "watch.episodeCount": "{count} бөлүм"
+  "watch.episodeCount": "{count} бөлүм",
+  "weeklyPoll.title": "Жума анимеси (Добуш берүү)",
+  "weeklyPoll.active": "Добуш берүү активдүү",
+  "weeklyPoll.closed": "Аяктады",
+  "weeklyPoll.desc": "Өзүңүзгө жаккан анимеге добуш бериңиз. Дүйшөмбү күнү жеңүүчү аныкталып, сыйлыктар берилет!",
+  "weeklyPoll.voted": "Сиз добуш бердиңиз",
+  "weeklyPoll.voteBtn": "Добуш берүү",
+  "weeklyPoll.votedBtn": "Берилди",
+  "weeklyPoll.winner": "Жеңүүчү!",
+  "weeklyPoll.votes": "добуш",
+  "weeklyPoll.emptyTitle": "Жума анимеси — Добуш берип, кредит табыңыз!",
+  "weeklyPoll.emptyBadge": "Жаңы жума башталууда",
+  "weeklyPoll.emptyDesc": "Сүйүктүү анимеңизди кошуңуз же талапкерлерге добуш берип кредит жана XP утуп алыңыз!",
+  "weeklyPoll.addAnimeBtn": "Аниме кошуу"
 }

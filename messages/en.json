@@ -379,5 +379,18 @@
   "watch.previous": "Prev",
   "watch.nextEpisode": "Next Episode",
   "watch.upNext": "Up Next",
-  "watch.episodeCount": "{count} episodes"
+  "watch.episodeCount": "{count} episodes",
+  "weeklyPoll.title": "Anime of the Week (Vote)",
+  "weeklyPoll.active": "Voting Active",
+  "weeklyPoll.closed": "Finished",
+  "weeklyPoll.desc": "Vote for your favorite anime. The winner is announced every Monday with credit and XP rewards!",
+  "weeklyPoll.voted": "You voted",
+  "weeklyPoll.voteBtn": "Vote",
+  "weeklyPoll.votedBtn": "Voted",
+  "weeklyPoll.winner": "Winner!",
+  "weeklyPoll.votes": "votes",
+  "weeklyPoll.emptyTitle": "Anime of the Week — Vote and earn credits!",
+  "weeklyPoll.emptyBadge": "New week starting",
+  "weeklyPoll.emptyDesc": "Upload your favorite anime or vote for candidates to earn bonus credits and XP when your pick wins!",
+  "weeklyPoll.addAnimeBtn": "Upload Anime"
 }

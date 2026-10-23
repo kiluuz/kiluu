@@ -379,5 +379,18 @@
   "watch.previous": "Алдыңғы",
   "watch.nextEpisode": "Келесі эпизод",
   "watch.upNext": "Келесі",
-  "watch.episodeCount": "{count} эпизод"
+  "watch.episodeCount": "{count} эпизод",
+  "weeklyPoll.title": "Hápte Animesi (Dawıs beriw)",
+  "weeklyPoll.active": "Dawıs beriw belsendi",
+  "weeklyPoll.closed": "Juwmaqlandı",
+  "weeklyPoll.desc": "Ózińizge jaqqan animege dawıs beriń. Dúyshembi kúni jeńimpaz anıqlanadı hám sıylıqlar beriledi!",
+  "weeklyPoll.voted": "Siz dawıs berdińiz",
+  "weeklyPoll.voteBtn": "Dawıs beriw",
+  "weeklyPoll.votedBtn": "Berildi",
+  "weeklyPoll.winner": "Jeńimpaz!",
+  "weeklyPoll.votes": "dawıs",
+  "weeklyPoll.emptyTitle": "Hápte Animesi — Dawıs beriń hám kreditler islep tabıń!",
+  "weeklyPoll.emptyBadge": "Jańa hápte baslanbaqta",
+  "weeklyPoll.emptyDesc": "Óz süyikli animeńizdi qosıń yamasa dawıs berip kredit penen XP utıp alıń!",
+  "weeklyPoll.addAnimeBtn": "Anime qosıw"
 }

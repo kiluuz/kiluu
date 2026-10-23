@@ -7,12 +7,14 @@ import { log } from "@/lib/logger";
 import { sendVerificationEmail, isEmailEnabled } from "@/lib/email";
 import { z } from "zod";
 import { normalizeDisplayName } from "@/lib/display-name";
+import { bindReferralOnRegistration } from "@/lib/referrals";
 
 const Body = z.object({
   email: z.string().email().max(200),
   username: z.string().regex(/^[a-zA-Z0-9_]{3,20}$/),
   displayName: z.string().max(20).optional(),
   password: z.string().min(6).max(200),
+  referralCode: z.string().max(30).optional(),
 });
 
 function generateOtp(): string {
@@ -99,6 +101,17 @@ export async function POST(req: NextRequest) {
         });
         return created;
       });
+
+      if (parsed.data.referralCode) {
+        const ip = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim();
+        const userAgent = req.headers.get("user-agent") || undefined;
+        try {
+          await bindReferralOnRegistration(user.id, parsed.data.referralCode, ip, userAgent);
+        } catch (e) {
+          log.warn("failed to bind referral on registration", { err: String(e) });
+        }
+      }
+
       await sendVerificationEmail({ to: email, username, code });
       return NextResponse.json({ requiresVerification: true, email: email.toLowerCase() }, { status: 201 });
     } else {
@@ -127,6 +140,17 @@ export async function POST(req: NextRequest) {
         });
         return created;
       });
+
+      if (parsed.data.referralCode) {
+        const ip = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim();
+        const userAgent = req.headers.get("user-agent") || undefined;
+        try {
+          await bindReferralOnRegistration(user.id, parsed.data.referralCode, ip, userAgent);
+        } catch (e) {
+          log.warn("failed to bind referral on registration", { err: String(e) });
+        }
+      }
+
       await createSession(user.id);
       const ownedCount = await db.purchase.count({ where: { userId: user.id } });
       return NextResponse.json({ user: { ...toPublicUser(user), ownedCount } }, { status: 201 });

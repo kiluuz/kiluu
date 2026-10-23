@@ -379,5 +379,18 @@
   "watch.previous": "Назад",
   "watch.nextEpisode": "Следующий эпизод",
   "watch.upNext": "Далее",
-  "watch.episodeCount": "эпизодов: {count}"
+  "watch.episodeCount": "эпизодов: {count}",
+  "weeklyPoll.title": "Аниме недели (Голосование)",
+  "weeklyPoll.active": "Голосование активно",
+  "weeklyPoll.closed": "Завершено",
+  "weeklyPoll.desc": "Голосуйте за любимое аниме. В понедельник объявляется победитель и выдаются кредиты и XP!",
+  "weeklyPoll.voted": "Вы проголосовали",
+  "weeklyPoll.voteBtn": "Голосовать",
+  "weeklyPoll.votedBtn": "Принято",
+  "weeklyPoll.winner": "Победитель!",
+  "weeklyPoll.votes": "голосов",
+  "weeklyPoll.emptyTitle": "Аниме недели — Голосуйте и зарабатывайте кредиты!",
+  "weeklyPoll.emptyBadge": "Начало новой недели",
+  "weeklyPoll.emptyDesc": "Добавьте своё любимое аниме или голосуйте за номинантов, чтобы заработать кредиты и XP!",
+  "weeklyPoll.addAnimeBtn": "Добавить аниме"
 }

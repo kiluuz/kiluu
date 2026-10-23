@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Loader2, Eye, Mail, Lock, User, ArrowLeft, Sparkles, Coins, Clapperboard, Swords } from "lucide-react";
+import { Loader2, Eye, Mail, Lock, User, ArrowLeft, Sparkles, Coins, Clapperboard, Swords, Gift, Check } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -21,8 +21,29 @@ export function LoginView() {
   const [otpStep, setOtpStep] = useState<{ email: string } | null>(null);
   const [otpCode, setOtpCode] = useState("");
   const [registerDisplayName, setRegisterDisplayName] = useState("");
+  const [referralCode, setReferralCode] = useState("");
   const [resendCooldown, setResendCooldown] = useState(0);
   const [hero, setHero] = useState<{ banner: string | null; cover: string | null; title: string; quote: string } | null>(null);
+
+  // Check URL ref query or localStorage
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const params = new URLSearchParams(window.location.search);
+      const refParam = params.get("ref");
+      if (refParam) {
+        const clean = refParam.trim().toUpperCase();
+        setReferralCode(clean);
+        try {
+          localStorage.setItem("dubanix_ref", clean);
+        } catch {}
+      } else {
+        try {
+          const saved = localStorage.getItem("dubanix_ref");
+          if (saved) setReferralCode(saved.trim().toUpperCase());
+        } catch {}
+      }
+    }
+  }, []);
 
   // Already signed in → go home
   useEffect(() => {
@@ -115,6 +136,7 @@ export function LoginView() {
           username,
           displayName: registerDisplayName.trim() || username,
           password,
+          referralCode: referralCode.trim() || undefined,
         }),
       });
       const data = await res.json();
@@ -384,6 +406,28 @@ export function LoginView() {
                     <Label htmlFor="reg-confirm" className="text-xs font-semibold">{t("auth.confirm")}</Label>
                     <Input id="reg-confirm" name="confirm" type="password" required minLength={6} placeholder={t("auth.repeat")} className="h-12 rounded-xl text-[15px]" />
                   </div>
+                </div>
+                <div className="space-y-1.5">
+                  <div className="flex items-center justify-between">
+                    <Label htmlFor="reg-ref" className="text-xs font-semibold flex items-center gap-1.5">
+                      <Gift className="w-3.5 h-3.5 text-primary" />
+                      Referral kodi (ixtiyoriy)
+                    </Label>
+                    {referralCode && (
+                      <span className="text-[10px] text-emerald-500 font-bold flex items-center gap-1">
+                        <Check className="w-3 h-3" /> Qo'llandi
+                      </span>
+                    )}
+                  </div>
+                  <Input
+                    id="reg-ref"
+                    name="referralCode"
+                    value={referralCode}
+                    onChange={(e) => setReferralCode(e.target.value.toUpperCase())}
+                    placeholder="Masalan: ABC123"
+                    maxLength={20}
+                    className="h-12 rounded-xl text-[15px] font-mono tracking-wider uppercase"
+                  />
                 </div>
                 <Button type="submit" disabled={loading} className="w-full h-12 rounded-xl brand-gradient hover:opacity-90 text-white font-bold text-[15px]">
                   {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : t("auth.createAccount")}

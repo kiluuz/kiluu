@@ -473,8 +473,14 @@ export function AnimeCard({ anime, rank, compactTitle = false }: { anime: AnimeS
         {/* Bottom gradient always for rating */}
         <div className="absolute bottom-0 inset-x-0 bg-gradient-to-t from-black/80 to-transparent p-2 pt-6">
           <div className="flex items-center gap-1">
-            <Star className="w-3.5 h-3.5 fill-amber-400 text-amber-400" />
-            <span className="text-[12px] font-bold text-white">{anime.rating.toFixed(1)}</span>
+            {anime.rating > 0 ? (
+              <>
+                <Star className="w-3.5 h-3.5 fill-amber-400 text-amber-400" />
+                <span className="text-[12px] font-bold text-white">{anime.rating.toFixed(1)}</span>
+              </>
+            ) : (
+              <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-primary/30 text-white/90">Yangi</span>
+            )}
             <span className="text-[11px] text-white/70 ml-auto">{anime.year}</span>
           </div>
         </div>
@@ -550,8 +556,14 @@ export function RankedCard({ anime, rank, tone = "ember" }: { anime: AnimeSummar
           {/* resting info — rating + access chip */}
           <div className="absolute bottom-0 inset-x-0 z-10 bg-gradient-to-t from-black/95 via-black/40 to-transparent p-2.5 pt-10">
             <div className="flex items-center gap-1.5">
-              <Star className="w-3.5 h-3.5 fill-amber-400 text-amber-400 shrink-0" />
-              <span className="text-[12px] font-black text-white tabular-nums">{anime.rating.toFixed(1)}</span>
+              {anime.rating > 0 ? (
+                <>
+                  <Star className="w-3.5 h-3.5 fill-amber-400 text-amber-400 shrink-0" />
+                  <span className="text-[12px] font-black text-white tabular-nums">{anime.rating.toFixed(1)}</span>
+                </>
+              ) : (
+                <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-primary/30 text-white/90">Yangi</span>
+              )}
               {anime.isFree ? (
                 <span className="ml-auto text-[9px] font-black px-1.5 py-0.5 rounded-full bg-emerald-500/90 text-white tracking-wide">FREE</span>
               ) : anime.owned ? (

@@ -124,8 +124,14 @@ export function HomeView() {
               </h1>
               <div className="flex items-center gap-3 text-sm mb-4 flex-wrap">
                 <span className="flex items-center gap-1 font-bold">
-                  <Star className="w-4 h-4 fill-amber-400 text-amber-400" />
-                  {hero.rating.toFixed(1)}
+                  {hero.rating > 0 ? (
+                    <>
+                      <Star className="w-4 h-4 fill-amber-400 text-amber-400" />
+                      {hero.rating.toFixed(1)}
+                    </>
+                  ) : (
+                    <Badge variant="outline" className="text-xs border-primary/30 text-primary">Yangi</Badge>
+                  )}
                 </span>
                 <span className="text-muted-foreground">{hero.year}</span>
                 <span className="text-muted-foreground">·</span>

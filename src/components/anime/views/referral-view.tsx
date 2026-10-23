@@ -63,7 +63,29 @@ export function ReferralView() {
   const [loading, setLoading] = useState(true);
   const [copiedLink, setCopiedLink] = useState(false);
   const [copiedCode, setCopiedCode] = useState(false);
+  const [inputCode, setInputCode] = useState("");
+  const [binding, setBinding] = useState(false);
   const [activeTab, setActiveTab] = useState<"stats" | "leaderboard">("stats");
+
+  const handleBindCode = async () => {
+    if (!inputCode.trim()) return;
+    setBinding(true);
+    try {
+      const res = await fetch("/api/referrals/bind", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ code: inputCode.trim() }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
+      toast.success(data.message || "Referral muvaffaqiyatli bog'landi!");
+      setInputCode("");
+    } catch (e: any) {
+      toast.error(e.message || "Xatolik yuz berdi");
+    } finally {
+      setBinding(false);
+    }
+  };
 
   useEffect(() => {
     if (!user) {
@@ -190,6 +212,37 @@ export function ReferralView() {
           </div>
         </div>
       )}
+
+      {/* Enter Friend's Referral Code Card */}
+      <div className="glass rounded-3xl border p-5 sm:p-6 space-y-3 bg-card/60">
+        <div className="space-y-1">
+          <h3 className="font-black text-sm sm:text-base flex items-center gap-2">
+            <Gift className="w-4 h-4 text-primary" /> Sizni do'stingiz taklif qildimi?
+          </h3>
+          <p className="text-xs text-muted-foreground">
+            Do'stingiz bergan referral kodini kiriting va ikkalangiz ham bonus kredit va XP oling!
+          </p>
+        </div>
+        <div className="flex flex-col sm:flex-row gap-2 max-w-md">
+          <Input
+            value={inputCode}
+            onChange={(e) => setInputCode(e.target.value.toUpperCase())}
+            placeholder="KILUU-XXXXXX"
+            className="rounded-xl text-xs font-mono font-bold tracking-wider uppercase bg-secondary/40"
+          />
+          <Button
+            onClick={handleBindCode}
+            disabled={binding || !inputCode.trim()}
+            className="rounded-xl font-bold px-5 text-xs shrink-0"
+          >
+            {binding ? (
+              <Loader2 className="w-4 h-4 animate-spin" />
+            ) : (
+              "Kodni faollashtirish"
+            )}
+          </Button>
+        </div>
+      </div>
 
       {/* Stats Counter */}
       {data && (

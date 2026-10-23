@@ -41,6 +41,7 @@ export const ACHIEVEMENT_SEEDS: AchievementSeed[] = [
   { id: "couch_critic", emoji: "🛋️", name: "Couch Critic", description: "Watch 10 hours", rarity: "rare", category: "watch", condition: { type: "watch_hours", gte: 10 } },
   { id: "night_owl", emoji: "🦉", name: "Night Owl", description: "Watch between 02:00 and 05:00", rarity: "rare", category: "watch", condition: { type: "night_owl" } },
   { id: "streak_7", emoji: "🔥", name: "Streak Keeper", description: "7-day watch streak", rarity: "rare", category: "watch", condition: { type: "streak", gte: 7 } },
+  { id: "streak_20", emoji: "🔥", name: "Faithful Otaku", description: "20-day login streak", rarity: "epic", category: "watch", condition: { type: "streak", gte: 20 }, reward: { credits: 20 } },
   { id: "streak_30", emoji: "🔥", name: "Streak Keeper II", description: "30-day watch streak", rarity: "epic", category: "watch", condition: { type: "streak", gte: 30 } },
   { id: "streak_100", emoji: "🔥", name: "Streak Keeper III", description: "100-day watch streak", rarity: "legendary", category: "watch", condition: { type: "streak", gte: 100 } },
   { id: "party_host", emoji: "🎉", name: "Party Host", description: "Host 10 watch parties", rarity: "rare", category: "social", condition: { type: "parties_hosted", gte: 10 } },

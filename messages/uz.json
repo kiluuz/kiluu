@@ -379,5 +379,18 @@
   "watch.previous": "Oldingi",
   "watch.nextEpisode": "Keyingi qism",
   "watch.upNext": "Navbatdagisi",
-  "watch.episodeCount": "{count} ta qism"
+  "watch.episodeCount": "{count} ta qism",
+  "weeklyPoll.title": "Hafta Animesi (Ovoz berish)",
+  "weeklyPoll.active": "Ovoz berish faol",
+  "weeklyPoll.closed": "Yakunlangan",
+  "weeklyPoll.desc": "O'zingizga yoqqan animega ovoz bering. Dushanba kuni g'olib aniqlanadi va to'g'ri topganlarga mukofot beriladi!",
+  "weeklyPoll.voted": "Siz ovoz bergansiz",
+  "weeklyPoll.voteBtn": "Ovoz berish",
+  "weeklyPoll.votedBtn": "Berildi",
+  "weeklyPoll.winner": "G'olib!",
+  "weeklyPoll.votes": "ovoz",
+  "weeklyPoll.emptyTitle": "Hafta Animesi — Ovoz bering va kreditlar ishlang!",
+  "weeklyPoll.emptyBadge": "Yangi hafta boshlanmoqda",
+  "weeklyPoll.emptyDesc": "O'z sevimli animengizni qo'shing yoki nomzodlarga ovoz berib, g'olibni to'g'ri topsangiz bonus kredit va XP ishlang!",
+  "weeklyPoll.addAnimeBtn": "Anime qo'shish"
 }
