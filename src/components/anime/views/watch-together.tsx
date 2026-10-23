@@ -715,8 +715,8 @@ export function WatchTogetherView() {
               </div>
             )}
             {selAnime && episodes.length === 0 && (
-              <p className="text-xs text-muted-foreground rounded-xl border border-dashed p-4">
-                No owned/free episodes have HLS playback yet. Create an episode, prepare its HLS files locally, then upload them to the R2 path shown in Creator Studio.
+              <p className="text-xs text-muted-foreground rounded-xl border border-dashed p-4 text-center">
+                Ushbu anime uchun video pleyer oqimi hali tayyorlanmagan. Tez orada yuklanadi!
               </p>
             )}
             <Button

@@ -23,7 +23,7 @@ export async function GET(
   try {
     if (result.episode.hlsKey) {
       if (!(await r2ObjectExists(result.episode.hlsKey))) {
-        return NextResponse.json({ error: "HLS files have not been uploaded to R2 yet" }, { status: 404 });
+        return NextResponse.json({ error: "Video stream files have not been uploaded yet" }, { status: 404 });
       }
       const streamUrl = createSignedHlsUrl(result.episode.hlsKey);
       return NextResponse.json(

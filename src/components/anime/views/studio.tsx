@@ -225,7 +225,7 @@ export function StudioView() {
       }
       if (d.hlsKey) {
         toast.success(`Episode ${d.episode.number} created`, {
-          description: `Upload your HLS folder to R2 under ${d.hlsKey.replace(/\/index\.m3u8$/, "")}`,
+          description: `Upload your stream folder under ${d.hlsKey.replace(/\/index\.m3u8$/, "")}`,
           duration: 12000,
         });
       } else {
@@ -299,7 +299,7 @@ export function StudioView() {
             <p className="text-xs text-muted-foreground">
               The bot must be configured with access to the private media channel. Uploads stay hidden
               until moderator approval. Telegram episode delivery uses the bot; Watch Together playback
-              additionally needs an HLS copy uploaded to private R2.
+              additionally needs a web video stream uploaded to media storage.
             </p>
           </div>
         ) : (
@@ -568,7 +568,7 @@ export function StudioView() {
             <div className="space-y-1.5">
               <Label className="text-xs font-semibold">Watch Together playback</Label>
               <p className="text-[11px] text-muted-foreground">
-                Send the episode video through Telegram bot first. Convert a copy to HLS on your computer, then upload that folder to the private R2 path shown after creating this episode.
+                Send the episode video through Telegram bot first. Convert a copy for web video streaming, then upload it under the path shown after creating this episode.
               </p>
             </div>
             <div className="space-y-1.5">

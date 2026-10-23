@@ -32,7 +32,7 @@ export async function POST(req: NextRequest) {
     if (!animeId) return NextResponse.json({ error: "animeId is required" }, { status: 400 });
     if (!title || !title.trim()) return NextResponse.json({ error: "Episode title is required" }, { status: 400 });
     if (!useR2Hls) {
-      return NextResponse.json({ error: "Episode videos must be uploaded through Telegram; use private R2 HLS for Watch Together" }, { status: 400 });
+      return NextResponse.json({ error: "Episode videos must be uploaded through Telegram; web video stream required for Watch Together" }, { status: 400 });
     }
 
     const anime = await db.anime.findUnique({ where: { id: animeId } });

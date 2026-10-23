@@ -31,11 +31,11 @@ export async function POST(request: NextRequest) {
   if (episodeForAvailability?.hlsKey) {
     try {
       if (!(await r2ObjectExists(episodeForAvailability.hlsKey))) {
-        return NextResponse.json({ error: "HLS files have not been uploaded to R2 yet" }, { status: 409 });
+        return NextResponse.json({ error: "Video stream files have not been uploaded yet" }, { status: 409 });
       }
     } catch (error) {
-      console.error("Watch party R2 availability check failed", error);
-      return NextResponse.json({ error: "R2 media storage is temporarily unavailable" }, { status: 503 });
+      console.error("Watch party media availability check failed", error);
+      return NextResponse.json({ error: "Media storage is temporarily unavailable" }, { status: 503 });
     }
   }
   let joinPrice: number;

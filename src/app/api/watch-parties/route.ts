@@ -80,16 +80,16 @@ export async function POST(request: NextRequest) {
   if ("error" in result) {
     if (result.error === "NOT_FOUND") return NextResponse.json({ error: "Episode not found" }, { status: 404 });
     if (result.error === "FORBIDDEN") return NextResponse.json({ error: "Purchase required" }, { status: 403 });
-    return NextResponse.json({ error: "This episode has no browser HLS stream yet" }, { status: 409 });
+    return NextResponse.json({ error: "This episode has no video stream yet" }, { status: 409 });
   }
   if (result.episode.hlsKey) {
     try {
       if (!(await r2ObjectExists(result.episode.hlsKey))) {
-        return NextResponse.json({ error: "HLS files have not been uploaded to R2 yet" }, { status: 409 });
+        return NextResponse.json({ error: "Video stream files have not been uploaded yet" }, { status: 409 });
       }
     } catch (error) {
-      console.error("Watch party R2 availability check failed", error);
-      return NextResponse.json({ error: "R2 media storage is temporarily unavailable" }, { status: 503 });
+      console.error("Watch party media availability check failed", error);
+      return NextResponse.json({ error: "Media storage is temporarily unavailable" }, { status: 503 });
     }
   }
   let joinPrice: number;
