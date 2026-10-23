@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   BadgeCheck, Crown, CalendarDays, Heart, Film, Star, Timer, Package, Users,
-  Pencil, Loader2, Smile, Sparkles, Lock, Check, Send,
+  Pencil, Loader2, Smile, Sparkles, Lock, Check,
   Play, MessageSquare, ThumbsUp, Trophy, Clapperboard,
   Instagram, Youtube, Twitter, MapPin, Clock, Layers,
 } from "lucide-react";
@@ -11,8 +11,9 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { Button } from "@/components/ui/button";
 import { useAppStore, useOpenProfile } from "./store";
 import type { PublicProfile, AnimeSummary, ShowcaseConfig } from "./types";
-import { Avatar, SmartImage, formatDuration, timeAgo, formatCredits } from "./ui-bits";
+import { avatarNameGap, FramedAvatar, NameWithFrame, nameFrameContentInset, SmartImage, formatDuration, timeAgo, formatCredits } from "./ui-bits";
 import { RARITY_LABEL, type AchievementDef, type Rarity } from "./profile-assets";
+import { frameById } from "../../../frames.config";
 import { ProfileEditor } from "./profile-editor";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
@@ -492,34 +493,20 @@ function IdentityActions({ profile, onEdit }: { profile: PublicProfile; onEdit?:
         {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : following ? <Check className="w-4 h-4" /> : <Users className="w-4 h-4" />}
         {following ? "Following" : "Follow"}
       </Button>}
-      <Button
-        variant="outline"
-        size="sm"
-        className="rounded-full h-9 gap-1.5"
-        onClick={() => useAppStore.getState().openProfileCard(profile.username)}
-      >
-        <Send className="w-4 h-4" /> Message
-      </Button>
     </div>
   );
 }
 
 function ProfileIdentity({ profile, onEdit }: { profile: PublicProfile; onEdit?: () => void }) {
-  const online = profile.currentlyWatching; // presence proxy: active watching = online
+  const online = Boolean(profile.isOnline ?? profile.currentlyWatching);
+  const avatarOverflowGap = avatarNameGap(profile, 112);
   return (
     <div className="relative px-4 sm:px-8">
-      <div className="flex flex-col sm:flex-row sm:items-end gap-4 -mt-[52px] sm:-mt-[64px] relative z-10">
+      <div className="flex flex-col sm:flex-row sm:items-end gap-0 -mt-[52px] sm:-mt-[64px] relative z-10 overflow-visible">
         {/* Avatar — overlaps banner with SOLID page-bg ring (no bleed artifacts) */}
         <div className="relative shrink-0 mx-auto sm:mx-0">
           <div className="rounded-full bg-background p-1.5 shadow-2xl">
-            <Avatar
-              src={profile.avatarUrl}
-              name={profile.displayName || profile.username}
-              accent={profile.accentColor}
-              accentTo={profile.accentTo}
-              frame={profile.avatarFrame}
-              size={112}
-            />
+            <FramedAvatar user={profile} size={112} />
           </div>
           {/* online dot */}
           <span
@@ -527,15 +514,24 @@ function ProfileIdentity({ profile, onEdit }: { profile: PublicProfile; onEdit?:
               "absolute bottom-3 right-3 w-[18px] h-[18px] rounded-full border-[3px] border-background",
               online ? "bg-emerald-500 live-dot" : "bg-muted-foreground/50"
             )}
-            title={online ? "Online — watching now" : "Offline"}
+            title={online ? (profile.currentlyWatching ? "Online — tomosha qilmoqda" : "Online") : "Oflayn"}
           />
         </div>
 
         {/* Name block — BELOW banner edge with breathing room */}
-        <div className="flex-1 min-w-0 pt-2 sm:pt-0 sm:pb-1 text-center sm:text-left">
+        <div
+          className={cn(
+            "flex-1 min-w-0 sm:pt-0 sm:pb-1 text-center sm:text-left overflow-visible sm:ml-[var(--profile-avatar-gap)]",
+            profile.equippedAvatarFrameId ? "pt-6" : profile.equippedNameFrameId ? "pt-4" : "pt-2",
+          )}
+          style={{
+            "--profile-avatar-gap": profile.equippedAvatarFrameId ? `${avatarOverflowGap}px` : "0px",
+            "--profile-name-frame-inset": `${nameFrameContentInset(profile, 40)}px`,
+          } as React.CSSProperties}
+        >
           <div className="flex items-center gap-2 flex-wrap justify-center sm:justify-start">
-            <h1 className="font-display text-2xl sm:text-4xl font-bold tracking-tight leading-tight">
-              {profile.displayName || profile.username}
+            <h1 className="m-0 flex min-w-0 items-center font-display text-2xl sm:text-4xl font-bold tracking-tight leading-none">
+              <NameWithFrame user={profile} height={40} avatarSize={0} />
             </h1>
             {profile.role === "CREATOR" && (
               <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider text-white"
@@ -545,7 +541,7 @@ function ProfileIdentity({ profile, onEdit }: { profile: PublicProfile; onEdit?:
             )}
             {profile.isVerified && <BadgeCheck className="w-5 h-5 text-[var(--user-accent)]" aria-label="Verified" />}
           </div>
-          <div className="flex items-center gap-2 flex-wrap mt-1 justify-center sm:justify-start">
+          <div className="profile-name-frame-follow flex items-center gap-2 flex-wrap mt-1 justify-center sm:justify-start">
             <span className="text-sm text-muted-foreground">@{profile.username}</span>
             {profile.pronouns && (
               <span className="text-xs px-2 py-0.5 rounded-full bg-accent text-muted-foreground">{profile.pronouns}</span>
@@ -556,15 +552,15 @@ function ProfileIdentity({ profile, onEdit }: { profile: PublicProfile; onEdit?:
               </span>
             )}
             {profile.stats.badges?.map(b => (
-              <span key={b.id} className={cn("text-[10px] font-bold px-2 py-0.5 rounded-full shrink-0 uppercase tracking-wide shadow-sm", b.color, b.glow && "animate-pulse shadow-[0_0_8px_currentColor]")}>
+              <span key={b.id} className={cn("text-[10px] font-bold px-2 py-0.5 rounded-full shrink-0 shadow-sm", b.id !== "level_title" && "uppercase tracking-wide", b.color, b.glow && "animate-pulse shadow-[0_0_8px_currentColor]")}>
                 {b.label}
               </span>
             ))}
           </div>
           {profile.tagline && (
-            <p className="text-sm mt-1.5 font-medium text-foreground/80">{profile.tagline}</p>
+            <p className="profile-name-frame-follow text-sm mt-1.5 font-medium text-foreground/80">{profile.tagline}</p>
           )}
-          <div className="mt-2 flex justify-center sm:justify-start">
+          <div className="profile-name-frame-follow mt-2 flex justify-center sm:justify-start">
             <StatusLine profile={profile} />
           </div>
         </div>
@@ -677,9 +673,9 @@ function IdentityColumn({ profile }: { profile: PublicProfile }) {
                 onClick={() => openProfile(u.username)}
                 className="w-full flex items-center gap-2.5 p-1.5 rounded-xl hover:bg-accent transition text-left focus-ring-accent"
               >
-                <Avatar src={u.avatarUrl} name={u.displayName || u.username} accent={u.accentColor} accentTo={u.accentTo} size={30} />
+                <FramedAvatar user={u} size={30} />
                 <div className="min-w-0">
-                  <p className="text-[13px] font-semibold truncate">{u.displayName || u.username}</p>
+                  <NameWithFrame user={u} compact className="text-[13px] font-semibold truncate" avatarSize={30} />
                   <p className="text-[10px] text-muted-foreground truncate">@{u.username}</p>
                 </div>
               </button>
@@ -945,16 +941,10 @@ function PostCard({ post, profile }: { post: PublicProfile["posts"][number]; pro
   return (
     <article className="rounded-2xl border bg-card p-4 hover:border-[color-mix(in_srgb,var(--user-accent)_35%,transparent)] transition-colors">
       <div className="flex items-start gap-3">
-        <Avatar
-          src={profile.avatarUrl}
-          name={profile.displayName || profile.username}
-          accent={profile.accentColor}
-          accentTo={profile.accentTo}
-          size={36}
-        />
+        <FramedAvatar user={profile} size={36} />
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-1.5 flex-wrap">
-            <span className="text-sm font-bold">{profile.displayName || profile.username}</span>
+            <NameWithFrame user={profile} compact className="text-sm font-bold" avatarSize={36} />
             <span className="text-xs text-muted-foreground">@{profile.username}</span>
             <span className="text-xs text-muted-foreground">· {timeAgo(post.createdAt)}</span>
           </div>
@@ -1058,6 +1048,20 @@ export function ProfilePageBody({
   const { t } = useI18n();
   const [tab, setTab] = useState(activeTab || "overview");
   const [prevActiveTab, setPrevActiveTab] = useState(activeTab);
+  useEffect(() => {
+    const links = [profile.equippedAvatarFrameId, profile.equippedNameFrameId]
+      .map(frameById)
+      .filter((frame): frame is NonNullable<typeof frame> => Boolean(frame))
+      .map((frame) => {
+        const link = document.createElement("link");
+        link.rel = "preload";
+        link.as = "image";
+        link.href = `/frames/${frame.slug}.v${frame.version ?? 2}.webp`;
+        document.head.appendChild(link);
+        return link;
+      });
+    return () => links.forEach((link) => link.remove());
+  }, [profile.equippedAvatarFrameId, profile.equippedNameFrameId]);
   if (activeTab !== prevActiveTab) {
     setPrevActiveTab(activeTab);
     if (activeTab) setTab(activeTab);

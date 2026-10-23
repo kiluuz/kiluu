@@ -1,38 +1,76 @@
 "use client";
 
 import { useState } from "react";
-import { Loader2, Clapperboard, Swords, Check, Eye } from "lucide-react";
+import { Loader2, Clapperboard, Swords, Check, Eye, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useAppStore } from "./store";
 import { Logo } from "./logo";
 import { toast } from "sonner";
+import { ANIME_GENRES } from "@/lib/anime-preferences";
+import { normalizeDisplayName } from "@/lib/display-name";
 
 /** One-time onboarding: choose Creator or Viewer */
 export function Onboarding() {
   const { user, updateUser } = useAppStore();
   const [choice, setChoice] = useState<"CREATOR" | "VIEWER" | null>(null);
+  const [favoriteGenres, setFavoriteGenres] = useState<string[]>(user?.favoriteGenres ?? []);
   const [displayName, setDisplayName] = useState(user?.displayName || user?.username || "");
   const [saving, setSaving] = useState(false);
-  const [step, setStep] = useState<"role" | "name">("role");
+  const [step, setStep] = useState<"genres" | "role" | "name">("genres");
 
-  if (!user || user.onboardingDone) return null;
+  if (!user || (user.onboardingDone && user.favoriteGenres.length > 0)) return null;
+  const activeStep = step === "genres" && user.favoriteGenres.length > 0
+    ? user.onboardingDone ? "genres" : "role"
+    : step;
 
-  async function finish(role: "CREATOR" | "VIEWER") {
+  async function saveFavoriteGenres() {
+    const selected = [...new Set([...user!.favoriteGenres, ...favoriteGenres])];
+    if (selected.length === 0) {
+      toast.error("Choose at least one anime genre");
+      return;
+    }
     setSaving(true);
     try {
       const res = await fetch("/api/profile", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ role, displayName: displayName || user!.username }),
+        body: JSON.stringify({ favoriteGenres: selected }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        toast.error(data.error || "Failed to save your anime preferences");
+        return;
+      }
+      updateUser({ ...user!, ...data.user });
+      if (!user!.onboardingDone) setStep("role");
+    } catch {
+      toast.error("Network error");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function finish(role: "CREATOR" | "VIEWER") {
+    const normalizedName = normalizeDisplayName(displayName);
+    if (!normalizedName) {
+      toast.error("Display name must be 2-20 characters");
+      return;
+    }
+    setSaving(true);
+    try {
+      const res = await fetch("/api/profile", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ role, displayName: normalizedName }),
       });
       const data = await res.json();
       if (!res.ok) {
         toast.error(data.error || "Failed to save");
         return;
       }
-      updateUser(data.user);
+      updateUser({ ...user!, ...data.user });
       toast.success(role === "CREATOR" ? "Creator mode unlocked! Publish your animes in the Studio." : "You're all set. Enjoy the show!");
     } catch {
       toast.error("Network error");
@@ -52,7 +90,13 @@ export function Onboarding() {
           <h1 className="text-3xl font-black">
             Welcome to <span className="gradient-text">Kiluu</span>
           </h1>
-          {step === "role" ? (
+          {activeStep === "genres" ? (
+            <p className="text-muted-foreground mt-2 text-sm">
+              What types of anime do you like?
+              <br />
+              <span className="text-xs opacity-70">Choose all that apply to personalize your home page.</span>
+            </p>
+          ) : activeStep === "role" ? (
             <p className="text-muted-foreground mt-2 text-sm">
               One quick thing — how will you use Kiluu?
               <br />
@@ -63,7 +107,44 @@ export function Onboarding() {
           )}
         </div>
 
-        {step === "role" ? (
+        {activeStep === "genres" ? (
+          <div className="rounded-2xl border bg-card p-5 sm:p-6">
+            <div className="flex items-center gap-2 mb-4 text-sm font-semibold">
+              <Sparkles className="w-4 h-4 text-primary" />
+              Choose your favorite genres
+              <span className="ml-auto text-xs text-muted-foreground">{favoriteGenres.length} selected</span>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {ANIME_GENRES.map((genre) => {
+                const selected = favoriteGenres.includes(genre);
+                return (
+                  <button
+                    key={genre}
+                    type="button"
+                    onClick={() => setFavoriteGenres((genres) =>
+                      selected ? genres.filter((item) => item !== genre) : [...genres, genre]
+                    )}
+                    aria-pressed={selected}
+                    className={`rounded-full border px-3 py-2 text-sm font-semibold transition ${
+                      selected
+                        ? "border-primary bg-primary/15 text-primary"
+                        : "border-border bg-background/70 text-muted-foreground hover:border-primary/50 hover:text-foreground"
+                    }`}
+                  >
+                    {genre}
+                  </button>
+                );
+              })}
+            </div>
+            <Button
+              disabled={saving || favoriteGenres.length === 0}
+              onClick={saveFavoriteGenres}
+              className="w-full mt-5 h-12 rounded-xl font-bold brand-gradient hover:opacity-90 text-white"
+            >
+              {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : "Continue"}
+            </Button>
+          </div>
+        ) : activeStep === "role" ? (
           <>
             <div className="grid sm:grid-cols-2 gap-4">
               <button
@@ -135,12 +216,13 @@ export function Onboarding() {
                 <Input
                   id="ob-name"
                   value={displayName}
-                  onChange={(e) => setDisplayName(e.target.value)}
-                  maxLength={32}
+                  onChange={(e) => setDisplayName(e.target.value.replace(/[\u0000-\u001f\u007f-\u009f]/gu, ""))}
+                  maxLength={20}
                   placeholder="How others see you"
                   className="pl-9 h-12 rounded-xl text-base"
                 />
               </div>
+              <p className="mt-1 text-right text-[10px] text-muted-foreground">{[...displayName].length}/20</p>
             </div>
             <div className="flex gap-3">
               <Button variant="outline" onClick={() => setStep("role")} className="h-11 rounded-xl">

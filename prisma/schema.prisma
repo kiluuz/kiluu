@@ -21,6 +21,7 @@ model User {
   accentColor    String   @default("#f97316")
   credits        Int      @default(0)
   onboardingDone Boolean  @default(false)
+  favoriteGenres String   @default("")
   telegramId     String?  @unique
   telegramUsername String?
   locale         String   @default("uz")
@@ -42,6 +43,8 @@ model User {
   statusText     String?   // custom status text
   accentTo       String?   // gradient end color (accentColor is "from")
   avatarFrame    String?   // none | gold | ember | neon | sakura (unlockable)
+  equippedAvatarFrameId String? @map("equipped_avatar_frame_id")
+  equippedNameFrameId   String? @map("equipped_name_frame_id")
   bannerPreset   String?   // preset banner id when using gallery
   showcase       String?   // JSON {topFive:[], pinnedPostId, genres:[], achievementIds:[], order:[], hidden:{}}
   privacy        String?   // JSON {showWatchTime, showFavorites, showActivity, allowFollows, profileVisibility}
@@ -85,6 +88,80 @@ model User {
   creditPackagesPaid  StarsPayment[]
   animeRatings        AnimeRating[]
   watchEvents         WatchEvent[]
+  // 10-QISM
+  clubsOwned          Club[]            @relation("ClubOwner")
+  clubMemberships     ClubMember[]
+  clubJoinRequests    ClubJoinRequest[]
+  chatMessages        ChatMessage[]
+  messageReactions    MessageReaction[]
+  pollVotes           PollVote[]
+  chatBans            ChatBan[]
+  blockedBy           UserBlock[]       @relation("Blocker")
+  blockedUsers        UserBlock[]       @relation("Blocked")
+  userEmotes          UserEmote[]
+  equippedAvatarFrame Frame? @relation("EquippedAvatarFrame", fields: [equippedAvatarFrameId], references: [id], onDelete: SetNull)
+  equippedNameFrame   Frame? @relation("EquippedNameFrame", fields: [equippedNameFrameId], references: [id], onDelete: SetNull)
+  frames              UserFrame[]
+
+  // 11-QISM: Streak, Referral, Quests, Weekly Votes
+  referralCode        String?   @unique
+  referredById        String?
+  streakCount         Int       @default(0)
+  streakLastActiveAt  DateTime?
+  streakFreezeCount   Int       @default(0)
+  streakReminders     Boolean   @default(true)
+  referralsReceived   Referral[] @relation("Referrer")
+  referralRecord      Referral?  @relation("Referred")
+  userQuests          UserQuest[]
+  dailyClaims         UserDailyClaim[]
+  weeklyAnimeVotes    WeeklyAnimeVote[]
+  clubContributions   ClubQuestContribution[]
+}
+
+model Frame {
+  id              String      @id
+  type            String
+  slug            String      @unique
+  name            String
+  imageUrl        String?     @map("image_url")
+  imageWidth      Int?        @map("image_width")
+  imageHeight     Int?        @map("image_height")
+  version         Int         @default(1)
+  rarity          String
+  priceCredits    Int?        @map("price_credits")
+  acquisition     String
+  missionKey      String?     @map("mission_key")
+  scale           Decimal     @default(1.3) @db.Decimal(5, 2)
+  textInsetLeft   Decimal?    @map("text_inset_left") @db.Decimal(5, 2)
+  textInsetRight  Decimal?    @map("text_inset_right") @db.Decimal(5, 2)
+  textInsetTop    Decimal?    @map("text_inset_top") @db.Decimal(5, 2)
+  textInsetBottom Decimal?    @map("text_inset_bottom") @db.Decimal(5, 2)
+  textAlign       String      @default("center") @map("text_align")
+  maxFontPx       Int         @default(16) @map("max_font_px")
+  minFontPx       Int         @default(11) @map("min_font_px")
+  textColor       String?     @map("text_color")
+  isActive        Boolean     @default(true) @map("is_active")
+  sortOrder       Int         @default(0) @map("sort_order")
+  createdAt       DateTime    @default(now()) @map("created_at")
+  owners          UserFrame[]
+  avatarUsers     User[]      @relation("EquippedAvatarFrame")
+  nameUsers       User[]      @relation("EquippedNameFrame")
+
+  @@index([type, isActive, sortOrder])
+  @@map("frames")
+}
+
+model UserFrame {
+  userId     String   @map("user_id")
+  frameId    String   @map("frame_id")
+  acquiredAt DateTime @default(now()) @map("acquired_at")
+  source     String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  frame      Frame    @relation(fields: [frameId], references: [id], onDelete: Cascade)
+
+  @@id([userId, frameId])
+  @@index([frameId])
+  @@map("user_frames")
 }
 
 model PlatformConfig {
@@ -444,6 +521,8 @@ model Anime {
   watchEvents WatchEvent[]
   versions         Anime[] @relation("AnimeVersions")
   catalogVersions  AnimeVersion[]
+  weeklyCandidates WeeklyAnimeCandidate[]
+  weeklyVotes      WeeklyAnimeVote[]
 }
 
 /// Official yoki creator tarqatmasi. Narx va egalik shu qatorda.
@@ -723,4 +802,448 @@ model AnimeNotify {
   anime Anime @relation(fields: [animeId], references: [id], onDelete: Cascade)
 
   @@unique([userId, animeId])
+}
+
+// ─────────────────────────────────────────
+// 10-QISM: Klublar
+// ─────────────────────────────────────────
+
+model Club {
+  id          String   @id @default(cuid())
+  name        String
+  tag         String   @unique // 2-4 belgi, noyob [TAG]
+  description String?
+  avatarUrl   String?
+  bannerUrl   String?
+  isPublic    Boolean  @default(true)
+  level       Int      @default(1)  // 1-20
+  xp          Int      @default(0)
+  ownerId     String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  owner       User           @relation("ClubOwner", fields: [ownerId], references: [id], onDelete: Cascade)
+  members     ClubMember[]
+  invites     ClubInvite[]
+  joinRequests ClubJoinRequest[]
+  xpEvents    ClubXpEvent[]
+  chatRoom    ChatRoom?      @relation("ClubRoom")
+  quests      ClubQuest[]
+
+  @@index([ownerId])
+  @@index([xp])
+}
+
+model ClubMember {
+  id         String    @id @default(cuid())
+  clubId     String
+  userId     String
+  role       String    @default("member") // owner | mod | member
+  mutedUntil DateTime?
+  joinedAt   DateTime  @default(now())
+
+  club Club @relation(fields: [clubId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([clubId, userId])
+  @@index([userId])
+}
+
+model ClubInvite {
+  id         String   @id @default(cuid())
+  clubId     String
+  code       String   @unique
+  createdBy  String
+  maxUses    Int      @default(10)
+  uses       Int      @default(0)
+  expiresAt  DateTime?
+  createdAt  DateTime @default(now())
+
+  club Club @relation(fields: [clubId], references: [id], onDelete: Cascade)
+
+  @@index([clubId])
+}
+
+model ClubJoinRequest {
+  id        String   @id @default(cuid())
+  clubId    String
+  userId    String
+  message   String?
+  status    String   @default("pending") // pending | approved | rejected
+  createdAt DateTime @default(now())
+
+  club Club @relation(fields: [clubId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([clubId, userId])
+}
+
+model ClubXpEvent {
+  id        String   @id @default(cuid())
+  clubId    String
+  userId    String
+  type      String   // message | purchase | watch | daily
+  xp        Int
+  createdAt DateTime @default(now())
+
+  club Club @relation(fields: [clubId], references: [id], onDelete: Cascade)
+
+  @@index([clubId, createdAt])
+}
+
+// ─────────────────────────────────────────
+// 10-QISM: Chat xonalari va xabarlar
+// ─────────────────────────────────────────
+
+model ChatRoom {
+  id        String   @id @default(cuid())
+  type      String   // global | club | anime
+  refId     String?  // clubId yoki animeId
+  slowMode  Int      @default(0) // soniyalar, 0 = o'chiq
+  createdAt DateTime @default(now())
+
+  clubId    String?  @unique
+  club      Club?    @relation("ClubRoom", fields: [clubId], references: [id], onDelete: Cascade)
+
+  messages  ChatMessage[]
+  bans      ChatBan[]
+  pins      PinnedMessage[]
+
+  @@unique([type, refId])
+  @@index([type])
+}
+
+model ChatMessage {
+  id            String    @id @default(cuid())
+  roomId        String
+  userId        String
+  body          String    // sanitized matn yoki JSON (poll, anime_card)
+  type          String    @default("text") // text | anime_card | poll | system
+  replyToId     String?
+  animeId       String?   // anime karta uchun
+  episodeNo     Int?      // spoiler tegi
+  attachmentUrl String?   // R2 rasm
+  editedAt      DateTime?
+  deletedAt     DateTime?
+  createdAt     DateTime  @default(now())
+
+  room      ChatRoom          @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  user      User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  replyTo   ChatMessage?      @relation("MessageReply", fields: [replyToId], references: [id])
+  replies   ChatMessage[]     @relation("MessageReply")
+  reactions MessageReaction[]
+  poll      Poll?
+  pins      PinnedMessage[]
+
+  @@index([roomId, createdAt])
+  @@index([userId])
+}
+
+model MessageReaction {
+  id        String   @id @default(cuid())
+  messageId String
+  userId    String
+  emote     String   // emoji yoki custom emote kodi
+  createdAt DateTime @default(now())
+
+  message ChatMessage @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  user    User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([messageId, userId, emote])
+  @@index([messageId])
+}
+
+model Poll {
+  id        String   @id @default(cuid())
+  messageId String   @unique
+  question  String
+  options   String   // JSON array: ["A", "B", "C"]
+  endsAt    DateTime?
+  createdAt DateTime @default(now())
+
+  message ChatMessage @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  votes   PollVote[]
+}
+
+model PollVote {
+  id        String   @id @default(cuid())
+  pollId    String
+  userId    String
+  optionIdx Int
+  createdAt DateTime @default(now())
+
+  poll Poll @relation(fields: [pollId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([pollId, userId])
+}
+
+model PinnedMessage {
+  id        String   @id @default(cuid())
+  roomId    String
+  messageId String
+  pinnedBy  String
+  createdAt DateTime @default(now())
+
+  room    ChatRoom    @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  message ChatMessage @relation(fields: [messageId], references: [id], onDelete: Cascade)
+
+  @@unique([roomId, messageId])
+}
+
+model ChatBan {
+  id        String    @id @default(cuid())
+  roomId    String?   // null = global ban
+  userId    String
+  bannedBy  String
+  reason    String?
+  type      String    @default("ban") // ban | mute
+  expiresAt DateTime?
+  createdAt DateTime  @default(now())
+
+  room ChatRoom? @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  user User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([roomId, userId])
+  @@index([userId])
+}
+
+model UserBlock {
+  id          String   @id @default(cuid())
+  blockerId   String
+  blockedId   String
+  createdAt   DateTime @default(now())
+
+  blocker User @relation("Blocker", fields: [blockerId], references: [id], onDelete: Cascade)
+  blocked User @relation("Blocked", fields: [blockedId], references: [id], onDelete: Cascade)
+
+  @@unique([blockerId, blockedId])
+}
+
+// ─────────────────────────────────────────
+// 10-QISM: Emotelar va level gate
+// ─────────────────────────────────────────
+
+model Emote {
+  id          String @id @default(cuid())
+  code        String @unique // :kiluu_fire: kabi
+  imageUrl    String
+  unlockType  String @default("free") // free | level | achievement | purchase
+  unlockValue String? // level raqami yoki achievement id
+
+  userEmotes UserEmote[]
+}
+
+model UserEmote {
+  id        String   @id @default(cuid())
+  userId    String
+  emoteId   String
+  unlockedAt DateTime @default(now())
+
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  emote Emote @relation(fields: [emoteId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, emoteId])
+}
+
+model LevelGate {
+  id       String @id @default(cuid())
+  feature  String @unique // create_club | send_image | create_poll | ...
+  minLevel Int    @default(1)
+}
+
+// ─────────────────────────────────────────
+// 11-QISM: Quests, Streak, Referral, Events, Weekly Votes
+// ─────────────────────────────────────────
+
+model LevelReward {
+  id          String   @id @default(cuid())
+  level       Int      @unique
+  title       String
+  rewardType  String   // frame | banner | emote | credits | streak_freeze | title
+  rewardValue String
+  description String?
+  createdAt   DateTime @default(now())
+}
+
+model DailyXpCap {
+  id        String   @id @default(cuid())
+  userId    String
+  date      String   // YYYY-MM-DD
+  source    String   // post | comment | like | chat
+  amount    Int      @default(0)
+
+  @@unique([userId, date, source])
+  @@index([userId, date])
+}
+
+model UserDailyClaim {
+  id          String   @id @default(cuid())
+  userId      String
+  claimDate   String   // YYYY-MM-DD
+  streakDay   Int
+  xpAwarded   Int      @default(0)
+  rewardJson  String   @default("{}")
+  createdAt   DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, claimDate])
+  @@index([userId])
+}
+
+model QuestTemplate {
+  id             String   @id @default(cuid())
+  title          String
+  titleUz        String
+  description    String?
+  type           String   // daily | weekly | club | event
+  category       String   @default("general") // watch | social | explore | spend
+  eventType      String   // episode_watched | post_created | comment_created | like_received | chat_message_sent | gift_sent | anime_opened | club_message | daily_claim | ...
+  targetCount    Int      @default(1)
+  xpReward       Int      @default(20)
+  creditReward   Int      @default(0)
+  cosmeticReward String?
+  difficulty     String   @default("easy") // easy | medium | hard
+  isActive       Boolean  @default(true)
+  sortOrder      Int      @default(0)
+  eventId        String?
+  event          SeasonalEvent? @relation(fields: [eventId], references: [id], onDelete: SetNull)
+  createdAt      DateTime @default(now())
+
+  userQuests UserQuest[]
+
+  @@index([type, isActive])
+}
+
+model UserQuest {
+  id          String    @id @default(cuid())
+  userId      String
+  templateId  String
+  periodKey   String    // e.g. "daily:2026-10-23", "weekly:2026-W43", "event:halloween-2026"
+  progress    Int       @default(0)
+  targetCount Int
+  status      String    @default("active") // active | completed | claimed
+  claimedAt   DateTime?
+  expiresAt   DateTime
+  createdAt   DateTime  @default(now())
+
+  user     User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  template QuestTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, templateId, periodKey])
+  @@index([userId, status])
+  @@index([periodKey])
+}
+
+model ClubQuest {
+  id              String   @id @default(cuid())
+  clubId          String
+  title           String
+  eventType       String
+  targetCount     Int
+  progress        Int      @default(0)
+  status          String   @default("active") // active | completed
+  periodKey       String
+  xpRewardClub    Int      @default(100)
+  xpRewardMember  Int      @default(50)
+  expiresAt       DateTime
+  createdAt       DateTime @default(now())
+
+  club          Club                    @relation(fields: [clubId], references: [id], onDelete: Cascade)
+  contributions ClubQuestContribution[]
+
+  @@unique([clubId, periodKey, eventType])
+  @@index([clubId])
+}
+
+model ClubQuestContribution {
+  id          String   @id @default(cuid())
+  clubQuestId String
+  userId      String
+  amount      Int      @default(0)
+  claimed     Boolean  @default(false)
+
+  quest ClubQuest @relation(fields: [clubQuestId], references: [id], onDelete: Cascade)
+  user  User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([clubQuestId, userId])
+}
+
+model Referral {
+  id           String    @id @default(cuid())
+  referrerId   String
+  referredId   String    @unique
+  code         String
+  status       String    @default("pending") // pending | qualified | rewarded
+  isSuspicious Boolean   @default(false)
+  qualifiedAt  DateTime?
+  rewardedAt   DateTime?
+  ipAddress    String?
+  userAgent    String?
+  createdAt    DateTime  @default(now())
+
+  referrer User @relation("Referrer", fields: [referrerId], references: [id], onDelete: Cascade)
+  referred User @relation("Referred", fields: [referredId], references: [id], onDelete: Cascade)
+
+  @@index([referrerId])
+  @@index([code])
+}
+
+model WeeklyAnimePoll {
+  id             String    @id @default(cuid())
+  weekKey        String    @unique // e.g. "2026-W43"
+  status         String    @default("active") // active | closed
+  winnerAnimeId  String?
+  startsAt       DateTime
+  endsAt         DateTime
+  createdAt      DateTime  @default(now())
+
+  candidates WeeklyAnimeCandidate[]
+  votes      WeeklyAnimeVote[]
+}
+
+model WeeklyAnimeCandidate {
+  id         String   @id @default(cuid())
+  pollId     String
+  animeId    String
+  votesCount Int      @default(0) // Poll tugaguncha sir saqlanadi
+  isManual   Boolean  @default(false)
+
+  poll  WeeklyAnimePoll @relation(fields: [pollId], references: [id], onDelete: Cascade)
+  anime Anime           @relation(fields: [animeId], references: [id], onDelete: Cascade)
+
+  @@unique([pollId, animeId])
+}
+
+model WeeklyAnimeVote {
+  id            String   @id @default(cuid())
+  pollId        String
+  animeId       String
+  userId        String
+  rewardClaimed Boolean  @default(false)
+  createdAt     DateTime @default(now())
+
+  poll  WeeklyAnimePoll @relation(fields: [pollId], references: [id], onDelete: Cascade)
+  anime Anime           @relation(fields: [animeId], references: [id], onDelete: Cascade)
+  user  User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([pollId, userId])
+}
+
+model SeasonalEvent {
+  id              String   @id @default(cuid())
+  slug            String   @unique
+  title           String
+  titleUz         String
+  description     String?
+  themeColor      String   @default("#f97316")
+  bannerUrl       String?
+  startsAt        DateTime
+  endsAt          DateTime
+  isNeverReturns  Boolean  @default(true)
+  configJson      String   @default("{}")
+  createdAt       DateTime @default(now())
+
+  quests QuestTemplate[]
 }

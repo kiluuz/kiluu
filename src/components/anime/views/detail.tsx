@@ -4,16 +4,17 @@ import { useEffect, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   Play, Star, Plus, Check, Coins, Heart, Share2, Users, Video,
-  Clock3, Loader2, BadgeCheck, Tv, Film, Package, Sparkles, Clapperboard, Send, ShoppingCart, Bell, BellOff, Link2, Lock
+  Clock3, Loader2, BadgeCheck, Tv, Film, Package, Sparkles, Clapperboard, Send, ShoppingCart, Bell, BellOff, Link2, Lock, MessageSquare
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { useAppStore } from "../store";
 import type { AnimeDetail, EpisodeItem, AnimeSummary, AnimeVersionCard } from "../types";
-import { AnimeCard, Avatar, SmartImage, formatCredits } from "../ui-bits";
+import { AnimeCard, FramedAvatar, SmartImage, formatCredits } from "../ui-bits";
 import { useBotCatalog, useBotStatus } from "../bot-hooks";
 import { CreditPurchaseModal, LinkTelegramModal } from "../bot-ui";
+import { ChatPanel } from "../chat/chat-panel";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 
@@ -41,6 +42,7 @@ function formatDetailCountdown(ms: number): string {
 
 export function DetailView() {
   const { view, user, setAuthOpen, navigate, updateUser } = useAppStore();
+  const [activeDetailTab, setActiveDetailTab] = useState<"episodes" | "chat">("episodes");
   const queryClient = useQueryClient();
   const animeId = view.animeId!;
   const detailKey = ["anime-detail", animeId, user?.id ?? "anonymous"] as const;
@@ -716,111 +718,143 @@ export function DetailView() {
         </div>
 
         {/* Description + creator */}
-        <div className="mt-8 grid lg:grid-cols-[1fr_300px] gap-8">
-          <div>
+        <div className="mt-8 grid min-w-0 grid-cols-1 lg:grid-cols-[minmax(0,1fr)_300px] gap-8">
+          <div className="min-w-0">
             <h2 className="text-lg font-bold mb-2.5">Synopsis</h2>
             <p className="text-sm sm:text-[15px] text-muted-foreground leading-relaxed whitespace-pre-line">
               {anime.description}
             </p>
 
-            {/* Episodes */}
+            {/* Episodes & Discussion Switcher */}
             <Separator className="my-7" />
-            <div id="episodes-section" className="flex items-center justify-between mb-4">
-              <h2 className="text-lg font-bold flex items-center gap-2">
-                <Tv className="w-5 h-5 text-primary" /> Episodes
-              </h2>
-              <span className="text-xs text-muted-foreground">{totalEpisodesCount} total</span>
+            <div id="episodes-section" className="flex items-center justify-between mb-4 flex-wrap gap-2">
+              <div className="flex items-center gap-1.5 p-1 bg-secondary/50 rounded-2xl border">
+                <button
+                  onClick={() => setActiveDetailTab("episodes")}
+                  className={cn(
+                    "flex items-center gap-2 px-3.5 py-1.5 rounded-xl text-xs sm:text-sm font-bold transition-all",
+                    activeDetailTab === "episodes"
+                      ? "bg-background text-foreground shadow-sm"
+                      : "text-muted-foreground hover:text-foreground"
+                  )}
+                >
+                  <Tv className="w-4 h-4 text-primary" /> Epizodlar ({totalEpisodesCount})
+                </button>
+                <button
+                  onClick={() => setActiveDetailTab("chat")}
+                  className={cn(
+                    "flex items-center gap-2 px-3.5 py-1.5 rounded-xl text-xs sm:text-sm font-bold transition-all",
+                    activeDetailTab === "chat"
+                      ? "bg-background text-foreground shadow-sm"
+                      : "text-muted-foreground hover:text-foreground"
+                  )}
+                >
+                  <MessageSquare className="w-4 h-4 text-primary" /> Muhokama (Chat)
+                </button>
+              </div>
+
+              {activeDetailTab === "episodes" && (
+                <span className="text-xs text-muted-foreground">{totalEpisodesCount} total</span>
+              )}
             </div>
 
-            {displayEpisodes.length === 0 ? (
-              <div className="rounded-2xl border border-dashed p-8 text-center text-muted-foreground">
-                <Clapperboard className="w-8 h-8 mx-auto mb-2 opacity-50" />
-                <p className="text-sm font-medium">No episodes have been added yet.</p>
-              </div>
+            {activeDetailTab === "chat" ? (
+              <ChatPanel
+                roomId={`anime:${anime.id}`}
+                title={`${anime.title} muhokamasi`}
+                subtitle="Ushbu anime bo'yicha fikr almashish xonasi"
+              />
             ) : (
-              <div className="space-y-2.5">
-                {displayEpisodes.map((ep) => {
-                  const isTelegramOnly = !ep.videoUrl || ep.videoUrl === "telegram";
-                  // Determine if user owns this specific episode
-                  const ownedViaFullPurchase = canWatchLocally || isPurchasedInBot;
-                  const ownedThisEp = ownedViaFullPurchase || myEpisodePurchases[String(ep.number)];
-                  const epPrice = botAnime?.episode_prices?.[String(ep.number)] ?? botAnime?.price ?? 0;
-                  const locked = !ownedThisEp;
-                  const pct = ep.progress && ep.progress.duration > 0
-                    ? Math.min(100, (ep.progress.position / ep.progress.duration) * 100)
-                    : 0;
-                  return (
-                    <button
-                      key={ep.id}
-                      onClick={() => {
-                        if (locked) {
-                          // Show per-episode purchase modal
-                          setEpisodePurchaseModal({
-                            number: ep.number,
-                            title: ep.title,
-                            price: epPrice,
-                          });
-                          return;
-                        }
-                        if (isTelegramOnly) {
-                          handleWatchTelegram(ep.number);
-                        } else {
-                          startWatching(ep.id);
-                        }
-                      }}
-                      className="w-full flex items-center gap-3.5 p-2.5 rounded-2xl border bg-card hover:border-primary/50 hover:bg-accent/50 transition group text-left"
-                      aria-label={`Play episode ${ep.number}: ${ep.title}`}
-                    >
-                      <div className="relative w-28 sm:w-40 aspect-video shrink-0 rounded-xl overflow-hidden bg-muted">
-                        <SmartImage src={anime.coverImage} alt={`Episode ${ep.number}`} className="w-full h-full object-cover" />
-                        <div className="absolute inset-0 bg-black/40 group-hover:bg-black/25 transition flex items-center justify-center">
-                          {locked ? (
-                            <span className="bg-black/60 rounded-full p-2"><Lock size={16} className="text-white" /></span>
-                          ) : (
-                            <span className="bg-white/90 rounded-full p-2 opacity-0 group-hover:opacity-100 transition scale-75 group-hover:scale-100">
-                              <Play className="w-4 h-4 fill-black text-black" />
-                            </span>
-                          )}
-                        </div>
-                        {pct > 0 && (
-                          <div className="absolute bottom-0 inset-x-0 h-1 bg-black/40">
-                            <div className="h-full brand-gradient" style={{ width: `${pct}%` }} />
+              displayEpisodes.length === 0 ? (
+                <div className="rounded-2xl border border-dashed p-8 text-center text-muted-foreground">
+                  <Clapperboard className="w-8 h-8 mx-auto mb-2 opacity-50" />
+                  <p className="text-sm font-medium">No episodes have been added yet.</p>
+                </div>
+              ) : (
+                <div className="space-y-2.5">
+                  {displayEpisodes.map((ep) => {
+                    const isTelegramOnly = !ep.videoUrl || ep.videoUrl === "telegram";
+                    // Determine if user owns this specific episode
+                    const ownedViaFullPurchase = canWatchLocally || isPurchasedInBot;
+                    const ownedThisEp = ownedViaFullPurchase || myEpisodePurchases[String(ep.number)];
+                    const epPrice = botAnime?.episode_prices?.[String(ep.number)] ?? botAnime?.price ?? 0;
+                    const locked = !ownedThisEp;
+                    const pct = ep.progress && ep.progress.duration > 0
+                      ? Math.min(100, (ep.progress.position / ep.progress.duration) * 100)
+                      : 0;
+                    return (
+                      <button
+                        key={ep.id}
+                        onClick={() => {
+                          if (locked) {
+                            // Show per-episode purchase modal
+                            setEpisodePurchaseModal({
+                              number: ep.number,
+                              title: ep.title,
+                              price: epPrice,
+                            });
+                            return;
+                          }
+                          if (isTelegramOnly) {
+                            handleWatchTelegram(ep.number);
+                          } else {
+                            startWatching(ep.id);
+                          }
+                        }}
+                        className="w-full flex items-center gap-3.5 p-2.5 rounded-2xl border bg-card hover:border-primary/50 hover:bg-accent/50 transition group text-left"
+                        aria-label={`Play episode ${ep.number}: ${ep.title}`}
+                      >
+                        <div className="relative w-28 sm:w-40 aspect-video shrink-0 rounded-xl overflow-hidden bg-muted">
+                          <SmartImage src={anime.coverImage} alt={`Episode ${ep.number}`} className="w-full h-full object-cover" />
+                          <div className="absolute inset-0 bg-black/40 group-hover:bg-black/25 transition flex items-center justify-center">
+                            {locked ? (
+                              <span className="bg-black/60 rounded-full p-2"><Lock size={16} className="text-white" /></span>
+                            ) : (
+                              <span className="bg-white/90 rounded-full p-2 opacity-0 group-hover:opacity-100 transition scale-75 group-hover:scale-100">
+                                <Play className="w-4 h-4 fill-black text-black" />
+                              </span>
+                            )}
                           </div>
-                        )}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <span className="text-xs font-black text-primary">EP {String(ep.number).padStart(2, "0")}</span>
-                          {ep.progress?.completed && (
-                            <Badge className="h-4.5 text-[9px] px-1.5 bg-emerald-500/15 text-emerald-500 border-emerald-500/30">WATCHED</Badge>
-                          )}
-                          {isTelegramOnly && (
-                            <Badge variant="outline" className="h-4.5 text-[9px] px-1.5 border-primary/30 text-primary">TELEGRAM</Badge>
-                          )}
-                          {locked && epPrice > 0 && (
-                            <Badge className="h-4.5 text-[9px] px-1.5 bg-amber-500/15 text-amber-600 border-amber-500/30 gap-0.5">
-                              <Coins className="w-2.5 h-2.5" />{epPrice}
-                            </Badge>
-                          )}
-                          {!locked && (
-                            <Badge className="h-4.5 text-[9px] px-1.5 bg-emerald-500/15 text-emerald-600 border-emerald-500/30">OWNED</Badge>
+                          {pct > 0 && (
+                            <div className="absolute bottom-0 inset-x-0 h-1 bg-black/40">
+                              <div className="h-full brand-gradient" style={{ width: `${pct}%` }} />
+                            </div>
                           )}
                         </div>
-                        <p className="font-semibold text-sm truncate mt-0.5">{ep.title}</p>
-                        {ep.description && (
-                          <p className="text-xs text-muted-foreground line-clamp-1 mt-0.5 hidden sm:block">{ep.description}</p>
-                        )}
-                        <p className="text-[11px] text-muted-foreground/70 mt-1 flex items-center gap-1">
-                          <Clock3 className="w-3 h-3" /> {Math.max(1, Math.round((ep.duration || 1440) / 60))} min
-                          {locked && epPrice > 0 && (
-                            <span className="ml-2 text-primary font-semibold">• Buy: {epPrice} 💰</span>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="text-xs font-black text-primary">EP {String(ep.number).padStart(2, "0")}</span>
+                            {ep.progress?.completed && (
+                              <Badge className="h-4.5 text-[9px] px-1.5 bg-emerald-500/15 text-emerald-500 border-emerald-500/30">WATCHED</Badge>
+                            )}
+                            {isTelegramOnly && (
+                              <Badge variant="outline" className="h-4.5 text-[9px] px-1.5 border-primary/30 text-primary">TELEGRAM</Badge>
+                            )}
+                            {locked && epPrice > 0 && (
+                              <Badge className="h-4.5 text-[9px] px-1.5 bg-amber-500/15 text-amber-600 border-amber-500/30 gap-0.5">
+                                <Coins className="w-2.5 h-2.5" />{epPrice}
+                              </Badge>
+                            )}
+                            {!locked && (
+                              <Badge className="h-4.5 text-[9px] px-1.5 bg-emerald-500/15 text-emerald-600 border-emerald-500/30">OWNED</Badge>
+                            )}
+                          </div>
+                          <p className="font-semibold text-sm truncate mt-0.5">{ep.title}</p>
+                          {ep.description && (
+                            <p className="text-xs text-muted-foreground line-clamp-1 mt-0.5 hidden sm:block">{ep.description}</p>
                           )}
-                        </p>
-                      </div>
-                    </button>
-                  );
-                })}
-              </div>
+                          <p className="text-[11px] text-muted-foreground/70 mt-1 flex items-center gap-1">
+                            <Clock3 className="w-3 h-3" /> {Math.max(1, Math.round((ep.duration || 1440) / 60))} min
+                            {locked && epPrice > 0 && (
+                              <span className="ml-2 text-primary font-semibold">• Buy: {epPrice} 💰</span>
+                            )}
+                          </p>
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              )
             )}
           </div>
 
@@ -833,7 +867,7 @@ export function DetailView() {
                   className="flex items-center gap-3 w-full p-2 rounded-xl hover:bg-accent transition"
                   onClick={() => navigate("user-profile", { username: anime.creator!.username })}
                 >
-                  <Avatar src={anime.creator.avatarUrl} name={anime.creator.displayName} accent={anime.creator.accentColor} size={44} ring />
+                  <FramedAvatar user={anime.creator} size={44} ring />
                   <div className="text-left min-w-0">
                     <p className="font-bold text-sm truncate flex items-center gap-1.5">
                       {anime.creator.displayName}

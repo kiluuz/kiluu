@@ -6,6 +6,7 @@ import { rateLimit } from "@/lib/rate-limit";
 import { sanitizeText } from "@/lib/sanitize";
 import { awardXpInTransaction, getXpTotal, getXpTotals, levelFromXp } from "@/lib/xp";
 import { evaluateAchievements } from "@/lib/achievements";
+import { emitEvent } from "@/lib/events";
 
 const COMMENT_USER = {
   id: true,
@@ -13,6 +14,9 @@ const COMMENT_USER = {
   displayName: true,
   avatarUrl: true,
   accentColor: true,
+  avatarFrame: true,
+  equippedAvatarFrameId: true,
+  equippedNameFrameId: true,
   role: true,
 } as const;
 
@@ -95,6 +99,7 @@ export async function POST(
   });
   if ("error" in result) return NextResponse.json({ error: result.error }, { status: 404 });
   await evaluateAchievements(user.id);
+  await emitEvent(user, "comment_created", { postId: id, commentId: result.comment.id, content });
   const xpTotal = await getXpTotal(user.id);
   return NextResponse.json({
     comment: {

@@ -9,13 +9,35 @@ const nextConfig: NextConfig = {
 
   async headers() {
     return [
+      ...(process.env.NODE_ENV === "production"
+        ? [
+            {
+              // Only production assets are content-hashed; avoid stale HMR bundles in development.
+              source: "/_next/static/:path*",
+              headers: [
+                {
+                  key: "Cache-Control",
+                  value: "public, max-age=31536000, immutable",
+                },
+              ],
+            },
+          ]
+        : []),
       {
-        // Cache static assets aggressively (JS, CSS, images)
-        source: "/_next/static/:path*",
+        source: "/frames/:path*",
         headers: [
           {
             key: "Cache-Control",
             value: "public, max-age=31536000, immutable",
+          },
+        ],
+      },
+      {
+        source: "/api/frames/catalog",
+        headers: [
+          {
+            key: "Cache-Control",
+            value: "public, s-maxage=3600, stale-while-revalidate=86400",
           },
         ],
       },

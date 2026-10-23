@@ -2,16 +2,17 @@
 
 import { useEffect, useRef, useState } from "react";
 import {
-  Clock, Heart, Sparkles, Film, Trophy, Timer, Package,
+  Heart, Sparkles, Film, Trophy, Timer, Package,
   Send, Link2, CheckCircle2, Loader2, ExternalLink, ShoppingBag, AlertCircle, Star
 } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { useAppStore } from "../store";
 import type { AnimeSummary } from "../types";
-import { AnimeCard, formatDuration, formatCredits } from "../ui-bits";
+import { AnimeCard, FramedAvatar, NameWithFrame, formatDuration, formatCredits } from "../ui-bits";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import { useI18n } from "@/components/i18n-provider";
 
 interface LibraryData {
   owned: (AnimeSummary & { purchasedAt: string; episodeCount: number })[];
@@ -31,6 +32,10 @@ interface LeaderboardEntry {
   username: string;
   displayName: string | null;
   avatarUrl: string | null;
+  avatarFrame: string | null;
+  equippedAvatarFrameId: string | null;
+  equippedNameFrameId: string | null;
+  accentColor: string;
   score: number;
   level: number;
   postCount?: number;
@@ -44,6 +49,7 @@ interface Leaderboards {
 }
 
 export function LibraryView() {
+  const { t } = useI18n();
   const { user, setAuthOpen, navigate } = useAppStore();
   const [data, setData] = useState<LibraryData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -61,7 +67,7 @@ export function LibraryView() {
     fetch("/api/library")
       .then((r) => r.json())
       .then(setData)
-      .catch(() => toast.error("Failed to load library"))
+      .catch(() => toast.error(t("library.loadError")))
       .finally(() => setLoading(false));
 
     // Load bot status
@@ -81,7 +87,7 @@ export function LibraryView() {
       })
       .catch(() => {})
       .finally(() => setBotLoading(false));
-  }, [user]);
+  }, [user, t]);
 
   useEffect(() => {
     fetch("/api/leaderboards")
@@ -90,8 +96,8 @@ export function LibraryView() {
         if (!response.ok) throw new Error(result.error || "Could not load leaderboards");
         setLeaderboards(result);
       })
-      .catch((error) => toast.error(error instanceof Error ? error.message : "Could not load leaderboards"));
-  }, []);
+      .catch((error) => toast.error(error instanceof Error ? error.message : t("library.leaderboardError")));
+  }, [t]);
 
   async function startLinking() {
     setLinkLoading(true);
@@ -117,7 +123,7 @@ export function LibraryView() {
       }
       startPolling();
     } catch {
-      toast.error("Could not get the Telegram link.");
+      toast.error(t("library.telegramLinkError"));
     } finally {
       setLinkLoading(false);
     }
@@ -139,11 +145,11 @@ export function LibraryView() {
             .then(r => r.json())
             .then(res => {
               if (res.delivered > 0) {
-                toast.success(`✅ ${res.delivered} anime sent to your Telegram bot!`);
+                toast.success(t("library.telegramDelivered").replace("{count}", String(res.delivered)));
               }
             })
             .catch(() => {});
-          toast.success("Telegram connected! ✅");
+          toast.success(t("library.telegramConnected"));
         }
       } catch {}
     }, 2500);
@@ -155,10 +161,10 @@ export function LibraryView() {
     return (
       <div className="text-center py-32 px-4">
         <p className="text-6xl mb-4">📚</p>
-        <h1 className="text-2xl font-black mb-2">Your library lives here</h1>
-        <p className="text-muted-foreground text-sm mb-6">Sign in to see your animes, favorites and watch stats</p>
+        <h1 className="text-2xl font-black mb-2">{t("library.guestTitle")}</h1>
+        <p className="text-muted-foreground text-sm mb-6">{t("library.guestDescription")}</p>
         <Button className="rounded-full brand-gradient text-white font-bold h-11 px-6" onClick={() => setAuthOpen(true)}>
-          Sign in
+          {t("signIn")}
         </Button>
       </div>
     );
@@ -166,38 +172,29 @@ export function LibraryView() {
 
   return (
     <div className="max-w-[1280px] mx-auto px-4 sm:px-8 py-6 pb-10">
-      <h1 className="text-2xl sm:text-3xl font-black flex items-center gap-3 mb-1">
-        <span className="w-10 h-10 rounded-xl brand-gradient flex items-center justify-center">
-          <Clock className="w-5 h-5 text-white" />
-        </span>
-        My Library
-      </h1>
-      <p className="text-sm text-muted-foreground mb-6">
-        Your collection, favorites and everything you&apos;re watching
-      </p>
-
+      <h1 className="sr-only">{t("nav.library")}</h1>
       {/* Stats cards */}
       {data && (
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mb-6">
           <div className="glass rounded-2xl p-4 sm:p-5">
             <Package className="w-5 h-5 text-primary mb-2" />
             <p className="text-2xl font-black tabular-nums">{data.stats.purchaseCount}</p>
-            <p className="text-xs text-muted-foreground">Animes owned</p>
+            <p className="text-xs text-muted-foreground">{t("library.animesOwned")}</p>
           </div>
           <div className="glass rounded-2xl p-4 sm:p-5">
             <Timer className="w-5 h-5 text-cyan-400 mb-2" />
             <p className="text-2xl font-black tabular-nums">{formatDuration(data.stats.totalWatchSeconds)}</p>
-            <p className="text-xs text-muted-foreground">Watch time</p>
+            <p className="text-xs text-muted-foreground">{t("profile.watchTime")}</p>
           </div>
           <div className="glass rounded-2xl p-4 sm:p-5">
             <Trophy className="w-5 h-5 text-amber-400 mb-2" />
             <p className="text-2xl font-black tabular-nums">{data.stats.completedEpisodes}</p>
-            <p className="text-xs text-muted-foreground">Episodes completed</p>
+            <p className="text-xs text-muted-foreground">{t("library.episodesCompleted")}</p>
           </div>
           <div className="glass rounded-2xl p-4 sm:p-5">
             <Sparkles className="w-5 h-5 text-primary mb-2" />
             <p className="text-2xl font-black tabular-nums">{formatCredits(data.stats.credits)}</p>
-            <p className="text-xs text-muted-foreground">Credit balance</p>
+            <p className="text-xs text-muted-foreground">{t("library.creditBalance")}</p>
           </div>
         </div>
       )}
@@ -205,10 +202,10 @@ export function LibraryView() {
       <div className="glass rounded-2xl p-4 sm:p-5 mb-8">
         <div className="flex items-center justify-between gap-3 flex-wrap">
           <p className="text-sm text-muted-foreground">
-            You can gift an anime from your library to a friend. Credits are charged even if you already own it.
+            {t("library.giftHint")}
           </p>
           <Button size="sm" className="rounded-full brand-gradient text-white font-bold" onClick={() => navigate("gifts")}>
-            Gifts
+            {t("nav.gifts")}
           </Button>
         </div>
       </div>
@@ -216,16 +213,16 @@ export function LibraryView() {
       <Tabs defaultValue="owned">
         <TabsList className="rounded-xl mb-5 flex-wrap h-auto gap-1">
           <TabsTrigger value="owned" className="rounded-lg">
-            Owned ({data?.owned.length ?? 0})
+            {t("schedule.owned")} ({data?.owned.length ?? 0})
           </TabsTrigger>
           <TabsTrigger value="favorites" className="rounded-lg">
-            <Heart className="w-3.5 h-3.5 mr-1" /> Favorites ({data?.favorites.length ?? 0})
+            <Heart className="w-3.5 h-3.5 mr-1" /> {t("profile.favorites")} ({data?.favorites.length ?? 0})
           </TabsTrigger>
           <TabsTrigger value="telegram" className="rounded-lg gap-1.5">
-            <Star className="w-3.5 h-3.5" /> Stars purchases
+            <Star className="w-3.5 h-3.5" /> {t("library.starsPurchases")}
           </TabsTrigger>
           <TabsTrigger value="leaderboards" className="rounded-lg gap-1.5">
-            <Trophy className="w-3.5 h-3.5" /> Leaderboards
+            <Trophy className="w-3.5 h-3.5" /> {t("library.leaderboards")}
           </TabsTrigger>
         </TabsList>
 
@@ -243,10 +240,10 @@ export function LibraryView() {
           ) : (
             <EmptyState
               emoji="🛒"
-              title="No animes yet"
-              desc="Browse the catalog and grab your first anime — lots of free ones available!"
+              title={t("library.noAnimes")}
+              desc={t("library.noAnimesHint")}
               action={() => navigate("browse")}
-              actionLabel="Discover animes"
+              actionLabel={t("nav.browse")}
             />
           )}
         </TabsContent>
@@ -265,10 +262,10 @@ export function LibraryView() {
           ) : (
             <EmptyState
               emoji="💜"
-              title="No favorites yet"
-              desc="Tap the heart on any anime to pin it here"
+              title={t("library.noFavorites")}
+              desc={t("library.noFavoritesHint")}
               action={() => navigate("browse")}
-              actionLabel="Find something to love"
+              actionLabel={t("library.findAnime")}
             />
           )}
         </TabsContent>
@@ -278,7 +275,7 @@ export function LibraryView() {
           <div className="space-y-6">
             {data?.starsPurchases.length ? (
               <section>
-                <h3 className="font-bold text-sm text-muted-foreground uppercase tracking-wider mb-3">Site Stars purchases</h3>
+                <h3 className="font-bold text-sm text-muted-foreground uppercase tracking-wider mb-3">{t("library.siteStarsPurchases")}</h3>
                 <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
                   {data.starsPurchases.map((anime) => (
                     <div key={`${anime.id}-${anime.purchasedAt}`} className="flex justify-center">
@@ -297,12 +294,12 @@ export function LibraryView() {
                 <>
                   <CheckCircle2 className="w-8 h-8 text-emerald-500 shrink-0" />
                   <div className="flex-1">
-                    <p className="font-bold">✅ Telegram connected</p>
-                    <p className="text-sm text-muted-foreground mt-0.5">Purchased anime is sent automatically.</p>
+                    <p className="font-bold">✅ {t("library.telegramConnected")}</p>
+                    <p className="text-sm text-muted-foreground mt-0.5">{t("library.purchasedAutoSent")}</p>
                   </div>
                   <a href={`https://t.me/${process.env.NEXT_PUBLIC_BOT_USERNAME || "DubAniXbot"}`} target="_blank" rel="noopener noreferrer">
                     <Button variant="outline" className="rounded-xl gap-2">
-                      <ExternalLink className="w-4 h-4" /> Open bot
+                      <ExternalLink className="w-4 h-4" /> {t("library.openBot")}
                     </Button>
                   </a>
                 </>
@@ -310,13 +307,13 @@ export function LibraryView() {
                 <>
                   <Loader2 className="w-8 h-8 text-primary animate-spin shrink-0" />
                   <div className="flex-1">
-                    <p className="font-bold">Waiting for Telegram connection...</p>
-                    <p className="text-sm text-muted-foreground mt-0.5">Open the bot and tap /start.</p>
+                    <p className="font-bold">{t("library.waitingTelegram")}</p>
+                    <p className="text-sm text-muted-foreground mt-0.5">{t("library.startBotHint")}</p>
                   </div>
                   {linkUrl && (
                     <a href={linkUrl} target="_blank" rel="noopener noreferrer">
                       <Button size="sm" variant="outline" className="rounded-xl gap-1.5">
-                        <ExternalLink className="w-3.5 h-3.5" /> Open bot
+                        <ExternalLink className="w-3.5 h-3.5" /> {t("library.openBot")}
                       </Button>
                     </a>
                   )}
@@ -325,12 +322,12 @@ export function LibraryView() {
                 <>
                   <Link2 className="w-8 h-8 text-muted-foreground/50 shrink-0" />
                   <div className="flex-1">
-                    <p className="font-bold">Telegram not connected</p>
-                    <p className="text-sm text-muted-foreground mt-0.5">Connect your Telegram account to receive anime.</p>
+                    <p className="font-bold">{t("library.telegramNotConnected")}</p>
+                    <p className="text-sm text-muted-foreground mt-0.5">{t("library.connectTelegramHint")}</p>
                   </div>
                   <Button onClick={startLinking} disabled={linkLoading} className="rounded-xl brand-gradient text-white gap-2 shrink-0">
                     {linkLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
-                    Connect
+                    {t("library.connectTelegram")}
                   </Button>
                 </>
               )}
@@ -338,7 +335,7 @@ export function LibraryView() {
 
             {/* Purchases List */}
             <div>
-              <h3 className="font-bold text-sm text-muted-foreground uppercase tracking-wider mb-3">Purchased anime</h3>
+              <h3 className="font-bold text-sm text-muted-foreground uppercase tracking-wider mb-3">{t("library.purchasedAnime")}</h3>
               {botLoading ? (
                 <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
                   {[...Array(4)].map((_, i) => (
@@ -351,10 +348,10 @@ export function LibraryView() {
               ) : botAnimes.length === 0 ? (
                 <div className="rounded-2xl border border-dashed p-12 text-center">
                   <ShoppingBag className="w-10 h-10 text-muted-foreground/30 mx-auto mb-3" />
-                  <p className="font-bold">No purchases yet</p>
-                  <p className="text-sm text-muted-foreground mt-1 mb-4">Visit the anime catalog to make your first purchase.</p>
+                  <p className="font-bold">{t("library.noPurchases")}</p>
+                  <p className="text-sm text-muted-foreground mt-1 mb-4">{t("library.noPurchasesHint")}</p>
                   <Button onClick={() => navigate("browse")} className="rounded-xl brand-gradient text-white gap-2">
-                    <ShoppingBag className="w-4 h-4" /> Browse anime
+                    <ShoppingBag className="w-4 h-4" /> {t("nav.browse")}
                   </Button>
                 </div>
               ) : (
@@ -372,15 +369,15 @@ export function LibraryView() {
                         <div className="p-2">
                           <p className="text-xs font-bold line-clamp-2">{anime.title}</p>
                           <p className="text-[10px] text-primary mt-0.5 flex items-center gap-1">
-                            <Star className="w-2.5 h-2.5 fill-current" /> Purchased with Stars
+                            <Star className="w-2.5 h-2.5 fill-current" /> {t("library.purchasedWithStars")}
                           </p>
                         </div>
                       </button>
                     ))}
                   </div>
                   <div className="mt-4 p-4 rounded-xl bg-secondary/30 border text-sm text-muted-foreground">
-                    <p className="font-semibold mb-1">📦 Need to receive your anime again?</p>
-                    <p>Send <code className="bg-secondary/80 px-1.5 py-0.5 rounded text-xs">/library</code> in the Telegram bot to receive your purchased anime again.</p>
+                    <p className="font-semibold mb-1">📦 {t("library.receiveAnimeAgain")}</p>
+                    <p>{t("library.sendLibraryCommand")} <code className="bg-secondary/80 px-1.5 py-0.5 rounded text-xs">/library</code> {t("library.receiveAnimeAgainHint")}</p>
                   </div>
                 </>
               )}
@@ -389,9 +386,9 @@ export function LibraryView() {
         </TabsContent>
         <TabsContent value="leaderboards">
           <div className="grid gap-4 lg:grid-cols-3">
-            <LeaderboardCard title="Top Collectors" entries={leaderboards?.collectors ?? []} loading={!leaderboards} scoreLabel="anime" />
-            <LeaderboardCard title="Top Contributors" entries={leaderboards?.contributors ?? []} loading={!leaderboards} scoreLabel="points" />
-            <LeaderboardCard title="Top Creators" entries={leaderboards?.creators ?? []} loading={!leaderboards} scoreLabel="anime" />
+            <LeaderboardCard title={t("library.topCollectors")} entries={leaderboards?.collectors ?? []} loading={!leaderboards} scoreLabel={t("library.animeScore")} />
+            <LeaderboardCard title={t("library.topContributors")} entries={leaderboards?.contributors ?? []} loading={!leaderboards} scoreLabel={t("library.points")} />
+            <LeaderboardCard title={t("library.topCreators")} entries={leaderboards?.creators ?? []} loading={!leaderboards} scoreLabel={t("library.animeScore")} />
           </div>
         </TabsContent>
       </Tabs>
@@ -410,34 +407,31 @@ function LeaderboardCard({
   loading: boolean;
   scoreLabel: string;
 }) {
+  const { t } = useI18n();
   return (
     <section className="glass rounded-2xl p-4">
       <h2 className="font-black mb-4">{title}</h2>
       {loading ? (
-        <p className="text-xs text-muted-foreground">Loading…</p>
+        <p className="text-xs text-muted-foreground">{t("browse.loading")}</p>
       ) : entries.length ? (
         <ol className="space-y-3">
           {entries.map((entry, index) => (
             <li key={entry.id} className="flex items-center gap-3">
               <span className="w-5 text-xs font-black text-muted-foreground">{index + 1}</span>
-              <img
-                src={entry.avatarUrl || "/placeholder.svg"}
-                alt=""
-                className="w-8 h-8 rounded-full object-cover bg-muted"
-              />
+              <FramedAvatar user={entry} size={32} />
               <span className="min-w-0 flex-1 truncate text-sm font-semibold">
-                {entry.displayName || entry.username} <span className="text-[10px] text-muted-foreground">Lv.{entry.level}</span>
+                <NameWithFrame user={entry} compact className="truncate" avatarSize={32} /> <span className="text-[10px] text-muted-foreground">Lv.{entry.level}</span>
               </span>
               <span className="text-xs font-bold text-primary">
                 {entry.postCount !== undefined
-                  ? `${entry.postCount} posts · ${entry.likeCount ?? 0} likes`
+                  ? `${entry.postCount} ${t("community.category.discussions")} · ${entry.likeCount ?? 0} ${t("library.likes")}`
                   : `${entry.score} ${scoreLabel}`}
               </span>
             </li>
           ))}
         </ol>
       ) : (
-        <p className="text-xs text-muted-foreground">No qualifying activity yet.</p>
+        <p className="text-xs text-muted-foreground">{t("library.noLeaderboardActivity")}</p>
       )}
     </section>
   );

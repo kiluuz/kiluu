@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { Search, SlidersHorizontal, Loader2, X } from "lucide-react";
+import { Search, Loader2, X } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -9,6 +9,8 @@ import { useAppStore } from "../store";
 import type { AnimeSummary } from "../types";
 import { AnimeCard } from "../ui-bits";
 import { cn } from "@/lib/utils";
+import { useI18n } from "@/components/i18n-provider";
+import { genreTranslationKey } from "@/lib/i18n";
 
 const GENRES = [
   "Action", "Adventure", "Comedy", "Drama", "Fantasy", "Sci-Fi", "Romance",
@@ -19,6 +21,7 @@ const TYPES = ["TV", "MOVIE", "OVA"];
 
 export function BrowseView() {
   const { view, navigate } = useAppStore();
+  const { t } = useI18n();
   const [animes, setAnimes] = useState<AnimeSummary[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
@@ -66,18 +69,7 @@ export function BrowseView() {
 
   return (
     <div className="max-w-[1280px] mx-auto px-4 sm:px-8 py-6 pb-10">
-      <div className="mb-6">
-        <h1 className="text-2xl sm:text-3xl font-black flex items-center gap-3">
-          <span className="w-10 h-10 rounded-xl brand-gradient flex items-center justify-center">
-            <SlidersHorizontal className="w-5 h-5 text-white" />
-          </span>
-          Discover
-        </h1>
-        <p className="text-sm text-muted-foreground mt-1.5">
-          Find your next obsession — filter by genre, type and more
-        </p>
-      </div>
-
+      <h1 className="sr-only">{t("browse.title")}</h1>
       {/* Search + filters */}
       <div className="glass rounded-2xl p-3 sm:p-4 mb-6 space-y-3">
         <div className="flex gap-2 flex-col sm:flex-row">
@@ -86,31 +78,31 @@ export function BrowseView() {
             <Input
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search by title, description, studio..."
+              placeholder={t("browse.searchPlaceholder")}
               className="pl-9 h-11 rounded-xl"
-              aria-label="Search animes"
+              aria-label={t("browse.searchAria")}
             />
           </div>
           <div className="flex gap-2">
             <Select value={sort} onValueChange={setSort}>
-              <SelectTrigger className="w-[140px] h-11 rounded-xl" aria-label="Sort by">
-                <SelectValue placeholder="Sort" />
+              <SelectTrigger className="w-[140px] h-11 rounded-xl" aria-label={t("browse.sortBy")}>
+                <SelectValue placeholder={t("browse.sort")} />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="trending">🔥 Trending</SelectItem>
-                <SelectItem value="rating">⭐ Top Rated</SelectItem>
-                <SelectItem value="newest">🆕 Newest</SelectItem>
+                  <SelectItem value="trending">🔥 {t("browse.trending")}</SelectItem>
+                  <SelectItem value="rating">⭐ {t("browse.topRated")}</SelectItem>
+                  <SelectItem value="newest">🆕 {t("browse.newest")}</SelectItem>
                 <SelectItem value="title">🔤 A-Z</SelectItem>
-                <SelectItem value="price-low">💎 Price ↑</SelectItem>
-                <SelectItem value="price-high">💎 Price ↓</SelectItem>
+                  <SelectItem value="price-low">💎 {t("browse.priceAscending")}</SelectItem>
+                  <SelectItem value="price-high">💎 {t("browse.priceDescending")}</SelectItem>
               </SelectContent>
             </Select>
             <Select value={type} onValueChange={setType}>
-              <SelectTrigger className="w-[110px] h-11 rounded-xl" aria-label="Type">
-                <SelectValue placeholder="Type" />
+              <SelectTrigger className="w-[110px] h-11 rounded-xl" aria-label={t("browse.type")}>
+                <SelectValue placeholder={t("browse.type")} />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="ALL">All Types</SelectItem>
+                <SelectItem value="ALL">{t("browse.allTypes")}</SelectItem>
                 {TYPES.map((t) => (
                   <SelectItem key={t} value={t}>{t}</SelectItem>
                 ))}
@@ -129,7 +121,7 @@ export function BrowseView() {
                 : "hover:border-emerald-500/50 text-muted-foreground"
             )}
           >
-            FREE only
+            {t("browse.freeOnly")}
           </button>
           {GENRES.map((g) => (
             <button
@@ -142,7 +134,7 @@ export function BrowseView() {
                   : "text-muted-foreground hover:border-primary/50 hover:text-foreground"
               )}
             >
-              {g}
+              {t(genreTranslationKey(g))}
             </button>
           ))}
           {activeFilters > 0 && (
@@ -150,7 +142,7 @@ export function BrowseView() {
               onClick={resetFilters}
               className="px-3 py-1.5 rounded-full text-xs font-semibold text-destructive hover:bg-destructive/10 flex items-center gap-1 transition"
             >
-              <X className="w-3 h-3" /> Clear
+              <X className="w-3 h-3" /> {t("browse.clear")}
             </button>
           )}
         </div>
@@ -159,21 +151,21 @@ export function BrowseView() {
       {/* Results */}
       {loading ? (
         <div className="flex items-center justify-center py-24 text-muted-foreground">
-          <Loader2 className="w-6 h-6 animate-spin mr-2" /> Loading animes...
+          <Loader2 className="w-6 h-6 animate-spin mr-2" /> {t("browse.loading")}
         </div>
       ) : animes.length === 0 ? (
         <div className="text-center py-24">
           <p className="text-4xl mb-3">🔍</p>
-          <p className="font-bold text-lg">No animes found</p>
-          <p className="text-sm text-muted-foreground mt-1">Try different filters or search terms</p>
+          <p className="font-bold text-lg">{t("browse.noResults")}</p>
+          <p className="text-sm text-muted-foreground mt-1">{t("browse.noResultsHint")}</p>
           <Button variant="outline" onClick={resetFilters} className="mt-4 rounded-full">
-            Reset filters
+            {t("browse.resetFilters")}
           </Button>
         </div>
       ) : (
         <>
           <p className="text-xs text-muted-foreground mb-4">
-            {animes.length} {animes.length === 1 ? "anime" : "animes"} found
+            {animes.length} {t(animes.length === 1 ? "browse.resultSingular" : "browse.resultPlural")}
           </p>
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3.5 sm:gap-5">
             {animes.map((a) => (

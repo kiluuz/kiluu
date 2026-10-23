@@ -96,7 +96,10 @@ export async function POST(request: NextRequest) {
         host: { select: { id: true, username: true, displayName: true } },
         members: {
           where: { lastSeenAt: { gte: cutoff } },
-          include: { user: { select: { id: true, username: true, displayName: true, avatarUrl: true, accentColor: true } } },
+          include: { user: { select: {
+            id: true, username: true, displayName: true, avatarUrl: true, accentColor: true,
+            avatarFrame: true, equippedAvatarFrameId: true, equippedNameFrameId: true,
+          } } },
         },
         messages: { orderBy: { createdAt: "desc" }, take: 50, include: { user: { select: { username: true, displayName: true } } } },
       },
@@ -160,6 +163,9 @@ export async function POST(request: NextRequest) {
       displayName: member.user.displayName || member.user.username,
       avatarUrl: member.user.avatarUrl,
       accentColor: member.user.accentColor,
+      avatarFrame: member.user.avatarFrame,
+      equippedAvatarFrameId: member.user.equippedAvatarFrameId,
+      equippedNameFrameId: member.user.equippedNameFrameId,
       isHost: member.user.id === joined.hostId,
     })),
     messages: joined.messages.reverse().map((message) => ({

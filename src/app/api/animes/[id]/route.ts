@@ -22,7 +22,10 @@ export async function GET(
     where: { OR: [{ id }, { slug: id }] },
     include: {
       episodes: { orderBy: { number: "asc" } },
-      creator: { select: { id: true, username: true, displayName: true, avatarUrl: true, accentColor: true, role: true } },
+      creator: { select: {
+        id: true, username: true, displayName: true, avatarUrl: true, accentColor: true, role: true,
+        avatarFrame: true, equippedAvatarFrameId: true, equippedNameFrameId: true,
+      } },
       catalogVersions: {
         include: {
           creator: { select: { username: true, displayName: true } },

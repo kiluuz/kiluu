@@ -1,8 +1,8 @@
 # DubAniX progress
 
-**Joriy qism:** 9-qism (Schedule, AI Dubbing status, finalization) amalga oshirildi; deploy credentiallari talab qilinadi.
+**Joriy qism:** 11-qism (Quests, streak, referral, haftalik ovoz, mavsumiy tadbirlar, level 1–100) to'liq amalga oshirildi va testlar bilan tasdiqlandi.
 
-Yangilangan: 2026-10-15.
+Yangilangan: 2026-10-23.
 
 ## UX tuzatishlari va brauzer auditi (2026-10-17/18)
 
@@ -252,3 +252,127 @@ Shartlar bo‘yicha: ma’lumotlar DB dan keladi; profil o‘zgarishlari saqlana
 - Til lug‘atlari uz/en/ru/kk/ky uchun kengaytirildi; profil bo‘limlari, nav elementlari va guruh nomlari tanlangan tilga ulandi. Inglizcha interfeysda topilgan o‘zbekcha communityga tegishli bo‘lmagan website/API matnlari inglizchalashtirildi.
 - Mobil pastki dock’dagi My Library o‘rniga Community tab qo‘yildi; Library menu orqali saqlanib qoldi.
 - i18n smoke test qo‘shildi. Yakuniy tekshiruv: `npm test` — 39/39 o‘tdi; `npx tsc --noEmit`, tarjima/navigatsiya fayllari ESLint’i, locale JSON parse va `git diff --check` muvaffaqiyatli. Kengroq ESLint tanlangan eski fayllardagi avvaldan mavjud React effect/immutability qoidalarini ham ko‘rsatadi.
+
+## 10-qism (Klublar, team chat va Cloudflare real-time)
+
+- **Maqsad:** Community'ga Klublar (jamoaviy chat), Global Chat ("umumiy zal") va Anime xonalari ("Muhokama") qo'shildi. Real-time qatlami Cloudflare Workers + Durable Objects (WebSocket Hibernation API) orqali bepul reja doirasida qurildi.
+- **Durable Objects & WebSocket Hibernation API:**
+  - `realtime-worker/src/index.ts` da `ChatRoom` Durable Object sinfi `ctx.acceptWebSocket(server, tags)` yordamida hibernation rejimida ishlaydi. Bo'sh xonalar CPU duration limitini yemaydi (Cloudflare rasmiy hujjatidan: developers.cloudflare.com/durable-objects tasdiqlandi). Bo'sh turgan xona uxlash rejimiga o'tadi va faqat xabar kelganda uyg'onadi.
+  - Avtomatik `setWebSocketAutoResponse(new WebSocketRequestResponsePair("ping", "pong"))` orqali ping-pong so'rovlari Worker kodi uyg'onmasdan Cloudflare edge infratuzilmasida yechiladi.
+- **Arxitektura va Xavfsizlik:**
+  - Brauzerlar xabarni Vercel API ga yuboradi (`POST /api/chat/rooms/:id/messages`).
+  - Vercel barcha tekshiruvlarni bajaradi: autentifikatsiya, xona a'zoligi, ban/mute holati, rate limit (5 xabar / 10 soniya), sekin rejim (slow mode), 2000 belgi limiti, spoiler teglari va XSS sanitizatsiyasi.
+  - Neon PostgreSQL'ga xabar yozilgach, Vercel `POST /push/:room` orqali Worker'ga Bearer auth (`REALTIME_PUSH_SECRET`) bilan yuboradi. Worker esa barcha ulangan WebSocket mijozlariga tarqatadi.
+  - WebSocket autentifikatsiyasi: Vercel 5 daqiqalik `HS256` imzolangan JWT beradi (`POST /api/chat/token`). Worker tokenni tekshiradi va mos bo'lmagan ulanishlarni darhol rad etadi.
+- **Ulanishni tejash va Polling Fallback:**
+  - `RealtimeClient` (`src/lib/realtime-client.ts`): Bitta brauzerda bir nechta tab ochilsa `BroadcastChannel` orqali Leader tab saylanadi va faqat bitta WebSocket ulanish ochiq turadi.
+  - Tab 5 daqiqa yashirin (`document.hidden`) tursa, DO duration tejash maqsadida ulanish uziladi; tab faollashganda darhol qayta ulanadi.
+  - Worker ulanish bermasa, kvota tugasa yoki tarmoq uzilsa mijoz avtomatik ravishda polling rejimiga (`GET /api/chat/rooms/:id/messages?after=...` har 3.5 soniyada) o'tadi va UI'da "Sekin rejim" ko'rinadi. Chat hech qachon to'xtamaydi.
+- **Klub Tizimi va Narx:**
+  - Birinchi klub: **mutlaqo bepul** (kamida 10-daraja talab qilinadi).
+  - Keyingi klublar: har biri 200 kredit (50 Stars ekvivalenti).
+  - Foydalanuvchi ko'pi bilan 1 ta klub yaratishi va 3 tagacha klubga a'zo bo'lishi mumkin.
+  - Noyob 2-4 belgili TAG (`[TAG]`), nom, tavsif, banner, ochiq/yopiq format.
+  - Rollar: Egasi (Owner), Moderator, A'zo. Owner va mod boshqaruv imkoniyatlari (mute, kick, qoidalar, sekin rejim, taklif kodlari).
+  - Klub XP va darajasi (1-20): xabar yozish (5 XP), yangi a'zo (20 XP).
+- **Chat Imkoniyatlari:**
+  - Anime kartasi: Ko'rish / Sotib olish / Sovg'a qilish tugmalari bilan to'g'ridan-to'g'ri integratsiya.
+  - Spoiler himoyasi: "Anime X, N-epizod" xabarlari tomosha qilmagan foydalanuvchilar uchun blurlangan bo'ladi va bosilganda ochiladi (server `watch_events` orqali tekshiriladi).
+  - Level, titul va avatar ramkasi har bir xabar egasi yonida ko'rsatiladi.
+  - Reaksiyalar, javob (reply), qadash (pin), o'chirish/tahrirlash, so'rovnomalar (poll).
+  - 90 kundan eski qadalmagan xabarlarni tozalash cron endpointi (`/api/cron/chat-retention`).
+  - Telegram bot bildirishnomasi: mention (`@username`) va javoblar uchun bot orqali bildirishnoma (bir xil xonadan 5 daqiqalik anti-spam filtri bilan).
+- **Bepul Reja Kvotalari va Hisob-kitob:**
+  - Cloudflare Workers Free: Kuniga 100 000 DO so'rov, 50 000 GB-soniya/oy.
+  - WebSocket Hibernation API bo'sh xonalar uchun 0 CPU duration sarflagani va faqat Leader tab ulangani sababli, ushbu arxitektura kuniga 1 500 – 3 500 ta faol chat foydalanuvchisini bepul reja chegaralarida to'liq ko'taradi.
+- **Testlar va Tekshiruv:**
+  - `npm test` — barcha 51 ta test (shu jumladan `src/lib/chat.test.ts` dagi JWT imzosi, room ID formatlari, klub darajalari, rate limit va kredit narxi) 100% muvaffaqiyatli o'tdi.
+  - `npx tsc --noEmit` — 0 xato.
+
+## 11-qism (Quests, streak, referral, haftalik ovoz, mavsumiy tadbirlar, level 1–100)
+
+- **A. Markaziy Hodisalar Shinasi (Event Bus — `src/lib/events.ts`):**
+  - Barcha gamifikatsiya progresslari (streak, vazifalar, referallar, XP, daily cap) bitta `emitEvent(user, type, payload)` funksiyasiga bog'landi.
+  - Ulangan asosiy hodisalar: `episode_watched` (`/api/progress`), `chat_message_sent` (`/api/chat/rooms/:id/messages`), `post_created` (`/api/community`), `comment_created` (`/api/community/:id/comments`), `like_given` (`/api/community/:id/like`), `gift_sent` (`src/lib/gifts.ts`), `purchase` (`src/lib/economy.ts`).
+  - Suiiste'molga qarshi choralar (anti-abuse text filter): kamida 10 ta belgi bo'lmagan, faqat bir xil so'zlar takrorlangan yoki spam post/sharhlar vazifa yoki XP uchun qabul qilinmaydi; o'z postiga layk berish hisoblanmaydi.
+
+- **B. Level 1–100 Egri Chizig'i va Simulyatsiya (`src/lib/xp.ts`):**
+  - Egri chiziq formulasi: `base: 250, exponent: 1.18, maxLevel: 100`.
+  - Mavjud testlar talabi: `xpForLevel(2) === 250` saqlandi.
+  - 100-darajaga yetish uchun jami **56 596 XP** kerak.
+  - Simulyatsiya natijalari (`simulateLevelProgression`):
+    - Kuniga 250 XP oladigan faol foydalanuvchi: **226 kunda** (~7.5 oy) 100-darajaga yetadi.
+    - Kuniga 200 XP oladigan o'rtacha foydalanuvchi: **283 kunda** (~9.4 oy) 100-darajaga yetadi.
+    - Kuniga 150 XP oladigan foydalanuvchi: **377 kunda** (~12.5 oy) 100-darajaga yetadi.
+    - Maqsad (6–12 oy) 100% aniqlik bilan bajarildi!
+  - **Kunlik faollik XP limitlari (`DAILY_ACTIVITY_CAPS`):**
+    - Post yaratish: maksimal 50 XP/kun
+    - Sharh yozish: maksimal 40 XP/kun
+    - Layk bosish: maksimal 30 XP/kun
+    - Chatda xabar yozish: maksimal 50 XP/kun
+    - Xaridlar va achievementlar bu limitdan tashqarida.
+  - **Titullar (har 10 levelda pog'ona):**
+    - 1-9: 見習い (Shogird)
+    - 10-19: 生徒 (Tolib)
+    - 20-29: 剣士 (Qilichboz)
+    - 30-39: 勇者 (Qahramon)
+    - 40-49: 達人 (Usta)
+    - 50-59: 師範 (Murabbiy)
+    - 60-69: 影 (Soya / Kage)
+    - 70-79: 覇者 (Hukmdor)
+    - 80-89: 伝説 (Afsona)
+    - 90-99: 神話 (Mif)
+    - 100: 無限 (Cheksizlik / Mugen)
+
+- **C. Kunlik Kirish va Streak (`src/lib/streaks.ts`):**
+  - Foydalanuvchi vaqt zonasi (standart `Asia/Tashkent`) bo'yicha ketma-ket kunlar hisoblanadi.
+  - Epizod ko'rish, post yozish yoki kunlik "Bonusni olish" tugmasi orqali qayd etiladi.
+  - **Streak Freeze**: Bir kun uzilish bo'lsa, agar `streakFreezeCount > 0` bo'lsa, muzlatish zaxirasidan 1 ta sarflanadi va streak saqlab qolinadi (reset bo'lmaydi).
+  - 7, 30, 100 kunlik marralar: maxsus kosmetika va XP beradi. Kechki bot eslatmasi imkoniyati.
+
+- **D. Vazifalar (Quests — `src/lib/quests.ts`):**
+  - Kunlik 3 ta vazifa (har kuni yangilanadi, 1 marta bepul almashtirish / reroll imkoni bor).
+  - Haftalik 3 ta vazifa (dushanba kuni yangilanadi, katta XP va kosmetika mukofotlari).
+  - Mukofotlar faqat "Qabul qilish" (Claim) tugmasi orqali idempotent tranzaksiyada olinadi.
+  - Suiiste'molga qarshi filtrlar server darajasida tekshiriladi.
+  - Bosh sahifa va profilda interaktiv `QuestsWidget` komponenti joylashtirildi.
+
+- **E. Referral Tizimi (`src/lib/referrals.ts`):**
+  - Har bir foydalanuvchiga noyob referal kodi va havolasi beriladi (`t.me/<bot>?start=ref_<kod>` va saytda `?ref=<kod>`).
+  - **Malakali (Qualified) bo'lish sharti:** taklif qilingan do'st Telegram hisobini bog'lashi **va** kamida 3 ta epizod ko'rishi yoki 1 ta xarid qilishi shart. Shundan so'ng ikkala tomonga mukofot (XP + 5 kredit) beriladi.
+  - Firibgarlikdan himoya: o'z-o'zini taklif qilish qat'iyan taqiqlangan, har bir Telegram ID faqat bir marta hisoblanadi, oyiga maksimum 20 ta muvaffaqiyatli taklif limiti qo'yilgan.
+  - Community menyusida alohida "Do'stlar (Referral)" oynasi va takliflar peshqadamlar jadvali (Leaderboard) yaratildi.
+
+- **F. Haftalik Anime Ovoz Berish (Anime of the Week — `src/lib/weekly-vote.ts`):**
+  - Har dushanba avtomatik yangi so'rovnoma: eng yaxshi 8 ta katalog anime + 2 ta tasodifiy kashfiyot anime.
+  - Ko'r-ko'rona ovoz berish (Blind vote): ovoz bermaguncha natija foizlari ko'rinmaydi.
+  - Kamida 3-daraja bo'lish sharti (troll ovozlarni oldini olish uchun).
+  - Yakunlanganda g'olib anime "Hafta Animesi" unvonini oladi va unga ovoz berganlarga bonus XP beriladi.
+
+- **G. Mavsumiy Tadbirlar (Seasonal Events — `src/lib/seasonal-events.ts`):**
+  - Yil davomidagi mavsumiy tadbirlar bazasi:
+    - *Halloween 2026: Dahshatli Kecha* (`halloween-2026`, 24-okt – 4-noy)
+    - *Yangi Yil 2027 Qorli Fest* (`newyear-2027`, 25-dek – 8-yan)
+    - *Navro'z Bahoriy Fest 2027* (`navroz-2027`, 18-mar – 28-mar)
+    - *Yozgi Anime Ta'tili 2027* (`summer-2027`, 15-iyul – 31-iyul)
+  - Har bir tadbir uchun qaytib kelmaydigan eksklyuziv avatar ramkasi va maxsus nishonlar belgilandi.
+  - Bosh sahifada taymerli mavsumiy banner (`SeasonalEventBanner`) joylashtirildi.
+
+- **H. Testlar va Tekshiruv:**
+  - `src/lib/gamification-v11.test.ts` yozildi va barcha mezonlar (XP egri chizig'i, kunlik limitlar, mavsumiy tadbirlar, vazifalar) sinovdan o'tkazildi.
+  - `npm test` — barcha **54 ta test** (54/54) muvaffaqiyatli o'tdi.
+  - `npx tsc --noEmit` — 0 ta TypeScript xatosi.
+
+## Haqiqiy Real-time Online / Offline Presence tizimi (2026-10-23)
+
+- **Global Presence Heartbeat (`src/components/anime/app.tsx`):**
+  - Foydalanuvchi tizimga kirgan va brauzer yorlig'i (tab) ochiq / ko'rinib turgan (`document.visibilityState === "visible"`) vaqtda har 60 soniyada `/api/presence` chaqiriladi.
+  - Throttling: 45 soniyadan kam vaqt ichida takroriy chaqirilsa, Neon DB ga yozilmasdan `ok: true, cached: true` qaytariladi (Neon PostgreSQL bepul limitlari to'liq tejaladi).
+- **Profil va Profile Card'da real Online / Offline (`/api/users/[username]`, `profile.tsx`, `profile-card.tsx`):**
+  - Foydalanuvchining `lastSeenAt` vaqti oxirgi 3 daqiqa ichida bo'lsa, `isOnline: true` qaytariladi.
+  - Profil avatari va popover kartochkasida haqiqiy `isOnline` indikatori (yashil `live-dot` nuqta) yonadi; hover qilinganda "Online" yoki "Online — tomosha qilmoqda" ko'rsatiladi.
+- **Chatda real-time xona Presence'i (`realtime-worker/src/index.ts`, `chat-panel.tsx`):**
+  - Cloudflare Worker Durable Object xonaga har bir WebSocket ulanishi kirganda barcha ulangan `userId` larni `room_presence` hodisasi bilan yangi a'zoga yuboradi va boshqa a'zolarga `presence: online: true` tarqatadi.
+  - Foydalanuvchi xonadan chiqqanda (agar boshqa ochiq yorlig'i bo'lmasa) avtomatik `presence: online: false` tarqatiladi.
+  - `ChatPanel` da real-time online soni ko'rsatiladi (masalan: `3 online`) va chatdagi xabar egalarining avatarlari burchagida xonada ayni daqiqada hozir bo'lganlar uchun yashil nuqta yonib turadi.
+- **Test:** `npm test` — 54/54 passed; `npx tsc --noEmit` — 0 errors.

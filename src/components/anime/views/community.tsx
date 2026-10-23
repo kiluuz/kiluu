@@ -2,17 +2,21 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useQueries, useQueryClient } from "@tanstack/react-query";
-import { Users, Send, Flame, Trophy, UserCheck } from "lucide-react";
+import { Send, Flame, Trophy, UserCheck, Shield, MessageSquare, Newspaper, Gift } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useAppStore, useOpenProfile } from "../store";
 import type { CommunityPost, CommentItem, AnimeSummary, PostType, CommunityStats } from "../types";
-import { Avatar as UiAvatar, timeAgo, SmartImage } from "../ui-bits";
+import { avatarNameGap, FramedAvatar, NameWithFrame, timeAgo, SmartImage } from "../ui-bits";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { readApiJson } from "@/lib/api-response";
 import { PostComposer, PostCard, RightSidebar } from "./community-ui";
+import { useI18n } from "@/components/i18n-provider";
+import { ChatPanel } from "../chat/chat-panel";
+import { ClubsView } from "../clubs/clubs-view";
+import { ReferralView } from "./referral-view";
 
 const CATEGORIES: ("All" | PostType)[] = ["All", "Theories", "Reviews", "Discussions", "Memes", "Fan Art", "Recommendations", "UZ Dubbing", "Watch Parties"];
 
@@ -27,10 +31,12 @@ type CommunityReport = {
 
 export function CommunityView() {
   const { user, setAuthOpen } = useAppStore();
+  const { t } = useI18n();
   const queryClient = useQueryClient();
   const openProfile = useOpenProfile();
 
   const [posts, setPosts] = useState<CommunityPost[]>([]);
+  const [communityMode, setCommunityMode] = useState<"feed" | "chat" | "clubs" | "referral">("feed");
   const [tab, setTab] = useState("latest");
   const [activeCategory, setActiveCategory] = useState("All");
   const feedKey = `${user?.id ?? "anonymous"}:${tab}:${activeCategory}`;
@@ -453,48 +459,99 @@ export function CommunityView() {
 
   return (
     <div className="max-w-[1200px] mx-auto px-4 sm:px-8 py-6 pb-10">
+      <h1 className="sr-only">{t("community.title")}</h1>
 
-      {/* Hero Header */}
-      <div className="mb-6 flex flex-col md:flex-row md:items-end justify-between gap-4">
-        <div>
-          <h1 className="text-2xl sm:text-4xl font-black flex items-center gap-3 mb-2">
-            <span className="w-12 h-12 rounded-2xl brand-gradient flex items-center justify-center shadow-lg shadow-primary/20">
-              <Users className="w-6 h-6 text-white" />
-            </span>
-            Community
-          </h1>
-          <p className="text-sm text-muted-foreground">
-            Share theories, reviews and watch parties — be excellent to each other
-          </p>
-        </div>
-        <div className="flex items-center gap-4">
-          <div className="flex items-center gap-3 text-xs font-bold bg-secondary/50 p-3 rounded-2xl border">
-            {stats && <div className="flex flex-col"><span className="text-muted-foreground">Online</span><span>{stats.online}</span></div>}
-            {stats && <div className="w-px h-6 bg-border" />}
-            <div className="flex flex-col"><span className="text-muted-foreground">Posts Today</span><span>{stats?.postsToday ?? "—"}</span></div>
-          </div>
-        </div>
-      </div>
-
-      {/* Category Chips */}
-      <div className="flex items-center gap-2 overflow-x-auto fancy-scroll pb-4 mb-2 -mx-4 px-4 sm:mx-0 sm:px-0">
-        {CATEGORIES.map(cat => (
+      {/* Top Mode Navigation & Online Stats */}
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6">
+        <div className="flex items-center gap-1.5 p-1 bg-secondary/50 rounded-2xl border">
           <button
-            key={cat}
-            onClick={() => setActiveCategory(cat)}
+            onClick={() => setCommunityMode("feed")}
             className={cn(
-              "px-4 py-2 rounded-full text-sm font-bold whitespace-nowrap transition-all duration-300",
-              activeCategory === cat
-                ? "bg-foreground text-background shadow-md transform scale-105"
-                : "bg-secondary/50 text-muted-foreground hover:bg-secondary hover:text-foreground"
+              "flex items-center gap-2 px-4 py-2 rounded-xl text-xs sm:text-sm font-bold transition-all",
+              communityMode === "feed"
+                ? "bg-background text-foreground shadow-sm"
+                : "text-muted-foreground hover:text-foreground"
             )}
           >
-            {cat}
+            <Newspaper className="w-4 h-4" /> Lenta
           </button>
-        ))}
+          <button
+            onClick={() => setCommunityMode("chat")}
+            className={cn(
+              "flex items-center gap-2 px-4 py-2 rounded-xl text-xs sm:text-sm font-bold transition-all",
+              communityMode === "chat"
+                ? "bg-background text-foreground shadow-sm"
+                : "text-muted-foreground hover:text-foreground"
+            )}
+          >
+            <MessageSquare className="w-4 h-4" /> Global Chat
+          </button>
+          <button
+            onClick={() => setCommunityMode("clubs")}
+            className={cn(
+              "flex items-center gap-2 px-4 py-2 rounded-xl text-xs sm:text-sm font-bold transition-all",
+              communityMode === "clubs"
+                ? "bg-background text-foreground shadow-sm"
+                : "text-muted-foreground hover:text-foreground"
+            )}
+          >
+            <Shield className="w-4 h-4" /> Klublar
+          </button>
+          <button
+            onClick={() => setCommunityMode("referral")}
+            className={cn(
+              "flex items-center gap-2 px-4 py-2 rounded-xl text-xs sm:text-sm font-bold transition-all",
+              communityMode === "referral"
+                ? "bg-background text-foreground shadow-sm"
+                : "text-muted-foreground hover:text-foreground"
+            )}
+          >
+            <Gift className="w-4 h-4 text-emerald-500" /> Do&apos;stlar (Referral)
+          </button>
+        </div>
+
+        <div className="flex items-center gap-3 text-xs font-bold bg-secondary/50 p-2.5 rounded-2xl border">
+          {stats && <div className="flex flex-col"><span className="text-muted-foreground">{t("community.online")}</span><span>{stats.online}</span></div>}
+          {stats && <div className="w-px h-6 bg-border" />}
+          <div className="flex flex-col"><span className="text-muted-foreground">{t("community.postsToday")}</span><span>{stats?.postsToday ?? "—"}</span></div>
+        </div>
       </div>
 
-      <div className="lg:flex lg:gap-6 relative">
+      {communityMode === "chat" ? (
+        <div className="max-w-4xl mx-auto">
+          <ChatPanel
+            roomId="global"
+            title="Global zal (Umumiy chat)"
+            subtitle="Barcha anime muxlislari uchun real-time muloqot zali"
+          />
+        </div>
+      ) : communityMode === "clubs" ? (
+        <ClubsView />
+      ) : communityMode === "referral" ? (
+        <div className="max-w-4xl mx-auto">
+          <ReferralView />
+        </div>
+      ) : (
+        <>
+          {/* Category Chips */}
+          <div className="flex items-center gap-2 overflow-x-auto fancy-scroll pb-4 mb-2 -mx-4 px-4 sm:mx-0 sm:px-0">
+            {CATEGORIES.map(cat => (
+              <button
+                key={cat}
+                onClick={() => setActiveCategory(cat)}
+                className={cn(
+                  "px-4 py-2 rounded-full text-sm font-bold whitespace-nowrap transition-all duration-300",
+                  activeCategory === cat
+                    ? "bg-foreground text-background shadow-md transform scale-105"
+                    : "bg-secondary/50 text-muted-foreground hover:bg-secondary hover:text-foreground"
+                )}
+              >
+                {t(`community.category.${cat.toLowerCase().replaceAll(" ", "")}`)}
+              </button>
+            ))}
+          </div>
+
+          <div className="lg:flex lg:gap-6 relative">
 
         {/* Main Feed Column */}
         <div className="flex-1 min-w-0">
@@ -504,13 +561,13 @@ export function CommunityView() {
           <Tabs value={tab} onValueChange={setTab} className="mb-5">
             <TabsList className="rounded-xl h-12 p-1 bg-secondary/40">
               <TabsTrigger value="latest" className="rounded-lg gap-2 text-sm font-bold px-5 data-[state=active]:bg-background data-[state=active]:shadow-sm transition-all">
-                <Flame className="w-4 h-4" /> Latest
+                <Flame className="w-4 h-4" /> {t("community.latest")}
               </TabsTrigger>
               <TabsTrigger value="top" className="rounded-lg gap-2 text-sm font-bold px-5 data-[state=active]:bg-background data-[state=active]:shadow-sm transition-all">
-                <Trophy className="w-4 h-4" /> Top
+                <Trophy className="w-4 h-4" /> {t("community.top")}
               </TabsTrigger>
               <TabsTrigger value="following" className="rounded-lg gap-2 text-sm font-bold px-5 data-[state=active]:bg-background data-[state=active]:shadow-sm transition-all">
-                <UserCheck className="w-4 h-4" /> Following
+                <UserCheck className="w-4 h-4" /> {t("community.following")}
               </TabsTrigger>
             </TabsList>
           </Tabs>
@@ -538,8 +595,8 @@ export function CommunityView() {
           ) : posts.length === 0 ? (
             <div className="rounded-3xl border border-dashed border-border/60 bg-secondary/10 p-16 text-center animate-in fade-in zoom-in duration-500">
               <p className="text-6xl mb-4 animate-bounce">💬</p>
-              <p className="text-xl font-bold">No posts found</p>
-              <p className="text-sm text-muted-foreground mt-2">Try a different category or be the first to post!</p>
+              <p className="text-xl font-bold">{t("community.emptyTitle")}</p>
+              <p className="text-sm text-muted-foreground mt-2">{t("community.emptyHint")}</p>
             </div>
           ) : (
             <div className="space-y-5">
@@ -572,19 +629,19 @@ export function CommunityView() {
                   {openComments[post.id] && (
                     <div className="mt-2 ml-4 sm:ml-12 pl-4 border-l-2 border-border space-y-3 animate-in fade-in slide-in-from-top-2 duration-300">
                       {commentsErrorsByPostId[post.id] && (
-                        <p className="text-sm text-destructive">Could not refresh comments. Retrying…</p>
+                        <p className="text-sm text-destructive">{t("community.commentsRetry")}</p>
                       )}
                       {(commentsByPostId[post.id] || []).map((c) => (
                         <div key={c.id} className={cn("flex gap-3 group/comment", c.parentId && "ml-8")}>
-                          <UiAvatar src={c.user.avatarUrl} name={c.user.displayName} accent={c.user.accentColor} size={32} className="shrink-0" />
-                          <div className="flex-1 min-w-0">
+                          <FramedAvatar user={c.user} size={32} className="shrink-0" />
+                          <div className="flex-1 min-w-0" style={{ marginLeft: avatarNameGap(c.user, 32) }}>
                             <div className="bg-secondary/40 hover:bg-secondary/60 transition rounded-2xl rounded-tl-sm px-4 py-2.5">
                               <p className="text-xs">
                                 <button
                                   className="font-bold hover:text-primary transition"
                                   onClick={() => openProfile(c.user.username)}
                                 >
-                                  {c.user.displayName || c.user.username}
+                                  <NameWithFrame user={c.user} compact className="font-bold" avatarSize={0} />
                                 </button>
                                 {c.user.level && <span className="ml-1.5 text-[9px] font-bold bg-secondary/80 px-1 py-0.5 rounded text-muted-foreground">Lv.{c.user.level}</span>}
                               </p>
@@ -608,7 +665,7 @@ export function CommunityView() {
 
                       {/* Comment Input */}
                       <div className="flex gap-3 mt-4 items-start">
-                         <UiAvatar src={user?.avatarUrl} name={user?.displayName || user?.username} accent={user?.accentColor} size={32} className="shrink-0" />
+                         {user && <FramedAvatar user={user} size={32} className="shrink-0" />}
                          <div className="flex-1 relative">
                           <Textarea
                             value={commentInputs[post.id] || ""}
@@ -650,9 +707,9 @@ export function CommunityView() {
           )}
           {visibleModerationReports && (
             <section className="mt-8 rounded-2xl border bg-secondary/20 p-4">
-              <h2 className="mb-3 font-bold">Community moderation</h2>
+              <h2 className="mb-3 font-bold">{t("community.moderation")}</h2>
               {!visibleModerationReports.length ? (
-                <p className="text-sm text-muted-foreground">No open community reports.</p>
+                <p className="text-sm text-muted-foreground">{t("community.noReports")}</p>
               ) : (
                 <div className="space-y-3">
                   {visibleModerationReports.map((report) => {
@@ -675,7 +732,7 @@ export function CommunityView() {
                               {label}
                             </Button>
                           ))}
-                          <Button size="sm" variant="ghost" onClick={() => moderateReport(report, "dismiss")}>Dismiss</Button>
+                          <Button size="sm" variant="ghost" onClick={() => moderateReport(report, "dismiss")}>{t("community.dismiss")}</Button>
                         </div>
                       </div>
                     );
@@ -690,6 +747,8 @@ export function CommunityView() {
         <RightSidebar user={user} stats={stats} />
 
       </div>
+      </>
+      )}
     </div>
   );
 }

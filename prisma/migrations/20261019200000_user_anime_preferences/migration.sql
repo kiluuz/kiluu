@@ -1,0 +1,1 @@
+ALTER TABLE "User" ADD COLUMN "favoriteGenres" TEXT NOT NULL DEFAULT '';

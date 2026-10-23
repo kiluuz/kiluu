@@ -8,6 +8,9 @@ type RankedUser = {
   username: string;
   displayName: string | null;
   avatarUrl: string | null;
+  avatarFrame: string | null;
+  equippedAvatarFrameId: string | null;
+  equippedNameFrameId: string | null;
   accentColor: string;
   score: number;
   level: number;
@@ -34,6 +37,9 @@ export async function getLeaderboards(): Promise<Leaderboards> {
         username: string;
         displayName: string | null;
         avatarUrl: string | null;
+        avatarFrame: string | null;
+        equippedAvatarFrameId: string | null;
+        equippedNameFrameId: string | null;
         accentColor: string;
         animeCount: number | bigint;
       }>>(Prisma.sql`
@@ -45,7 +51,9 @@ export async function getLeaderboards(): Promise<Leaderboards> {
           JOIN ${sqlTable("Anime")} a ON a.slug = o."anime_slug"
           WHERE o.status IN ('COMPLETED', 'PAID_PENDING_GRANT')
         )
-        SELECT u.id, u.username, u."displayName", u."avatarUrl", u."accentColor",
+        SELECT u.id, u.username, u."displayName", u."avatarUrl", u."avatarFrame",
+          u."equipped_avatar_frame_id" AS "equippedAvatarFrameId",
+          u."equipped_name_frame_id" AS "equippedNameFrameId", u."accentColor",
           COUNT(DISTINCT owned."animeId") AS "animeCount"
         FROM owned
         JOIN ${sqlTable("User")} u ON u.id = owned."userId"
@@ -59,11 +67,16 @@ export async function getLeaderboards(): Promise<Leaderboards> {
         username: string;
         displayName: string | null;
         avatarUrl: string | null;
+        avatarFrame: string | null;
+        equippedAvatarFrameId: string | null;
+        equippedNameFrameId: string | null;
         accentColor: string;
         postCount: number;
         likeCount: number;
       }>>(Prisma.sql`
-        SELECT u.id, u.username, u."displayName", u."avatarUrl", u."accentColor",
+        SELECT u.id, u.username, u."displayName", u."avatarUrl", u."avatarFrame",
+          u."equipped_avatar_frame_id" AS "equippedAvatarFrameId",
+          u."equipped_name_frame_id" AS "equippedNameFrameId", u."accentColor",
           COUNT(DISTINCT p.id) AS "postCount", COUNT(DISTINCT l.id) AS "likeCount"
         FROM ${sqlTable("User")} u
         LEFT JOIN ${sqlTable("Post")} p ON p."userId" = u.id AND p.hidden = false
@@ -78,10 +91,15 @@ export async function getLeaderboards(): Promise<Leaderboards> {
         username: string;
         displayName: string | null;
         avatarUrl: string | null;
+        avatarFrame: string | null;
+        equippedAvatarFrameId: string | null;
+        equippedNameFrameId: string | null;
         accentColor: string;
         animeCount: number | bigint;
       }>>(Prisma.sql`
-        SELECT u.id, u.username, u."displayName", u."avatarUrl", u."accentColor",
+        SELECT u.id, u.username, u."displayName", u."avatarUrl", u."avatarFrame",
+          u."equipped_avatar_frame_id" AS "equippedAvatarFrameId",
+          u."equipped_name_frame_id" AS "equippedNameFrameId", u."accentColor",
           COUNT(a.id) AS "animeCount"
         FROM ${sqlTable("Anime")} a
         JOIN ${sqlTable("User")} u ON u.id = a."creatorId"

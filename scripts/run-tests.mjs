@@ -7,6 +7,8 @@ const testSchemaPath = path.resolve("prisma/schema.test.prisma");
 const postgresSchema = readFileSync(schemaPath, "utf8");
 const sqliteSchema = postgresSchema
   .replace('provider  = "postgresql"', 'provider  = "sqlite"')
+  .replace(/\s+@db\.Decimal\(\d+,\s*\d+\)/g, "")
+  .replace(/\bDecimal\b/g, "Float")
   .replace(/^\s*directUrl = env\("DIRECT_URL"\)\r?\n/m, "");
 
 if (sqliteSchema === postgresSchema || !postgresSchema.includes('directUrl = env("DIRECT_URL")')) {

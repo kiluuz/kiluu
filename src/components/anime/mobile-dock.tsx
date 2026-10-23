@@ -2,20 +2,21 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { motion, useReducedMotion } from "framer-motion";
-import { LayoutGrid, UserRound, Settings } from "lucide-react";
+import { LayoutGrid } from "lucide-react";
 import { useAppStore } from "./store";
-import { useMenuItemForView, useResolvedNav, EXCHANGE_REQUIRED } from "./nav-config";
+import { useMenuItemForView, useResolvedNav } from "./nav-config";
 import { NavSheet } from "./nav-sheet";
 import { cn } from "@/lib/utils";
+import { LogoMark } from "@/components/brand/LogoMark";
 import type { LucideIcon } from "lucide-react";
 import type { ViewName } from "./types";
 
 /* ============================================================
    MOBILE DOCK — floating glass dock (< 768px)
-   5 slots: Home | Discover | [raised AI Dub] | Library | Menu
+   5 slots: Home | Discover | [raised AI Dub] | Community | Menu
    - sliding pill active indicator (spring, shared layoutId)
-   - label only on the active tab
-   - raised center CTA with animated Kiluu waveform + UZ badge
+   - icons only; accessible labels remain available to assistive technology
+   - raised center CTA with the Kiluu mark
    - hide-on-scroll + hide in player / fullscreen / keyboard / modals
    - haptic press feedback, 44px targets, safe-area aware
    ============================================================ */
@@ -26,21 +27,6 @@ function haptic() {
   try {
     if (typeof navigator !== "undefined" && "vibrate" in navigator) navigator.vibrate(8);
   } catch { /* no-op */ }
-}
-
-/** 5-bar Kiluu waveform (same rhythm as the Logo mark: 1.3s eq, .15s stagger) */
-function WaveformBars() {
-  return (
-    <span className="flex items-center justify-center gap-[3px] h-[22px]" aria-hidden="true">
-      {[22, 22, 20, 16, 10].map((h, i) => (
-        <span
-          key={i}
-          className="dock-wave-bar w-[3px] rounded-full bg-white"
-          style={{ height: h, opacity: [1, 1, 0.95, 0.8, 0.6][i], animationDelay: `${i * 0.15}s` }}
-        />
-      ))}
-    </span>
-  );
 }
 
 interface DockTabProps {
@@ -66,11 +52,7 @@ function DockTab({ icon: Icon, label, active, dot, onPress }: DockTabProps) {
           transition={SPRING}
         />
       )}
-      <motion.span
-        className="relative z-10 flex items-center justify-center"
-        animate={{ y: active ? -7 : 0 }}
-        transition={SPRING}
-      >
+      <span className="relative z-10 flex items-center justify-center">
         <Icon
           className={cn(
             "w-[22px] h-[22px] transition-colors",
@@ -80,14 +62,6 @@ function DockTab({ icon: Icon, label, active, dot, onPress }: DockTabProps) {
           fill={active ? "currentColor" : "none"}
           fillOpacity={active ? 0.18 : 0}
         />
-      </motion.span>
-      <span
-        className={cn(
-          "absolute bottom-[4px] left-0 right-0 text-center text-[10.5px] leading-none font-bold truncate px-1 transition-all duration-200",
-          active ? "opacity-100 translate-y-0 text-primary" : "opacity-0 translate-y-1"
-        )}
-      >
-        {label}
       </span>
       {dot && (
         <span className="absolute top-[7px] right-[calc(50%-18px)] w-[7px] h-[7px] rounded-full bg-emerald-500 live-dot border border-background" aria-hidden="true" />
@@ -119,15 +93,7 @@ export function MobileDock() {
   const community = byId("community");
   const dubbing = byId("dubbing");
 
-  /* Menu slot mirrors the current in-menu page so the user always knows where they are */
-  const settingsHere = view.name === "settings";
-  const profileHere = view.name === "user-profile";
-  const menuSlot: { icon: LucideIcon; label: string } =
-    menuItem ? { icon: menuItem.def.icon, label: menuItem.def.shortLabel } :
-    settingsHere ? { icon: Settings, label: "Settings" } :
-    profileHere ? { icon: UserRound, label: "Profile" } :
-    { icon: LayoutGrid, label: "Menu" };
-  const menuActive = !!menuItem || settingsHere || profileHere;
+  const menuActive = !!menuItem || view.name === "settings" || view.name === "user-profile";
 
   /* ---- hide-on-scroll (transform only, rAF-throttled) ---- */
   const lastY = useRef(0);
@@ -211,22 +177,15 @@ export function MobileDock() {
               aria-label="Open AI Dubbing — coming soon"
               aria-current={dubbing.active ? "page" : undefined}
             >
-              <WaveformBars />
-              <span
-                className="absolute -top-1 -right-1 text-[8px] font-black tracking-wide px-[5px] py-[1px] rounded-full bg-background text-primary border border-primary/40 shadow-sm"
-                aria-hidden="true"
-              >
-                SOON
-              </span>
-              <span className="sr-only">AI dubbing coming soon</span>
+              <LogoMark size={32} animated="none" decorative />
             </button>
           </div>
 
           {/* right pair */}
           <DockTab icon={community.def.icon} label={community.def.shortLabel} active={community.active} onPress={() => navigate("community")} />
           <DockTab
-            icon={menuSlot.icon}
-            label={menuSlot.label}
+            icon={LayoutGrid}
+            label="Menu"
             active={menuActive}
             dot={scheduleAirsToday && !menuActive}
             onPress={openSheet}
@@ -235,8 +194,8 @@ export function MobileDock() {
 
         {/* screen-reader summary of what lives inside the menu */}
         <p className="sr-only">
-          Menu opens the full navigation sheet with Community, Watch Together, Schedule, Exchange, Get Credits,
-          Creator Studio, profile and settings. Exchange requires {EXCHANGE_REQUIRED} owned animes.
+          Menu opens the full navigation sheet with Community, Watch Together, Schedule, Gifts, Get Credits,
+          Creator Studio, profile and settings.
         </p>
       </nav>
 

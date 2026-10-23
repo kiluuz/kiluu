@@ -15,12 +15,14 @@ import { Switch } from "@/components/ui/switch";
 import { Slider } from "@/components/ui/slider";
 import { useAppStore } from "./store";
 import type { PublicProfile, AnimeSummary, ShowcaseConfig, PrivacyConfig, SocialLinks } from "./types";
-import { Avatar, SmartImage } from "./ui-bits";
+import { Avatar, avatarNameGap, NameWithFrame, SmartImage } from "./ui-bits";
+import { FramePicker } from "./frame-shop";
 import { BANNER_PRESETS, AVATAR_PRESETS, ACCENT_PRESETS, AVATAR_FRAMES } from "./profile-assets";
 import { ProfilePageBody, getAchievementStates, userAccentVars } from "./profile";
 import { ProfilePopupCard } from "./profile-card";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import { ANIME_GENRES } from "@/lib/anime-preferences";
 
 /* ================================================================
    DRAFT STATE
@@ -38,6 +40,8 @@ interface Draft {
   accentFrom: string;
   accentTo: string;
   avatarFrame: string;
+  equippedAvatarFrameId: string | null;
+  equippedNameFrameId: string | null;
   bannerUrl: string;
   bannerPreset: string;
   avatarUrl: string;
@@ -45,11 +49,6 @@ interface Draft {
   privacy: PrivacyConfig;
   unlocked: string[];
 }
-
-const GENRE_OPTIONS = [
-  "Action", "Adventure", "Fantasy", "Sci-Fi", "Drama", "Comedy", "Romance",
-  "Horror", "Mystery", "Thriller", "Sports", "Slice of Life", "Mecha", "Supernatural",
-];
 
 function initialDraft(p: PublicProfile): Draft {
   return {
@@ -65,13 +64,15 @@ function initialDraft(p: PublicProfile): Draft {
     accentFrom: p.accentColor,
     accentTo: p.accentTo || p.accentColor,
     avatarFrame: p.avatarFrame || "none",
+    equippedAvatarFrameId: p.equippedAvatarFrameId ?? null,
+    equippedNameFrameId: p.equippedNameFrameId ?? null,
     bannerUrl: p.bannerUrl || "",
-    bannerPreset: "",
+    bannerPreset: p.bannerPreset || "",
     avatarUrl: p.avatarUrl || "",
     showcase: {
       topFive: p.showcase?.topFive ?? [],
       pinnedPostId: p.showcase?.pinnedPostId ?? null,
-      genres: p.showcase?.genres ?? [],
+      genres: p.showcase?.genres?.length ? p.showcase.genres : p.favoriteGenres ?? [],
       achievementIds: p.showcase?.achievementIds ?? [],
       order: p.showcase?.order?.length ? p.showcase.order : ["topFive", "currentlyWatching", "favorites", "collection", "pinned", "achievements"],
       hidden: p.showcase?.hidden ?? {},
@@ -101,6 +102,8 @@ function buildPreview(draft: Draft, base: PublicProfile): PublicProfile {
     accentColor: draft.accentFrom,
     accentTo: draft.accentTo === draft.accentFrom ? null : draft.accentTo,
     avatarFrame: draft.avatarFrame === "none" ? null : draft.avatarFrame,
+    equippedAvatarFrameId: draft.equippedAvatarFrameId,
+    equippedNameFrameId: draft.equippedNameFrameId,
     bannerUrl: draft.bannerUrl,
     avatarUrl: draft.avatarUrl,
     showcase: draft.showcase,
@@ -155,187 +158,6 @@ async function extractDominantColor(src: string): Promise<{ from: string; to: st
     img.onerror = () => resolve(null);
     img.src = src;
   });
-}
-
-/* ================================================================
-   BANNER CROP MODAL — 3:1, drag pan, zoom, SAFE ZONES overlay
-   ================================================================ */
-function BannerCropModal({
-  file,
-  onClose,
-  onApply,
-  uploading,
-  isGif,
-  premiumUnlocked,
-  onBuyPremium,
-}: {
-  file: File;
-  onClose: () => void;
-  onApply: (crop: { x: number; y: number; width: number; height: number }) => void;
-  uploading: boolean;
-  isGif: boolean;
-  premiumUnlocked: boolean;
-  onBuyPremium: () => void;
-}) {
-  const containerRef = useRef<HTMLDivElement>(null);
-  const [containerW, setContainerW] = useState(0);
-  const [natW, setNatW] = useState(0);
-  const [natH, setNatH] = useState(0);
-  const [zoom, setZoom] = useState(1);
-  const [offset, setOffset] = useState({ x: 0, y: 0 });
-  const dragging = useRef<{ x: number; y: number; ox: number; oy: number } | null>(null);
-
-  /* object URL derived from the file (revoked when it changes / on unmount) */
-  const url = useMemo(() => URL.createObjectURL(file), [file]);
-  useEffect(() => () => URL.revokeObjectURL(url), [url]);
-
-  useEffect(() => {
-    if (!url) return;
-    const img = new Image();
-    img.onload = () => { setNatW(img.naturalWidth); setNatH(img.naturalHeight); };
-    img.src = url;
-  }, [url]);
-
-  /* measure the crop container reactively (no ref reads during render) */
-  useEffect(() => {
-    const el = containerRef.current;
-    if (!el) return;
-    const ro = new ResizeObserver(() => setContainerW(el.offsetWidth));
-    ro.observe(el);
-    return () => ro.disconnect();
-  }, []);
-
-  const baseFit = natW && natH && containerW
-    ? Math.max(containerW / natW, (containerW / 3) / natH)
-    : 1;
-  const dispW = natW * baseFit * zoom;
-  const dispH = natH * baseFit * zoom;
-
-  function clampOffset(x: number, y: number) {
-    if (!containerRef.current) return { x, y };
-    const cw = containerRef.current.offsetWidth, ch = cw / 3;
-    const maxX = Math.max(0, (dispW - cw) / 2);
-    const maxY = Math.max(0, (dispH - ch) / 2);
-    return { x: Math.min(maxX, Math.max(-maxX, x)), y: Math.min(maxY, Math.max(-maxY, y)) };
-  }
-
-  function onPointerDown(e: React.PointerEvent) {
-    (e.target as HTMLElement).setPointerCapture?.(e.pointerId);
-    dragging.current = { x: e.clientX, y: e.clientY, ox: offset.x, oy: offset.y };
-  }
-  function onPointerMove(e: React.PointerEvent) {
-    if (!dragging.current) return;
-    const dx = e.clientX - dragging.current.x;
-    const dy = e.clientY - dragging.current.y;
-    setOffset(clampOffset(dragging.current.ox + dx, dragging.current.oy + dy));
-  }
-  function onPointerUp() { dragging.current = null; }
-
-  function apply() {
-    if (!containerRef.current || !natW) return;
-    const cw = containerRef.current.offsetWidth, ch = cw / 3;
-    const scale = baseFit * zoom;
-    const imgLeft = cw / 2 - dispW / 2 + offset.x;
-    const imgTop = ch / 2 - dispH / 2 + offset.y;
-    const cropX = Math.max(0, Math.round(-imgLeft / scale));
-    const cropY = Math.max(0, Math.round(-imgTop / scale));
-    const cropW = Math.min(natW - cropX, Math.round(cw / scale));
-    const cropH = Math.min(natH - cropY, Math.round(ch / scale));
-    onApply({ x: cropX, y: cropY, width: cropW, height: cropH });
-  }
-
-  const animatedBlocked = isGif && !premiumUnlocked;
-
-  return (
-    <DialogContent className="max-w-3xl bg-card border-border p-0 overflow-hidden gap-0">
-      <DialogHeader className="px-5 py-3.5 border-b bg-background/50">
-        <DialogTitle className="text-base flex items-center gap-2">
-          <ImageIcon className="w-4 h-4 text-primary" /> Crop banner
-        </DialogTitle>
-        <DialogDescription className="text-xs">
-          Drag to reposition · 3:1 ratio · the shaded zones show where your avatar, name and the popup-card crop will appear.
-        </DialogDescription>
-      </DialogHeader>
-
-      <div className="p-5 space-y-4">
-        {/* Crop viewport with SAFE ZONES */}
-        <div
-          ref={containerRef}
-          className="relative w-full aspect-[3/1] rounded-2xl overflow-hidden border-2 border-border bg-muted touch-none select-none cursor-grab active:cursor-grabbing"
-          onPointerDown={onPointerDown}
-          onPointerMove={onPointerMove}
-          onPointerUp={onPointerUp}
-          onPointerCancel={onPointerUp}
-        >
-          {url && (
-            <img
-              src={url}
-              alt="Banner preview"
-              className="absolute pointer-events-none max-w-none"
-              style={{
-                width: dispW, height: dispH,
-                left: "50%", top: "50%",
-                transform: `translate(calc(-50% + ${offset.x}px), calc(-50% + ${offset.y}px))`,
-              }}
-              draggable={false}
-            />
-          )}
-          {/* SAFE ZONE: avatar + name (bottom-left of full-page banner) */}
-          <div className="absolute left-[3%] bottom-0 w-[22%] h-[70%] border-2 border-dashed border-white/70 bg-black/25 backdrop-blur-[1px] rounded-t-2xl pointer-events-none">
-            <span className="absolute inset-x-0 bottom-1.5 text-center text-[9px] font-bold text-white/90 uppercase tracking-wider">
-              Avatar + Name
-            </span>
-          </div>
-          {/* SAFE ZONE: popup card visible strip (center) */}
-          <div className="absolute inset-x-[18%] top-[8%] bottom-[30%] border border-dashed border-amber-300/80 bg-amber-300/10 rounded-lg pointer-events-none">
-            <span className="absolute top-1 left-1/2 -translate-x-1/2 text-[8.5px] font-bold text-amber-200/90 uppercase tracking-wider whitespace-nowrap">
-              Popup card crop — keep subject here
-            </span>
-          </div>
-        </div>
-
-        {/* Zoom slider */}
-        <div className="flex items-center gap-4 px-1">
-          <span className="text-xs font-semibold text-muted-foreground shrink-0">Zoom</span>
-          <Slider
-            value={[zoom]}
-            min={1}
-            max={3}
-            step={0.01}
-            onValueChange={([v]) => { setZoom(v); setOffset((o) => clampOffset(o.x, o.y)); }}
-            className="flex-1"
-            aria-label="Zoom"
-          />
-          <span className="text-xs font-bold tabular-nums w-10 text-right">{zoom.toFixed(2)}×</span>
-        </div>
-
-        {animatedBlocked && (
-          <div className="rounded-2xl border border-amber-500/40 bg-amber-500/10 p-4 flex items-center gap-3">
-            <Lock className="w-5 h-5 text-amber-500 shrink-0" />
-            <div className="flex-1">
-              <p className="text-sm font-bold">Animated banners are Premium</p>
-              <p className="text-xs text-muted-foreground">GIF banners loop on your profile. Unlock once, use forever.</p>
-            </div>
-            <Button size="sm" className="rounded-full brand-gradient text-white shrink-0" onClick={onBuyPremium}>
-              <Coins className="w-3.5 h-3.5" /> 500
-            </Button>
-          </div>
-        )}
-
-        <div className="flex items-center justify-end gap-2">
-          <Button variant="ghost" onClick={onClose} disabled={uploading} className="rounded-full">Cancel</Button>
-          <Button
-            onClick={apply}
-            disabled={!natW || animatedBlocked || uploading}
-            className="rounded-full brand-gradient text-white"
-          >
-            {uploading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
-            {uploading ? "Uploading…" : "Apply crop"}
-          </Button>
-        </div>
-      </div>
-    </DialogContent>
-  );
 }
 
 /* ================================================================
@@ -461,7 +283,7 @@ function EditorSection({ icon, title, desc, children, defaultOpen = true }: {
 }) {
   const [open, setOpen] = useState(defaultOpen);
   return (
-    <section className="rounded-2xl border bg-card overflow-hidden">
+    <section className="rounded-2xl border bg-card overflow-visible">
       <button
         onClick={() => setOpen(!open)}
         className="w-full flex items-center gap-3 px-4 py-3 hover:bg-accent/50 transition text-left focus-ring-accent"
@@ -498,12 +320,10 @@ export function ProfileEditor({
   const updateUser = useAppStore((s) => s.updateUser);
   const [draft, setDraft] = useState<Draft>(() => initialDraft(initial));
   const [saving, setSaving] = useState(false);
-  const [bannerFile, setBannerFile] = useState<File | null>(null);
   const [avatarFile, setAvatarFile] = useState<File | null>(null);
   const mediaUploadLock = useRef(false);
   const [topFiveOpen, setTopFiveOpen] = useState(false);
   const [previewMode, setPreviewMode] = useState<"page" | "card">("page");
-  const fileBannerRef = useRef<HTMLInputElement>(null);
   const fileAvatarRef = useRef<HTMLInputElement>(null);
   const [confirmDiscard, setConfirmDiscard] = useState(false);
 
@@ -517,8 +337,6 @@ export function ProfileEditor({
 
   const preview = useMemo(() => buildPreview(draft, initial), [draft, initial]);
   const earnedStates = useMemo(() => getAchievementStates(initial).filter((a) => a.earned), [initial]);
-
-  const premiumBannerUnlocked = draft.unlocked.includes("animatedBanner");
 
   /* ---------- handlers ---------- */
 
@@ -536,30 +354,6 @@ export function ProfileEditor({
       toast.success(`${label} unlocked!`);
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Could not unlock");
-    }
-  }
-
-  async function uploadBanner(crop: { x: number; y: number; width: number; height: number }) {
-    if (!bannerFile || mediaUploadLock.current) return;
-    mediaUploadLock.current = true;
-    const fd = new FormData();
-    fd.append("file", bannerFile);
-    fd.append("crop", JSON.stringify(crop));
-    fd.append("animatedAllowed", premiumBannerUnlocked ? "true" : "false");
-    setSaving(true);
-    try {
-      const res = await fetch("/api/profile/banner", { method: "POST", body: fd });
-      const d = await res.json();
-      if (!res.ok) throw new Error(d.error);
-      set("bannerUrl", d.banner.url);
-      set("bannerPreset", "");
-      setBannerFile(null);
-      toast.success("Banner updated");
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Banner upload failed");
-    } finally {
-      mediaUploadLock.current = false;
-      setSaving(false);
     }
   }
 
@@ -606,7 +400,7 @@ export function ProfileEditor({
   }
 
   async function autoAccent() {
-    if (!draft.bannerUrl) { toast.info("Upload a banner first — or pick a preset below."); return; }
+    if (!draft.bannerUrl) { toast.info("Choose a banner from the preset gallery first."); return; }
     toast.promise(extractDominantColor(draft.bannerUrl), {
       loading: "Extracting colors...",
       success: (c) => {
@@ -671,7 +465,10 @@ export function ProfileEditor({
         accentColor: draft.accentFrom,
         accentTo: draft.accentTo === draft.accentFrom ? "" : draft.accentTo,
         avatarFrame: draft.avatarFrame,
+        equippedAvatarFrameId: draft.equippedAvatarFrameId,
+        equippedNameFrameId: draft.equippedNameFrameId,
         bannerPreset: draft.bannerPreset,
+        favoriteGenres: draft.showcase.genres.length ? draft.showcase.genres : undefined,
         showcase: JSON.stringify({ ...draft.showcase, unlocked: draft.unlocked }),
         privacy: JSON.stringify(draft.privacy),
         avatarUrl: draft.avatarUrl,
@@ -687,8 +484,12 @@ export function ProfileEditor({
       updateUser({
         displayName: d.user.displayName, bio: d.user.bio, accentColor: d.user.accentColor,
         accentTo: d.user.accentTo, avatarUrl: d.user.avatarUrl, bannerUrl: d.user.bannerUrl,
+        bannerPreset: d.user.bannerPreset,
         pronouns: d.user.pronouns, tagline: d.user.tagline, statusEmoji: d.user.statusEmoji,
         statusText: d.user.statusText, avatarFrame: d.user.avatarFrame,
+        equippedAvatarFrameId: d.user.equippedAvatarFrameId,
+        equippedNameFrameId: d.user.equippedNameFrameId,
+        favoriteGenres: d.user.favoriteGenres,
       });
       // refresh full profile data for the callback
       const pf = await fetch(`/api/users/${initial.username}`).then((r) => r.json());
@@ -716,15 +517,17 @@ export function ProfileEditor({
     <div className="fixed inset-0 z-[80] bg-background flex flex-col animate-in fade-in duration-200">
       {/* Top bar */}
       <div className="shrink-0 border-b glass-strong">
-        <div className="max-w-[1600px] mx-auto flex items-center gap-3 px-4 sm:px-6 h-14">
+        <div className="max-w-[1600px] mx-auto flex items-center gap-2 px-2 sm:gap-3 sm:px-6 h-14">
           <Pencil className="w-4 h-4 text-primary" />
-          <h2 className="font-bold">Edit Profile</h2>
-          {dirty && <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-500 border border-amber-500/30">Unsaved changes</span>}
-          <div className="ml-auto flex items-center gap-2">
-            <Button variant="ghost" size="sm" className="rounded-full" onClick={requestClose}>Discard</Button>
-            <Button size="sm" className="rounded-full brand-gradient text-white" onClick={save} disabled={saving || !dirty}>
+          <h2 className="font-bold"><span className="sm:hidden">Edit</span><span className="hidden sm:inline">Edit Profile</span></h2>
+          {dirty && <span className="hidden sm:inline-flex text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-500 border border-amber-500/30">Unsaved changes</span>}
+          <div className="ml-auto flex items-center gap-1 sm:gap-2">
+            <Button variant="ghost" size="sm" className="rounded-full px-2 sm:px-3" onClick={requestClose}>
+              <span className="sm:hidden">Cancel</span><span className="hidden sm:inline">Discard</span>
+            </Button>
+            <Button size="sm" className="rounded-full brand-gradient text-white px-2 sm:px-3" onClick={save} disabled={saving || !dirty}>
               {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
-              Save changes
+              <span className="sm:hidden">Save</span><span className="hidden sm:inline">Save changes</span>
             </Button>
           </div>
         </div>
@@ -739,22 +542,8 @@ export function ProfileEditor({
             <div className="rounded-2xl overflow-hidden border relative aspect-[3/1] grain"
               style={{ background: `linear-gradient(120deg, ${draft.accentFrom}, ${draft.accentTo})` }}>
               {draft.bannerUrl && <SmartImage src={draft.bannerUrl} alt="Banner" className="w-full h-full object-cover" />}
-              <button
-                onClick={() => fileBannerRef.current?.click()}
-                className="absolute inset-0 flex flex-col items-center justify-center gap-1.5 bg-black/45 opacity-0 hover:opacity-100 transition"
-              >
-                <Upload className="w-5 h-5 text-white" />
-                <span className="text-xs font-bold text-white">Replace banner</span>
-              </button>
             </div>
-            <input
-              ref={fileBannerRef} type="file" accept="image/jpeg,image/png,image/webp,image/gif" className="hidden"
-              onChange={(e) => { const f = e.target.files?.[0]; if (f) setBannerFile(f); e.target.value = ""; }}
-            />
             <div className="flex flex-wrap gap-2">
-              <Button size="sm" variant="outline" className="rounded-full" onClick={() => fileBannerRef.current?.click()}>
-                <Upload className="w-3.5 h-3.5" /> Upload
-              </Button>
               <Button size="sm" variant="outline" className="rounded-full" onClick={autoAccent}>
                 <Wand2 className="w-3.5 h-3.5" /> Auto accent from banner
               </Button>
@@ -764,9 +553,6 @@ export function ProfileEditor({
                 </Button>
               )}
             </div>
-            <p className="text-[11px] text-muted-foreground">
-              JPG · PNG · WebP up to 8 MB. GIF animates with <span className="font-bold text-amber-500">Premium</span>.
-            </p>
             {/* Presets */}
             <div>
               <FieldLabel>Preset gallery</FieldLabel>
@@ -790,8 +576,10 @@ export function ProfileEditor({
 
           {/* AVATAR */}
           <EditorSection icon={<User className="w-4 h-4" />} title="Avatar" desc="Square crop, circular display">
-            <div className="flex items-center gap-4">
-              <Avatar src={draft.avatarUrl} name={draft.displayName || initial.username} accent={draft.accentFrom} accentTo={draft.accentTo} frame={draft.avatarFrame} size={72} />
+            <div className="flex items-center gap-4 overflow-visible">
+              <div className="shrink-0 overflow-visible py-2" style={{ marginRight: avatarNameGap({ equippedAvatarFrameId: draft.equippedAvatarFrameId }, 72, 16) }}>
+                <Avatar src={draft.avatarUrl} name={draft.displayName || initial.username} accent={draft.accentFrom} accentTo={draft.accentTo} frame={draft.equippedAvatarFrameId ? null : draft.avatarFrame} imageFrame={draft.equippedAvatarFrameId} size={72} />
+              </div>
               <div className="flex flex-col gap-2">
                 <Button size="sm" variant="outline" className="rounded-full" onClick={() => fileAvatarRef.current?.click()}>
                   <Upload className="w-3.5 h-3.5" /> Upload photo
@@ -823,7 +611,7 @@ export function ProfileEditor({
                       key={f.id}
                       onClick={() => {
                         if (!unlocked) { unlockPremiumItem(`frame:${f.id}`, f.price, f.label); return; }
-                        set("avatarFrame", f.id);
+                        setDraft((d) => ({ ...d, avatarFrame: f.id, equippedAvatarFrameId: null }));
                       }}
                       className={cn(
                         "relative rounded-xl border p-1.5 flex flex-col items-center gap-1 transition focus-ring-accent",
@@ -845,6 +633,15 @@ export function ProfileEditor({
                   );
                 })}
               </div>
+              <FramePicker
+                type="avatar"
+                selectedId={draft.equippedAvatarFrameId}
+                onSelect={(id) => setDraft((d) => ({
+                  ...d,
+                  equippedAvatarFrameId: id,
+                  avatarFrame: id ? "none" : d.avatarFrame,
+                }))}
+              />
             </div>
             {/* preset avatars */}
             <div>
@@ -912,8 +709,31 @@ export function ProfileEditor({
           <EditorSection icon={<Sparkles className="w-4 h-4" />} title="Identity" desc="Name, pronouns, about, socials">
             <div className="grid grid-cols-2 gap-3">
               <div className="col-span-2">
-                <FieldLabel>Display name</FieldLabel>
-                <Input value={draft.displayName} maxLength={32} onChange={(e) => set("displayName", e.target.value)} className="mt-1" placeholder="Sakura" />
+                <div className="flex items-center justify-between">
+                  <FieldLabel>Display name</FieldLabel>
+                  <span className="text-[10px] text-muted-foreground">{[...draft.displayName].length}/20</span>
+                </div>
+                <Input value={draft.displayName} maxLength={20} onChange={(e) => set("displayName", e.target.value.replace(/[\u0000-\u001f\u007f-\u009f]/gu, ""))} className="mt-1" placeholder="Sakura" />
+                <div className="mt-2">
+                  <NameWithFrame
+                    user={{
+                      ...initial,
+                      displayName: draft.displayName,
+                      accentColor: draft.accentFrom,
+                      equippedNameFrameId: draft.equippedNameFrameId,
+                    }}
+                    height={40}
+                    avatarSize={0}
+                  />
+                </div>
+              </div>
+              <div className="col-span-2">
+                <FieldLabel>Name frame</FieldLabel>
+                <FramePicker
+                  type="name"
+                  selectedId={draft.equippedNameFrameId}
+                  onSelect={(id) => set("equippedNameFrameId", id ?? "")}
+                />
               </div>
               <div>
                 <FieldLabel>Pronouns</FieldLabel>
@@ -997,7 +817,7 @@ export function ProfileEditor({
             <div>
               <FieldLabel>Favorite genres</FieldLabel>
               <div className="flex flex-wrap gap-1.5 mt-1.5">
-                {GENRE_OPTIONS.map((g) => {
+                {ANIME_GENRES.map((g) => {
                   const active = draft.showcase.genres.includes(g);
                   return (
                     <button
@@ -1006,7 +826,11 @@ export function ProfileEditor({
                         ...d,
                         showcase: {
                           ...d.showcase,
-                          genres: active ? d.showcase.genres.filter((x) => x !== g) : [...d.showcase.genres, g].slice(0, 8),
+                          genres: active && d.showcase.genres.length > 1
+                            ? d.showcase.genres.filter((x) => x !== g)
+                            : active
+                              ? d.showcase.genres
+                              : [...d.showcase.genres, g],
                         },
                       }))}
                       className={cn(
@@ -1172,20 +996,7 @@ export function ProfileEditor({
         </div>
       </div>
 
-      {/* Crop modals */}
-      {bannerFile && (
-        <Dialog open onOpenChange={(o) => !o && setBannerFile(null)}>
-          <BannerCropModal
-            file={bannerFile}
-            onClose={() => setBannerFile(null)}
-            onApply={uploadBanner}
-            uploading={saving}
-            isGif={bannerFile.type === "image/gif"}
-            premiumUnlocked={premiumBannerUnlocked}
-            onBuyPremium={() => unlockPremiumItem("animatedBanner", 500, "Animated banners")}
-          />
-        </Dialog>
-      )}
+      {/* Avatar crop modal */}
       {avatarFile && (
         <Dialog open onOpenChange={(o) => !o && setAvatarFile(null)}>
           <AvatarCropModal file={avatarFile} onClose={() => setAvatarFile(null)} onApply={uploadAvatar} uploading={saving} />

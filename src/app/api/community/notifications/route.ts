@@ -14,7 +14,21 @@ export async function GET(req: NextRequest) {
     }),
     db.notification.count({ where: { userId: user.id, readAt: null } }),
   ]);
-  return NextResponse.json({ notifications, unread });
+  return NextResponse.json({
+    notifications: notifications.map((notification) => {
+      let previewUrl: string | null = null;
+      try {
+        const data: unknown = JSON.parse(notification.dataJson);
+        if (data && typeof data === "object" && "previewUrl" in data && typeof data.previewUrl === "string") {
+          previewUrl = data.previewUrl;
+        }
+      } catch {
+        previewUrl = null;
+      }
+      return { ...notification, previewUrl };
+    }),
+    unread,
+  });
 }
 
 export async function PATCH(req: NextRequest) {

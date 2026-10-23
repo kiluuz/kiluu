@@ -11,13 +11,16 @@ import { Logo } from "../logo";
 import { SmartImage } from "../ui-bits";
 import type { AuthUser } from "../types";
 import { toast } from "sonner";
+import { useI18n } from "@/components/i18n-provider";
 
 /** Full-page split login — cinematic image left, auth form right */
 export function LoginView() {
   const { setUser, navigate, user } = useAppStore();
+  const { t } = useI18n();
   const [loading, setLoading] = useState(false);
   const [otpStep, setOtpStep] = useState<{ email: string } | null>(null);
   const [otpCode, setOtpCode] = useState("");
+  const [registerDisplayName, setRegisterDisplayName] = useState("");
   const [resendCooldown, setResendCooldown] = useState(0);
   const [hero, setHero] = useState<{ banner: string | null; cover: string | null; title: string; quote: string } | null>(null);
 
@@ -30,10 +33,10 @@ export function LoginView() {
   useEffect(() => {
     let alive = true;
     const QUOTES = [
-      "Every voice deserves to be heard — in every language.",
-      "Stream it. Love it. Dub it your way.",
-      "Where Central Asia meets anime.",
-      "Your library. Your language. Your cinema.",
+      t("auth.quote1"),
+      t("auth.quote2"),
+      t("auth.quote3"),
+      t("auth.quote4"),
     ];
     fetch("/api/home")
       .then((r) => r.json())
@@ -64,7 +67,7 @@ export function LoginView() {
     if (mode === "register") {
       payload.username = String(form.get("username") || "");
       if (payload.password !== String(form.get("confirm") || "")) {
-        toast.error("Passwords do not match");
+        toast.error(t("auth.passwordMismatch"));
         setLoading(false);
         return;
       }
@@ -77,14 +80,14 @@ export function LoginView() {
       });
       const data = await res.json();
       if (!res.ok) {
-        toast.error(data.error || "Something went wrong");
+        toast.error(data.error || t("auth.genericError"));
         return;
       }
       setUser(data.user as AuthUser);
-      toast.success(mode === "login" ? `Welcome back, ${data.user.displayName || data.user.username}!` : "Account created! Welcome to Kiluu ✦");
+      toast.success(mode === "login" ? `${t("auth.welcomeBack")}, ${data.user.displayName || data.user.username}!` : t("auth.accountWelcome"));
       navigate("home");
     } catch {
-      toast.error("Network error. Please try again.");
+      toast.error(t("auth.networkError"));
     } finally {
       setLoading(false);
     }
@@ -99,7 +102,7 @@ export function LoginView() {
     const password = String(form.get("password") || "");
     const confirm = String(form.get("confirm") || "");
     if (password !== confirm) {
-      toast.error("Passwords do not match");
+      toast.error(t("auth.passwordMismatch"));
       setLoading(false);
       return;
     }
@@ -107,11 +110,16 @@ export function LoginView() {
       const res = await fetch("/api/auth/register", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, username, password }),
+        body: JSON.stringify({
+          email,
+          username,
+          displayName: registerDisplayName.trim() || username,
+          password,
+        }),
       });
       const data = await res.json();
       if (!res.ok) {
-        toast.error(data.error || "Registration failed");
+        toast.error(data.error || t("auth.registrationFailed"));
         return;
       }
       if (data.requiresVerification) {
@@ -119,15 +127,15 @@ export function LoginView() {
         setOtpStep({ email });
         setOtpCode("");
         setResendCooldown(60);
-        toast.success("Tasdiqlash kodi emailingizga yuborildi!");
+        toast.success(t("auth.verificationSent"));
       } else if (data.user) {
         // Email sozlanmagan — to'g'ridan-to'g'ri kirish
         setUser(data.user as AuthUser);
-        toast.success("Akkount yaratildi! Kiluu ga xush kelibsiz ✦");
+        toast.success(t("auth.accountWelcome"));
         navigate("home");
       }
     } catch {
-      toast.error("Network error. Please try again.");
+      toast.error(t("auth.networkError"));
     } finally {
       setLoading(false);
     }
@@ -145,14 +153,14 @@ export function LoginView() {
       });
       const data = await res.json();
       if (!res.ok) {
-        toast.error(data.error || "Invalid code");
+        toast.error(data.error || t("auth.invalidCode"));
         return;
       }
       setUser(data.user as AuthUser);
-      toast.success("Email tasdiqlandi! Kiluu ga xush kelibsiz ✦");
+      toast.success(t("auth.emailVerified"));
       navigate("home");
     } catch {
-      toast.error("Network error. Please try again.");
+      toast.error(t("auth.networkError"));
     } finally {
       setLoading(false);
     }
@@ -167,14 +175,14 @@ export function LoginView() {
         body: JSON.stringify({ email: otpStep.email }),
       });
       if (res.ok) {
-        toast.success("Yangi kod yuborildi!");
+        toast.success(t("auth.newCodeSent"));
         setResendCooldown(60);
       } else {
         const d = await res.json();
-        toast.error(d.error || "Failed to resend");
+        toast.error(d.error || t("auth.resendFailed"));
       }
     } catch {
-      toast.error("Network error");
+      toast.error(t("auth.networkErrorShort"));
     }
   }
 
@@ -210,17 +218,17 @@ export function LoginView() {
         {/* Bottom caption — hidden on short mobile banner */}
         <div className="absolute bottom-0 inset-x-0 p-6 sm:p-10 lg:p-14 hidden lg:block max-w-2xl">
           <p className="font-display text-3xl xl:text-4xl font-black leading-tight text-white/95 drop-shadow-lg">
-            {hero?.quote || "Every voice deserves to be heard — in every language."}
+            {hero?.quote || t("auth.quote1")}
           </p>
           <div className="mt-6 flex items-center gap-6 text-white/70 text-sm">
             <span className="flex items-center gap-2">
-              <Coins className="w-4 h-4 text-amber-400" /> 100 free credits on signup
+              <Coins className="w-4 h-4 text-amber-400" /> {t("auth.freeCreditsSignup")}
             </span>
             <span className="flex items-center gap-2">
-              <Clapperboard className="w-4 h-4 text-primary" /> Creators earn from every view
+              <Clapperboard className="w-4 h-4 text-primary" /> {t("auth.creatorEarnings")}
             </span>
             <span className="flex items-center gap-2">
-              <Swords className="w-4 h-4 text-rose-400" /> Gift a version even if you already own it
+              <Swords className="w-4 h-4 text-rose-400" /> {t("auth.giftOwnedAnime")}
             </span>
           </div>
         </div>
@@ -235,7 +243,7 @@ export function LoginView() {
           className="absolute top-6 right-6 flex items-center gap-1.5 text-[13px] font-semibold text-muted-foreground hover:text-foreground transition"
         >
           <ArrowLeft className="w-4 h-4" />
-          Back to browse
+          {t("auth.backToBrowse")}
         </button>
 
         <div className="relative w-full max-w-[420px]">
@@ -246,10 +254,10 @@ export function LoginView() {
 
           <div className="text-center mb-8">
             <h1 className="font-display text-3xl font-black tracking-tight">
-              Welcome to <span className="gradient-text">Kiluu</span>
+              {t("auth.welcomeTo")} <span className="gradient-text">Kiluu</span>
             </h1>
             <p className="text-muted-foreground text-sm mt-2">
-              Stream, collect and gift premium anime — dubbed your way.
+              {t("auth.tagline")}
             </p>
           </div>
 
@@ -260,14 +268,14 @@ export function LoginView() {
                 <div className="w-16 h-16 rounded-2xl brand-gradient flex items-center justify-center mx-auto mb-4">
                   <Mail className="w-8 h-8 text-white" />
                 </div>
-                <h2 className="font-bold text-lg">Emailingizni tasdiqlang</h2>
+                <h2 className="font-bold text-lg">{t("auth.verifyEmail")}</h2>
                 <p className="text-muted-foreground text-sm mt-1">
-                  <span className="text-primary font-medium">{otpStep.email}</span> ga 6 xonali kod yuborildi
+                  {t("auth.codeSentTo")} <span className="text-primary font-medium">{otpStep.email}</span>
                 </p>
               </div>
               <form onSubmit={handleVerifyOtp} className="space-y-4">
                 <div className="space-y-1.5">
-                  <Label htmlFor="otp-code" className="text-xs font-semibold">Tasdiqlash kodi</Label>
+                  <Label htmlFor="otp-code" className="text-xs font-semibold">{t("auth.verificationCode")}</Label>
                   <Input
                     id="otp-code"
                     value={otpCode}
@@ -284,7 +292,7 @@ export function LoginView() {
                   disabled={loading || otpCode.length !== 6}
                   className="w-full h-12 rounded-xl brand-gradient hover:opacity-90 text-white font-bold text-[15px]"
                 >
-                  {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : "Tasdiqlash"}
+                  {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : t("auth.verify")}
                 </Button>
               </form>
               <div className="text-center">
@@ -293,44 +301,44 @@ export function LoginView() {
                   disabled={resendCooldown > 0}
                   className="text-sm text-muted-foreground hover:text-foreground transition disabled:opacity-50"
                 >
-                  {resendCooldown > 0 ? `Qayta yuborish (${resendCooldown}s)` : "Kodni qayta yuborish"}
+                  {resendCooldown > 0 ? `${t("auth.resendIn")} (${resendCooldown}s)` : t("auth.resendCode")}
                 </button>
               </div>
               <button
                 onClick={() => setOtpStep(null)}
                 className="flex items-center gap-1.5 text-[13px] text-muted-foreground hover:text-foreground transition mx-auto"
               >
-                <ArrowLeft className="w-4 h-4" /> Orqaga
+                <ArrowLeft className="w-4 h-4" /> {t("common.back")}
               </button>
             </div>
           ) : (
             <Tabs defaultValue="login">
               <TabsList className="grid grid-cols-2 w-full mb-6 rounded-xl">
-                <TabsTrigger value="login" className="rounded-lg">Sign In</TabsTrigger>
-                <TabsTrigger value="register" className="rounded-lg">Create Account</TabsTrigger>
+                <TabsTrigger value="login" className="rounded-lg">{t("auth.signIn")}</TabsTrigger>
+                <TabsTrigger value="register" className="rounded-lg">{t("auth.createAccount")}</TabsTrigger>
               </TabsList>
 
             <TabsContent value="login">
               <form onSubmit={(e) => handleSubmit("login", e)} className="space-y-4">
                 <div className="space-y-1.5">
-                  <Label htmlFor="login-email" className="text-xs font-semibold">Email</Label>
+                  <Label htmlFor="login-email" className="text-xs font-semibold">{t("auth.email")}</Label>
                   <div className="relative">
                     <Mail className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
                     <Input id="login-email" name="email" type="email" required placeholder="you@example.com" className="pl-9 h-12 rounded-xl text-[15px]" />
                   </div>
                 </div>
                 <div className="space-y-1.5">
-                  <Label htmlFor="login-pass" className="text-xs font-semibold">Password</Label>
+                  <Label htmlFor="login-pass" className="text-xs font-semibold">{t("auth.password")}</Label>
                   <div className="relative">
                     <Lock className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
                     <Input id="login-pass" name="password" type="password" required placeholder="••••••••" className="pl-9 h-12 rounded-xl text-[15px]" />
                   </div>
                 </div>
                 <Button type="submit" disabled={loading} className="w-full h-12 rounded-xl brand-gradient hover:opacity-90 text-white font-bold text-[15px]">
-                  {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : "Sign In"}
+                  {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : t("auth.signIn")}
                 </Button>
                 <p className="text-[11.5px] text-center text-muted-foreground">
-                  New here? You get <span className="text-amber-500 font-bold">100 free credits</span> when you register
+                  {t("auth.newHere")} <span className="text-amber-500 font-bold">{t("auth.freeCredits100")}</span> {t("auth.whenRegister")}
                 </p>
               </form>
             </TabsContent>
@@ -338,14 +346,30 @@ export function LoginView() {
             <TabsContent value="register">
               <form onSubmit={handleRegister} className="space-y-3.5">
                 <div className="space-y-1.5">
-                  <Label htmlFor="reg-username" className="text-xs font-semibold">Username</Label>
+                  <Label htmlFor="reg-username" className="text-xs font-semibold">{t("auth.username")}</Label>
                   <div className="relative">
                     <User className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
                     <Input id="reg-username" name="username" required minLength={3} maxLength={20} pattern="[a-zA-Z0-9_]+" placeholder="coolotaku_7" className="pl-9 h-12 rounded-xl text-[15px]" />
                   </div>
                 </div>
                 <div className="space-y-1.5">
-                  <Label htmlFor="reg-email" className="text-xs font-semibold">Email</Label>
+                  <div className="flex items-center justify-between">
+                    <Label htmlFor="reg-display-name" className="text-xs font-semibold">Display name</Label>
+                    <span className="text-[10px] text-muted-foreground">{[...registerDisplayName].length}/20</span>
+                  </div>
+                  <Input
+                    id="reg-display-name"
+                    name="displayName"
+                    value={registerDisplayName}
+                    onChange={(event) => setRegisterDisplayName(event.target.value.replace(/[\u0000-\u001f\u007f-\u009f]/gu, ""))}
+                    minLength={2}
+                    maxLength={20}
+                    placeholder="How others see you"
+                    className="h-12 rounded-xl text-[15px]"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="reg-email" className="text-xs font-semibold">{t("auth.email")}</Label>
                   <div className="relative">
                     <Mail className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
                     <Input id="reg-email" name="email" type="email" required placeholder="you@example.com" className="pl-9 h-12 rounded-xl text-[15px]" />
@@ -353,20 +377,20 @@ export function LoginView() {
                 </div>
                 <div className="grid grid-cols-2 gap-3">
                   <div className="space-y-1.5">
-                    <Label htmlFor="reg-pass" className="text-xs font-semibold">Password</Label>
-                    <Input id="reg-pass" name="password" type="password" required minLength={6} placeholder="min 6 chars" className="h-12 rounded-xl text-[15px]" />
+                    <Label htmlFor="reg-pass" className="text-xs font-semibold">{t("auth.password")}</Label>
+                    <Input id="reg-pass" name="password" type="password" required minLength={6} placeholder={t("auth.minPassword")} className="h-12 rounded-xl text-[15px]" />
                   </div>
                   <div className="space-y-1.5">
-                    <Label htmlFor="reg-confirm" className="text-xs font-semibold">Confirm</Label>
-                    <Input id="reg-confirm" name="confirm" type="password" required minLength={6} placeholder="repeat" className="h-12 rounded-xl text-[15px]" />
+                    <Label htmlFor="reg-confirm" className="text-xs font-semibold">{t("auth.confirm")}</Label>
+                    <Input id="reg-confirm" name="confirm" type="password" required minLength={6} placeholder={t("auth.repeat")} className="h-12 rounded-xl text-[15px]" />
                   </div>
                 </div>
                 <Button type="submit" disabled={loading} className="w-full h-12 rounded-xl brand-gradient hover:opacity-90 text-white font-bold text-[15px]">
-                  {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : "Create Account"}
+                  {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : t("auth.createAccount")}
                 </Button>
                 <p className="text-[11.5px] text-center text-muted-foreground flex items-center justify-center gap-1.5">
                   <Sparkles className="w-3.5 h-3.5 text-primary" />
-                  Choose Creator or Viewer after signup — one time only
+                  {t("auth.chooseRole")}
                 </p>
               </form>
             </TabsContent>
@@ -374,7 +398,7 @@ export function LoginView() {
           )} {/* end otpStep ternary */}
 
           <p className="mt-8 text-center text-[11px] text-muted-foreground/70">
-            By continuing you agree to watch responsibly and pause for snacks.
+            {t("auth.terms")}
           </p>
         </div>
       </div>

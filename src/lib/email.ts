@@ -56,17 +56,18 @@ export async function sendVerificationEmail(opts: {
 </head>
 <body style="margin:0;padding:0;background:#0f0f0f;font-family:'Segoe UI',Arial,sans-serif;">
   <div style="max-width:480px;margin:40px auto;background:#1a1a1a;border-radius:16px;overflow:hidden;border:1px solid #2a2a2a;">
-    <div style="background:linear-gradient(135deg,#f97316,#ef4444);padding:32px;text-align:center;">
-      <h1 style="color:#fff;margin:0;font-size:28px;font-weight:800;letter-spacing:-0.5px;">Kiluu</h1>
+    <div style="background:#15110e;padding:28px 32px;text-align:center;border-bottom:2px solid #d7263d;">
+      <img src="${SITE_URL}/icon-192.png" alt="" width="54" height="54" style="display:block;margin:0 auto 12px;" />
+      <h1 style="color:#e9e2d0;margin:0;font-size:28px;font-weight:800;letter-spacing:-0.5px;">Kiluu</h1>
       <p style="color:rgba(255,255,255,0.85);margin:8px 0 0;font-size:14px;">Anime streaming platform</p>
     </div>
     <div style="padding:36px 32px;">
       <h2 style="color:#fff;margin:0 0 8px;font-size:20px;font-weight:700;">Email tasdiqlash</h2>
       <p style="color:#aaa;margin:0 0 28px;font-size:14px;line-height:1.6;">
-        Salom <strong style="color:#f97316;">@${opts.username}</strong>! Kiluu'ga xush kelibsiz.<br/>
+        Salom <strong style="color:#d7263d;">@${opts.username}</strong>! Kiluu'ga xush kelibsiz.<br/>
         Akkountingizni faollashtirish uchun quyidagi kodni kiriting:
       </p>
-      <div style="background:#111;border:2px solid #f97316;border-radius:12px;padding:24px;text-align:center;margin-bottom:28px;">
+      <div style="background:#111;border:2px solid #d7263d;border-radius:12px;padding:24px;text-align:center;margin-bottom:28px;">
         <p style="color:#888;margin:0 0 8px;font-size:12px;text-transform:uppercase;letter-spacing:2px;">Tasdiqlash kodi</p>
         <p style="color:#fff;margin:0;font-size:42px;font-weight:900;letter-spacing:12px;font-family:monospace;">${opts.code}</p>
         <p style="color:#666;margin:12px 0 0;font-size:12px;">10 daqiqa ichida amal qiladi</p>
@@ -77,7 +78,7 @@ export async function sendVerificationEmail(opts: {
     </div>
     <div style="padding:20px 32px;border-top:1px solid #2a2a2a;text-align:center;">
       <p style="color:#444;margin:0;font-size:11px;">
-        © 2025 Kiluu • <a href="${SITE_URL}" style="color:#f97316;text-decoration:none;">${SITE_URL}</a>
+        © 2025 Kiluu • <a href="${SITE_URL}" style="color:#d7263d;text-decoration:none;">${SITE_URL}</a>
       </p>
     </div>
   </div>
@@ -109,21 +110,22 @@ export async function sendGiftNotificationEmail(opts: {
 <head><meta charset="UTF-8"><title>Sovg'a - Kiluu</title></head>
 <body style="margin:0;padding:0;background:#0f0f0f;font-family:'Segoe UI',Arial,sans-serif;">
   <div style="max-width:480px;margin:40px auto;background:#1a1a1a;border-radius:16px;overflow:hidden;border:1px solid #2a2a2a;">
-    <div style="background:linear-gradient(135deg,#f97316,#ef4444);padding:32px;text-align:center;">
-      <h1 style="color:#fff;margin:0;font-size:28px;font-weight:800;">Kiluu</h1>
+    <div style="background:#15110e;padding:28px 32px;text-align:center;border-bottom:2px solid #d7263d;">
+      <img src="${SITE_URL}/icon-192.png" alt="" width="54" height="54" style="display:block;margin:0 auto 12px;" />
+      <h1 style="color:#e9e2d0;margin:0;font-size:28px;font-weight:800;">Kiluu</h1>
     </div>
     <div style="padding:36px 32px;">
       <div style="text-align:center;margin-bottom:24px;"><span style="font-size:48px;">🎁</span></div>
       <h2 style="color:#fff;margin:0 0 12px;font-size:20px;font-weight:700;text-align:center;">Sizga sovg'a yuborildi!</h2>
       <p style="color:#aaa;margin:0 0 20px;font-size:14px;line-height:1.6;text-align:center;">
-        <strong style="color:#f97316;">@${opts.senderUsername}</strong> sizga
+        <strong style="color:#d7263d;">@${opts.senderUsername}</strong> sizga
         <strong style="color:#fff;">"${opts.animeTitle}"</strong> animeni sovg'a qildi!
       </p>
-      ${opts.message ? `<div style="background:#111;border-left:3px solid #f97316;padding:16px;border-radius:8px;margin-bottom:20px;">
+      ${opts.message ? `<div style="background:#111;border-left:3px solid #d7263d;padding:16px;border-radius:8px;margin-bottom:20px;">
         <p style="color:#ccc;margin:0;font-size:13px;font-style:italic;">"${opts.message}"</p>
       </div>` : ""}
       <div style="text-align:center;">
-        <a href="${SITE_URL}/gifts" style="display:inline-block;background:linear-gradient(135deg,#f97316,#ef4444);color:#fff;text-decoration:none;padding:14px 32px;border-radius:10px;font-weight:700;font-size:15px;">
+        <a href="${SITE_URL}/gifts" style="display:inline-block;background:#d7263d;color:#fff;text-decoration:none;padding:14px 32px;border-radius:10px;font-weight:700;font-size:15px;">
           Sovg'ani ko'rish →
         </a>
       </div>
@@ -170,19 +172,20 @@ export async function sendNewAnimeEmail(opts: {
 <head><meta charset="UTF-8"><title>${opts.animeTitle} — Kiluu</title></head>
 <body style="margin:0;padding:0;background:#0f0f0f;font-family:'Segoe UI',Arial,sans-serif;">
   <div style="max-width:480px;margin:40px auto;background:#1a1a1a;border-radius:16px;overflow:hidden;border:1px solid #2a2a2a;">
-    <div style="background:linear-gradient(135deg,#f97316,#ef4444);padding:32px;text-align:center;">
-      <h1 style="color:#fff;margin:0;font-size:28px;font-weight:800;">Kiluu</h1>
+    <div style="background:#15110e;padding:28px 32px;text-align:center;border-bottom:2px solid #d7263d;">
+      <img src="${SITE_URL}/icon-192.png" alt="" width="54" height="54" style="display:block;margin:0 auto 12px;" />
+      <h1 style="color:#e9e2d0;margin:0;font-size:28px;font-weight:800;">Kiluu</h1>
       <p style="color:rgba(255,255,255,0.85);margin:8px 0 0;font-size:13px;">Anime streaming platform</p>
     </div>
     ${opts.coverImage ? `<div style="text-align:center;background:#111;padding:20px 0;">
-      <img src="${opts.coverImage}" alt="${opts.animeTitle}" style="width:120px;height:160px;object-fit:cover;border-radius:10px;border:2px solid #f97316;" />
+      <img src="${opts.coverImage}" alt="${opts.animeTitle}" style="width:120px;height:160px;object-fit:cover;border-radius:10px;border:2px solid #d7263d;" />
     </div>` : ""}
     <div style="padding:32px;">
       <div style="text-align:center;margin-bottom:8px;font-size:28px;">${isNewVersion ? "🎬" : "✨"}</div>
       <h2 style="color:#fff;margin:0 0 12px;font-size:20px;font-weight:700;text-align:center;">${headline}</h2>
       <p style="color:#aaa;margin:0 0 24px;font-size:14px;line-height:1.6;text-align:center;">${subtext}</p>
       <div style="text-align:center;">
-        <a href="${animeUrl}" style="display:inline-block;background:linear-gradient(135deg,#f97316,#ef4444);color:#fff;text-decoration:none;padding:14px 36px;border-radius:10px;font-weight:700;font-size:15px;">
+        <a href="${animeUrl}" style="display:inline-block;background:#d7263d;color:#fff;text-decoration:none;padding:14px 36px;border-radius:10px;font-weight:700;font-size:15px;">
           Tomosha qilish →
         </a>
       </div>

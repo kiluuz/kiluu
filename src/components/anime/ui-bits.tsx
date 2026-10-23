@@ -1,12 +1,13 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Star, Play, Lock, BadgeCheck, Coins } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import type { AnimeSummary, ContinueWatchingItem } from "./types";
 import { useAppStore } from "./store";
 import { useBotCatalog } from "./bot-hooks";
+import { frameById } from "../../../frames.config";
 
 export function formatDuration(seconds: number): string {
   if (!seconds || seconds < 0) return "0m";
@@ -48,6 +49,7 @@ export function Avatar({
   accent = "#f97316",
   accentTo,
   frame,
+  imageFrame,
   size = 40,
   className,
   onClick,
@@ -58,6 +60,7 @@ export function Avatar({
   accent?: string;
   accentTo?: string | null;
   frame?: string | null;
+  imageFrame?: string | null;
   size?: number;
   className?: string;
   onClick?: () => void;
@@ -66,14 +69,23 @@ export function Avatar({
   const [err, setErr] = useState(false);
   const showImg = src && !err;
   const to = accentTo || accent;
+  const imageFrameConfig = frameById(imageFrame);
+  const [frameLoaded, setFrameLoaded] = useState(false);
+  const frameImageRef = useRef<HTMLImageElement>(null);
+  const frameScale = imageFrameConfig?.scale ?? 1.42;
+  useEffect(() => {
+    const image = frameImageRef.current;
+    if (image?.complete && image.naturalWidth > 0) setFrameLoaded(true);
+  }, [imageFrameConfig?.slug, imageFrameConfig?.version]);
   const frameStyle =
-    frame && frame !== "none"
+    !imageFrameConfig && frame && frame !== "none"
       ? { padding: Math.max(2, Math.round(size * 0.06)), background: FRAMES[frame] || FRAMES.ember }
       : undefined;
   return (
     <div
       className={cn(
-        "relative shrink-0 rounded-full overflow-hidden select-none",
+        "relative shrink-0 select-none",
+        imageFrameConfig ? "overflow-visible" : "rounded-full overflow-hidden",
         onClick && "cursor-pointer hover:brightness-110 transition",
         className
       )}
@@ -81,13 +93,13 @@ export function Avatar({
         width: frameStyle ? size + (frameStyle.padding * 2) : size,
         height: frameStyle ? size + (frameStyle.padding * 2) : size,
         ...(frameStyle || {}),
-        ...(ring ? { boxShadow: `0 0 0 2px ${accent}` } : {}),
+        ...(ring ? { boxShadow: `0 0 0 2px ${accent}`, borderRadius: "9999px" } : {}),
       }}
       onClick={onClick}
       role={onClick ? "button" : undefined}
       aria-label={name ? `${name} avatar` : undefined}
     >
-      <div className="w-full h-full rounded-full overflow-hidden bg-background">
+      <div className="relative w-full h-full rounded-full overflow-hidden bg-background">
         {showImg ? (
           <img
             src={src!}
@@ -108,6 +120,32 @@ export function Avatar({
           </div>
         )}
       </div>
+      {imageFrameConfig && (
+        <picture className="pointer-events-none">
+          <source
+            type="image/webp"
+            srcSet={`/frames/${imageFrameConfig.slug}.v${imageFrameConfig.version ?? 2}.webp${size >= 110 ? ` 1x, /frames/${imageFrameConfig.slug}.v${imageFrameConfig.version ?? 2}@2x.webp 2x` : ""}`}
+          />
+          <img
+            ref={frameImageRef}
+            src={`/frames/${imageFrameConfig.slug}.v${imageFrameConfig.version ?? 2}.webp`}
+            alt=""
+            aria-hidden="true"
+            className={cn("absolute pointer-events-none z-10 max-w-none object-contain transition-opacity duration-200", frameLoaded ? "opacity-100" : "opacity-0")}
+            style={{
+              left: "50%",
+              top: "50%",
+              width: `${frameScale * 100}%`,
+              height: `${frameScale * 100}%`,
+              transform: "translate(-50%, -50%)",
+            }}
+            loading="lazy"
+            decoding="async"
+            fetchPriority={size >= 110 ? "high" : "auto"}
+            onLoad={() => setFrameLoaded(true)}
+          />
+        </picture>
+      )}
     </div>
   );
 }
@@ -118,6 +156,218 @@ const FRAMES: Record<string, string> = {
   neon: "conic-gradient(from 200deg, #06b6d4, #8b5cf6, #ec4899, #06b6d4)",
   sakura: "conic-gradient(from 90deg, #fda4af, #f472b6, #c084fc, #fda4af)",
 };
+
+export interface FramedUser {
+  username?: string | null;
+  displayName?: string | null;
+  avatarUrl?: string | null;
+  avatarFrame?: string | null;
+  equippedAvatarFrameId?: string | null;
+  equippedNameFrameId?: string | null;
+  accentColor?: string | null;
+  accentTo?: string | null;
+}
+
+export function avatarNameGap(user: FramedUser, avatarSize: number, minimumGap = 20): number {
+  if (!user.equippedAvatarFrameId) return 0;
+  const scale = frameById(user.equippedAvatarFrameId)?.scale ?? 1.42;
+  return avatarSize * (scale - 1) / 2 + minimumGap;
+}
+
+export function nameFrameContentInset(user: FramedUser, height: number): number {
+  const config = frameById(user.equippedNameFrameId);
+  if (!config || config.type !== "name" || !config.safe || !config.imageWidth || !config.imageHeight) return 0;
+  const aspectRatio = config.imageWidth / config.imageHeight;
+  const safeWidthRatio = ((100 - config.safe.left - config.safe.right) / 100) * aspectRatio;
+  const safeHeightRatio = (100 - config.safe.top - config.safe.bottom) / 100;
+  const minReadableHeight = Math.max(68 / safeWidthRatio, (config.maxFontPx ?? 22) / safeHeightRatio);
+  const plateHeight = height >= 36 ? Math.max(height, minReadableHeight) : height;
+  return plateHeight * aspectRatio * 0.04;
+}
+
+export function FramedAvatar({
+  user,
+  size = 40,
+  className,
+  onClick,
+  ring = false,
+}: {
+  user: FramedUser;
+  size?: number;
+  className?: string;
+  onClick?: () => void;
+  ring?: boolean;
+}) {
+  return (
+    <Avatar
+      src={user.avatarUrl}
+      name={user.displayName || user.username}
+      accent={user.accentColor || "#f97316"}
+      accentTo={user.accentTo}
+      frame={user.equippedAvatarFrameId ? null : user.avatarFrame}
+      imageFrame={user.equippedAvatarFrameId}
+      size={size}
+      className={className}
+      onClick={onClick}
+      ring={ring}
+    />
+  );
+}
+
+export function NameWithFrame({
+  user,
+  compact = false,
+  className,
+  height = 40,
+  avatarSize = 40,
+}: {
+  user: FramedUser;
+  compact?: boolean;
+  className?: string;
+  height?: number;
+  avatarSize?: number;
+}) {
+  const name = user.displayName?.trim() || user.username || "";
+  const config = frameById(user.equippedNameFrameId);
+  const color = user.accentColor || undefined;
+  const avatarGap = avatarSize ? avatarNameGap(user, avatarSize, 16) : 0;
+  if (compact || !config || config.type !== "name") {
+    return <span className={className} title={name} style={{ color, marginLeft: user.equippedAvatarFrameId ? avatarGap : undefined }}>{name}</span>;
+  }
+  return (
+    <NameFramePlate
+      name={name}
+      color={color}
+      config={config}
+      className={className}
+      height={height}
+    />
+  );
+}
+
+function NameFramePlate({
+  name,
+  color,
+  config,
+  className,
+  height,
+}: {
+  name: string;
+  color?: string;
+  config: NonNullable<ReturnType<typeof frameById>>;
+  className?: string;
+  height: number;
+}) {
+  const [debug, setDebug] = useState(false);
+  const [fontSize, setFontSize] = useState(config.maxFontPx ?? 16);
+  const [imageLoaded, setImageLoaded] = useState(false);
+  const plateImageRef = useRef<HTMLImageElement>(null);
+  const safeRef = useRef<HTMLSpanElement>(null);
+  useEffect(() => {
+    const debugFrame = window.requestAnimationFrame(() => {
+      setDebug(new URLSearchParams(window.location.search).get("debugFrames") === "1");
+    });
+    return () => {
+      window.cancelAnimationFrame(debugFrame);
+    };
+  }, []);
+  useEffect(() => {
+    const safeElement = safeRef.current;
+    if (!safeElement) return;
+    const fit = () => {
+      const width = safeElement.clientWidth;
+      if (!width) return;
+      const canvas = document.createElement("canvas");
+      const context = canvas.getContext("2d");
+      if (!context) return;
+      const minFont = config.minFontPx ?? 11;
+      const maxFont = Math.min(config.maxFontPx ?? 16, Math.floor(safeElement.clientHeight));
+      for (let candidate = maxFont; candidate > minFont; candidate -= 1) {
+        context.font = `600 ${candidate}px system-ui, sans-serif`;
+        if (context.measureText(name).width <= width) {
+          setFontSize(candidate);
+          return;
+        }
+      }
+      setFontSize(minFont);
+    };
+    fit();
+    const observer = new ResizeObserver(fit);
+    observer.observe(safeElement);
+    return () => observer.disconnect();
+  }, [config.maxFontPx, config.minFontPx, name]);
+  useEffect(() => {
+    const image = plateImageRef.current;
+    if (image?.complete && image.naturalWidth > 0) setImageLoaded(true);
+  }, [config.slug, config.version]);
+
+  const safe = config.safe!;
+  const imageWidth = config.imageWidth!;
+  const imageHeight = config.imageHeight!;
+  const aspectRatio = imageWidth / imageHeight;
+  // Reserve enough plate space for a readable short name at the configured maximum font size.
+  const safeWidthRatio = ((100 - safe.left - safe.right) / 100) * aspectRatio;
+  const safeHeightRatio = (100 - safe.top - safe.bottom) / 100;
+  const minReadableHeight = Math.max(68 / safeWidthRatio, (config.maxFontPx ?? 22) / safeHeightRatio);
+  const plateHeight = height >= 36 ? Math.max(height, minReadableHeight) : height;
+  const plateWidth = plateHeight * aspectRatio;
+  return (
+    <span
+      className={cn("relative inline-flex max-w-full items-center align-middle", className)}
+      title={name}
+      style={{
+        width: `${plateWidth}px`,
+        maxWidth: "100%",
+        paddingBlock: Math.round(height * 0.08),
+        color: config.textColor || color || "var(--foreground)",
+      }}
+    >
+      <span
+        data-name-frame={config.slug}
+        className="relative block w-full"
+        style={{ aspectRatio: `${imageWidth} / ${imageHeight}` }}
+      >
+        <img
+          ref={plateImageRef}
+          src={`/frames/${config.slug}.v${config.version ?? 2}.webp`}
+          alt=""
+          aria-hidden="true"
+          className={cn("absolute inset-0 h-full w-full object-contain pointer-events-none transition-opacity duration-200", imageLoaded ? "opacity-100" : "opacity-0")}
+          loading="lazy"
+          decoding="async"
+          fetchPriority={height >= 36 ? "high" : "auto"}
+          onLoad={() => setImageLoaded(true)}
+        />
+        <span
+          data-safe-text-area={config.slug}
+          ref={safeRef}
+          className="absolute z-[1] flex min-w-0 items-center overflow-hidden leading-none"
+          style={{
+            left: `${safe.left}%`,
+            right: `${safe.right}%`,
+            top: `${safe.top}%`,
+            bottom: `${safe.bottom}%`,
+            justifyContent: config.textAlign === "left" ? "flex-start" : config.textAlign === "right" ? "flex-end" : "center",
+            fontSize: `${fontSize}px`,
+            textAlign: config.textAlign ?? "center",
+            whiteSpace: "nowrap",
+            outline: debug ? "1px dashed #ff00e6" : undefined,
+            background: debug ? "rgba(255, 0, 230, 0.16)" : undefined,
+          }}
+        >
+          <span
+            className="block min-w-0 max-w-full overflow-hidden text-ellipsis whitespace-nowrap"
+            style={{
+              textShadow: ["winter-flame", "scarlet-shatter"].includes(config.slug) ? "0 1px 2px var(--background)" : undefined,
+            }}
+          >
+            {name}
+          </span>
+        </span>
+      </span>
+    </span>
+  );
+}
 
 /** Smart image with gradient fallback — never renders raw URLs as text */
 export function SmartImage({

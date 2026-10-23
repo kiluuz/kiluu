@@ -1,0 +1,24 @@
+name = "kiluu-realtime"
+main = "src/index.ts"
+compatibility_date = "2024-09-23"
+compatibility_flags = ["nodejs_compat"]
+
+[[durable_objects.bindings]]
+name = "CHAT_ROOM"
+class_name = "ChatRoom"
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["ChatRoom"]
+
+[vars]
+REALTIME_ALLOWED_ORIGINS = "https://kiluu.vercel.app"
+
+# Secrets (wrangler secret put orqali kiritiladi):
+# REALTIME_JWT_SECRET
+# REALTIME_PUSH_SECRET
+# SITE_API_URL (https://kiluu.vercel.app)
+# CRON_SECRET
+
+[triggers]
+crons = ["* * * * *"]

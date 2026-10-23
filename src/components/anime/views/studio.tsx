@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
-  Clapperboard, Plus, Loader2, Film, Users, Heart, Package, Link2, Trophy, Sparkles, Trash2,
+  Plus, Loader2, Film, Users, Heart, Package, Link2, Trophy, Sparkles, Trash2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -241,18 +241,8 @@ export function StudioView() {
 
   return (
     <div className="max-w-[1200px] mx-auto px-4 sm:px-8 py-6 pb-10">
-      <div className="flex items-start justify-between gap-4 flex-wrap mb-6">
-        <div>
-          <h1 className="text-2xl sm:text-3xl font-black flex items-center gap-3">
-            <span className="w-10 h-10 rounded-xl brand-gradient flex items-center justify-center">
-              <Clapperboard className="w-5 h-5 text-white" />
-            </span>
-            Creator Studio
-          </h1>
-          <p className="text-sm text-muted-foreground mt-1.5">
-            Publish animes, add episodes and watch your audience grow
-          </p>
-        </div>
+      <h1 className="sr-only">Creator Studio</h1>
+      <div className="flex items-start justify-end gap-4 flex-wrap mb-6">
         <Button className="rounded-full brand-gradient text-white font-bold" onClick={() => setPubOpen(true)}>
           <Plus className="w-4 h-4" /> Publish Anime
         </Button>
@@ -292,8 +282,8 @@ export function StudioView() {
           <div>
             <h2 className="font-bold">Creator bot — My Animes va upload</h2>
             <p className="text-sm text-muted-foreground mt-1">
-              Link your Telegram account. Use <code>/my_animes</code> in the bot to list your uploads,
-              or <code>/upload_anime</code> to submit a new anime with a poster and description.
+              Link your Telegram account first. Send <code>/upload_anime</code> to the bot for the
+              exact format, then send the anime poster as a photo with that format in its caption.
             </p>
           </div>
         </div>
@@ -301,12 +291,15 @@ export function StudioView() {
           <div className="rounded-xl border border-emerald-500/25 bg-emerald-500/5 p-4 space-y-2 text-sm">
             <p className="font-semibold text-emerald-500">Telegram account connected</p>
             <p className="text-muted-foreground">
-              Send <code>/my_animes</code> or <code>/upload_anime</code> to the bot. Send episode videos
-              Send with a caption like <code>#anime-slug Episode 1 — Episode title</code>.
+              First send <code>/upload_anime</code>, then send a poster photo with the requested
+              metadata as its caption. After the bot confirms the anime and gives you its slug, send
+              each episode video separately with a caption like{" "}
+              <code>#my-anime 1-qism — Episode title</code>. Use <code>/my_animes</code> to check uploads.
             </p>
             <p className="text-xs text-muted-foreground">
-              Submissions appear in the catalog after moderator review. Videos uploaded through Telegram
-              are watched in the bot; for browser playback, add a valid HLS or MP4 source in the Studio&apos;s Episode section.
+              The bot must be configured with access to the private media channel. Uploads stay hidden
+              until moderator approval. Telegram episode delivery uses the bot; Watch Together playback
+              additionally needs an HLS copy uploaded to private R2.
             </p>
           </div>
         ) : (

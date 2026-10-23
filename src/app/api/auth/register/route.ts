@@ -6,10 +6,12 @@ import { rateKey } from "@/lib/client-ip";
 import { log } from "@/lib/logger";
 import { sendVerificationEmail, isEmailEnabled } from "@/lib/email";
 import { z } from "zod";
+import { normalizeDisplayName } from "@/lib/display-name";
 
 const Body = z.object({
   email: z.string().email().max(200),
   username: z.string().regex(/^[a-zA-Z0-9_]{3,20}$/),
+  displayName: z.string().max(20).optional(),
   password: z.string().min(6).max(200),
 });
 
@@ -27,6 +29,10 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Invalid email, username or password" }, { status: 400 });
     }
     const { email, username, password } = parsed.data;
+    const displayName = normalizeDisplayName(parsed.data.displayName ?? username);
+    if (!displayName) {
+      return NextResponse.json({ error: "Display name must be 2-20 characters and contain no control characters" }, { status: 400 });
+    }
 
     const [existingEmail, existingUsername] = await Promise.all([
       db.user.findUnique({ where: { email: email.toLowerCase() }, select: { id: true, emailVerified: true } }),
@@ -74,9 +80,9 @@ export async function POST(req: NextRequest) {
             username,
             password: hashPassword(password),
             credits: 100,
-            displayName: username,
+            displayName,
             role: "user",
-            locale: "uz",
+            locale: "en",
             emailVerified: false,
             verifyCode: code,
             verifyCodeExp: exp,
@@ -104,9 +110,9 @@ export async function POST(req: NextRequest) {
             username,
             password: hashPassword(password),
             credits: 100,
-            displayName: username,
+            displayName,
             role: "user",
-            locale: "uz",
+            locale: "en",
             emailVerified: true,
           },
         });

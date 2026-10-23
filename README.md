@@ -1,6 +1,16 @@
-# DubAniX
+# Kiluu
 
 Anime community and viewing platform with a Next.js web app, Telegram bot integration, Neon PostgreSQL/Prisma data store, Cloudflare R2 media storage, and a Socket.IO Watch Together service.
+
+## Kiluu brand assets
+
+The supplied vector artwork lives at the repository root (`kiluu-b-icon.svg` and the light/dark horizontal lockups). The inline `LogoMark` component extracts the enso and キ vectors for app UI; no logo image request is needed in the interface. The public PNG/PWA icons and multi-size favicon are regenerated automatically before `npm run build`. After updating the square icon source, regenerate them manually with:
+
+```sh
+npm run brand:icons
+```
+
+The root `loading.tsx` and app-view navigation use the shared branded loader. Update the vectors in `LogoMark` only by extracting the paths from the supplied SVG artwork, not by redrawing them.
 
 ## Requirements
 
@@ -25,7 +35,7 @@ Copy Neon’s **pooled** connection string into `DATABASE_URL` and its **direct*
 
 The existing Neon `public` schema belongs to the Telegram bot and contains live records. The web app’s PostgreSQL migrations run only in the `dubanix_web` schema and do not overwrite bot tables. The existing local `db/custom.db` was intentionally not transferred. Do not run the PostgreSQL migrations against that SQLite file. If you later need to preserve those records, use a separately reviewed and tested data-migration procedure.
 
-The Telegram bot has its own `BOT_DATABASE_URL` and its existing PostgreSQL schema. The bot and web application communicate through the authenticated HTTP API; sharing one Neon project does not by itself unify their tables or accounts.
+The Telegram bot has its own `BOT_DATABASE_URL` and its existing PostgreSQL schema. The bot and web application communicate through the authenticated HTTP API; sharing one Neon project does not by itself unify their tables or accounts. `realtime-worker/` is a separate Cloudflare Workers project with its own TypeScript environment; the web application's root TypeScript check excludes that directory.
 
 Run the Watch Together service in a separate terminal:
 
@@ -68,6 +78,20 @@ For R2, create an S3 API token with Object Read & Write access restricted to the
 Before deploying the Worker, replace the placeholder `bucket_name` in `cloudflare/wrangler.toml`. Deploy it with `npx wrangler deploy --config cloudflare/wrangler.toml`, then set its `R2_HLS_SIGNING_SECRET` using `npx wrangler secret put R2_HLS_SIGNING_SECRET --config cloudflare/wrangler.toml`. Attach the Worker custom domain in Cloudflare and set the same signing secret plus the R2 S3 credentials in the website host's private environment. The S3 secret belongs only in the web server environment and must never be added to Worker variables or browser-visible `NEXT_PUBLIC_*` settings.
 
 Cloudflare R2 Standard currently includes 10 GB-month storage, 1 million Class A requests, and 10 million Class B requests each month; internet egress is free. Above the included quota, storage and request charges apply. These limits are shared by images and HLS videos in the bucket. See [Cloudflare R2 pricing](https://developers.cloudflare.com/r2/pricing/).
+
+## Avatar and name frames
+
+Frame sources live in `frames-src/`: `imageframeN.png` files are avatar rings and `nameframeN.png`/`.webp` files are name plates. Add each source and its catalog entry to the single `frames.config.ts` file (unique slug, type, name, rarity, price or mission key, version, scale, and per-name-frame safe rectangle/alignment/font settings). Use `priceCredits: null` with a `missionKey` for mission-only rewards. Do not add `rank.png` or standalone artwork unless it is intentionally designed as a frame.
+
+After adding sources/config, deploy the `20261021200000_avatar_name_frames` migration, then run:
+
+```sh
+npm run frames:sync
+```
+
+The sync command writes 256px and 384px padded avatar WebPs and 480px padded name-plate WebPs under `public/frames/`, uploads versioned WebPs under `frames/avatar/` or `frames/name/` in the configured R2 bucket, and idempotently upserts frame metadata in Neon. Use `npm run frames:sync -- --force` to regenerate and upload existing assets. Increment each frame's `version` in `frames.config.ts` when replacing its art so browser/CDN caches use a new immutable URL. The R2 helper applies one-year immutable cache headers. Keep original assets in `frames-src/`; generated files should not be edited by hand.
+
+New mission keys must be paired with an achievement in `src/lib/achievements-catalog.ts` and, where needed, a corresponding progress metric in `src/lib/achievements.ts`. Mission rewards are added to `user_frames` when that achievement unlocks and are not purchasable in the shop.
 
 ## Creator uploads through Telegram
 
@@ -162,5 +186,5 @@ Store backups encrypted and outside the host. Test restores periodically in a se
 
 ## Legal and content operations
 
-Only distribute anime, artwork, audio, and subtitles for which DubAniX or the uploader has documented rights. Provide a published rights/contact address and a takedown process; respond to valid notices promptly, preserve relevant records, remove or disable the reported material while reviewing it, and provide a counter-notice path where legally appropriate. Obtain jurisdiction-specific legal advice before launch.
-# DubAniX
+Only distribute anime, artwork, audio, and subtitles for which Kiluu or the uploader has documented rights. Provide a published rights/contact address and a takedown process; respond to valid notices promptly, preserve relevant records, remove or disable the reported material while reviewing it, and provide a counter-notice path where legally appropriate. Obtain jurisdiction-specific legal advice before launch.
+# Kiluu

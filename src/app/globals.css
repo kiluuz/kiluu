@@ -3,6 +3,363 @@
 
 @custom-variant dark (&:is(.dark *));
 
+:root {
+  --logo-ink: #15110e;
+  --logo-enso: #15110e;
+  --logo-accent: #d7263d;
+  --logo-accent-shadow: #7a0f1d;
+}
+
+.dark {
+  --logo-ink: #e9e2d0;
+  --logo-enso: #e9e2d0;
+}
+
+[data-theme="light"] {
+  --logo-ink: #15110e;
+  --logo-enso: #15110e;
+}
+
+[data-theme="dark"] {
+  --logo-ink: #e9e2d0;
+  --logo-enso: #e9e2d0;
+}
+
+[data-theme="system"] {
+  --logo-ink: #15110e;
+  --logo-enso: #15110e;
+}
+
+@media (prefers-color-scheme: dark) {
+  [data-theme="system"] {
+    --logo-ink: #e9e2d0;
+    --logo-enso: #e9e2d0;
+  }
+}
+
+@property --logo-draw-progress {
+  syntax: "<angle>";
+  inherits: false;
+  initial-value: 0deg;
+}
+
+.kiluu-logo {
+  display: inline-flex;
+  align-items: center;
+  gap: calc(var(--logo-size, 40px) * 0.18);
+  color: var(--logo-ink);
+  line-height: 1;
+  vertical-align: middle;
+  flex: none;
+}
+
+.kiluu-logo__svg {
+  display: block;
+  overflow: visible;
+  flex: none;
+  transform-origin: center;
+}
+
+.kiluu-logo__enso,
+.kiluu-logo__kanji {
+  transform-box: fill-box;
+  transform-origin: center;
+}
+
+.kiluu-logo[data-animation="draw"] .kiluu-logo__enso {
+  --logo-draw-progress: 0deg;
+  mask: conic-gradient(from -90deg, #000 0deg, #000 var(--logo-draw-progress), transparent var(--logo-draw-progress) 360deg);
+  animation: kiluu-enso-draw 900ms ease-out forwards;
+}
+
+.kiluu-logo[data-animation="draw"] .kiluu-logo__kanji {
+  opacity: 0;
+  transform: scale(1.15);
+  animation: kiluu-kanji-stamp 350ms cubic-bezier(.2,.8,.2,1) 900ms forwards;
+}
+
+.kiluu-logo[data-animation="loop"] .kiluu-logo__enso {
+  animation: kiluu-enso-turn 8s linear infinite;
+}
+
+.kiluu-logo[data-animation="loop"] .kiluu-logo__svg {
+  animation: kiluu-breathe 4s ease-in-out infinite;
+}
+
+.kiluu-logo[data-animation="loop"] .kiluu-logo__kanji {
+  transform-origin: center;
+  animation: kiluu-kanji-pulse 2.8s ease-in-out infinite;
+}
+
+.kiluu-logo__wordmark {
+  color: var(--logo-ink);
+  font-family: var(--font-space-grotesk), "Space Grotesk", sans-serif;
+  font-size: calc(var(--logo-size, 40px) * 0.66);
+  font-weight: 700;
+  letter-spacing: -0.065em;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.kiluu-logo-control {
+  display: inline-flex;
+  align-items: center;
+  gap: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-decoration: none;
+}
+
+button.kiluu-logo-control {
+  cursor: pointer;
+}
+
+.kiluu-logo-control--tagline {
+  flex-direction: column;
+  align-items: flex-start;
+}
+
+.kiluu-logo-tagline {
+  margin-top: calc(var(--logo-size, 40px) * 0.18);
+  color: color-mix(in oklab, var(--logo-ink) 62%, transparent);
+  font-family: var(--font-space-grotesk), "Space Grotesk", sans-serif;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.13em;
+  white-space: nowrap;
+}
+
+.dbx-navbrand .kiluu-logo__wordmark {
+  max-width: 140px;
+  overflow: hidden;
+  transition: max-width 220ms ease, opacity 160ms ease;
+}
+
+.dbx-navbrand.dbx-collapse .kiluu-logo__wordmark {
+  max-width: 0;
+  opacity: 0;
+}
+
+.kiluu-loader {
+  position: relative;
+  display: flex;
+  min-height: 100%;
+  width: 100%;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 24px;
+  color: var(--foreground);
+  background: var(--background);
+  text-align: center;
+}
+
+.kiluu-loader--screen {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  min-height: 100dvh;
+}
+
+.kiluu-loader__title {
+  margin: 12px 0 0;
+  font-family: var(--font-space-grotesk), "Space Grotesk", sans-serif;
+  font-size: clamp(22px, 3vw, 30px);
+  font-weight: 700;
+  letter-spacing: -0.035em;
+}
+
+.kiluu-loader__caption {
+  margin: 0;
+  color: var(--muted-foreground);
+  font-size: 13px;
+}
+
+.kiluu-splash {
+  position: fixed;
+  inset: 0;
+  z-index: 10000;
+  display: grid;
+  place-items: center;
+  background: var(--background);
+  pointer-events: none;
+  animation: kiluu-splash-dismiss 1.4s ease forwards;
+}
+
+.kiluu-splash[hidden] {
+  display: none;
+}
+
+html.kiluu-splash-seen .kiluu-splash {
+  display: none;
+}
+
+.kiluu-splash__content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  color: var(--foreground);
+  font-family: var(--font-space-grotesk), "Space Grotesk", sans-serif;
+}
+
+.kiluu-splash__content strong {
+  margin-top: 8px;
+  font-size: 26px;
+  font-weight: 700;
+}
+
+.kiluu-splash__content > span {
+  color: var(--muted-foreground);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.18em;
+}
+
+.kiluu-nav-progress {
+  position: fixed;
+  top: 0;
+  right: 0;
+  left: 0;
+  z-index: 10001;
+  height: 2px;
+  background: var(--logo-accent);
+  box-shadow: 0 0 12px color-mix(in srgb, var(--logo-accent) 60%, transparent);
+  transform-origin: left;
+  animation: kiluu-progress 550ms ease-out forwards;
+  pointer-events: none;
+}
+
+.kiluu-content-loader {
+  position: absolute;
+  inset: 0;
+  z-index: 30;
+  min-height: 420px;
+  background: color-mix(in srgb, var(--background) 94%, transparent);
+}
+
+.kiluu-message {
+  display: flex;
+  min-height: 100dvh;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 24px;
+  color: var(--foreground);
+  background: var(--background);
+  text-align: center;
+}
+
+.kiluu-message h1 {
+  margin: 8px 0 0;
+  font-family: var(--font-space-grotesk), "Space Grotesk", sans-serif;
+  font-size: clamp(24px, 4vw, 34px);
+  font-weight: 700;
+}
+
+.kiluu-message p {
+  margin: 0;
+  color: var(--muted-foreground);
+}
+
+.kiluu-message a,
+.kiluu-message button {
+  margin-top: 8px;
+  border: 0;
+  border-radius: 999px;
+  padding: 10px 18px;
+  color: #fff;
+  background: var(--logo-accent);
+  font-weight: 600;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+@keyframes kiluu-enso-draw {
+  to { --logo-draw-progress: 360deg; }
+}
+
+@keyframes kiluu-kanji-stamp {
+  to { opacity: 1; transform: scale(1); }
+}
+
+@keyframes kiluu-enso-turn {
+  to { transform: rotate(360deg); }
+}
+
+@keyframes kiluu-breathe {
+  50% { transform: scale(1.03); }
+}
+
+@keyframes kiluu-kanji-pulse {
+  50% { opacity: 0.84; }
+}
+
+@keyframes kiluu-splash-dismiss {
+  to { opacity: 0; visibility: hidden; }
+}
+
+@keyframes kiluu-progress {
+  0% { transform: scaleX(0.02); }
+  65% { transform: scaleX(0.76); }
+  100% { transform: scaleX(1); opacity: 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .kiluu-logo[data-animation="draw"] .kiluu-logo__enso,
+  .kiluu-logo[data-animation="draw"] .kiluu-logo__kanji,
+  .kiluu-logo[data-animation="loop"] .kiluu-logo__enso,
+  .kiluu-logo[data-animation="loop"] .kiluu-logo__svg,
+  .kiluu-logo[data-animation="loop"] .kiluu-logo__kanji {
+    animation: none;
+    opacity: 1;
+    transform: none;
+    mask: none;
+  }
+
+  .kiluu-logo[data-animation="loop"] .kiluu-logo__svg {
+    animation: kiluu-reduced-pulse 8s ease-in-out infinite;
+  }
+
+  .kiluu-splash,
+  .kiluu-nav-progress {
+    animation-duration: 1ms;
+    animation-delay: 1ms;
+  }
+
+  .dbx-navbrand .kiluu-logo__wordmark {
+    transition: none;
+  }
+}
+
+@keyframes kiluu-reduced-pulse {
+  50% { opacity: 0.86; }
+}
+
+@media (max-width: 359.98px) {
+  .dbx-navbrand .kiluu-logo__wordmark {
+    max-width: 0;
+    opacity: 0;
+  }
+}
+
+@media (min-width: 768px) and (max-width: 1099.98px) {
+  .dbx-navbrand .kiluu-logo__svg {
+    display: none;
+  }
+}
+
+@media (min-width: 640px) {
+  .profile-name-frame-follow {
+    margin-left: var(--profile-name-frame-inset, 0px);
+  }
+}
+
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
@@ -96,7 +453,7 @@
    MIDNIGHT CINEMA — dark theme (default: projector ink)
    ============================================================ */
 .dark {
-  --background: oklch(0.128 0.008 55);
+  --background: #000;
   --foreground: oklch(0.955 0.006 75);
   --card: oklch(0.165 0.011 55);
   --card-foreground: oklch(0.955 0.006 75);
@@ -151,9 +508,9 @@
 
 /* ============ MIDNIGHT CINEMA UTILITIES ============ */
 
-/* Ember gradient text — warm ambers rolling like projector light */
+/* Kiluu vermilion gradient text */
 .gradient-text {
-  background: linear-gradient(115deg, oklch(0.78 0.16 65), oklch(0.705 0.195 47), oklch(0.63 0.2 35));
+  background: linear-gradient(115deg, #ef6575, #d7263d, #9e1b2d);
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
@@ -165,12 +522,12 @@
   to { background-position: 200% center; }
 }
 
-/* Brand ember gradient for buttons / active pills */
+/* Kiluu vermilion brand gradient for buttons and active pills */
 .brand-gradient {
-  background: linear-gradient(120deg, oklch(0.75 0.17 55), oklch(0.68 0.2 42));
+  background: linear-gradient(120deg, #d7263d, #a91d31);
 }
 .brand-gradient-hover:hover {
-  background: linear-gradient(120deg, oklch(0.79 0.17 55), oklch(0.72 0.2 42));
+  background: linear-gradient(120deg, #e13d51, #b92338);
 }
 
 /* Opaque-enough glass — fixes see-through sticky header artifacts */
@@ -639,41 +996,29 @@ input[type="range"].player-range::-moz-range-thumb {
     0 2px 8px rgba(64, 42, 20, 0.12);
 }
 
-/* Center AI Dub CTA — brand orange gradient + glow ring */
+/* Center AI Dub CTA — vermilion brand accent + glow ring */
 .dock-cta {
-  background: linear-gradient(135deg, #ff4d1c, #ffa23a);
+  background: linear-gradient(135deg, #d7263d, #a91d31);
   box-shadow:
     0 0 0 3px color-mix(in oklch, var(--background) 92%, transparent),
-    0 10px 26px -6px rgba(255, 92, 35, 0.55),
-    0 3px 10px rgba(255, 92, 35, 0.35),
+    0 10px 26px -6px rgba(215, 38, 61, 0.55),
+    0 3px 10px rgba(215, 38, 61, 0.35),
     inset 0 1px 0 rgba(255, 255, 255, 0.35);
 }
 .dock-cta:hover {
   box-shadow:
     0 0 0 3px color-mix(in oklch, var(--background) 92%, transparent),
-    0 12px 34px -6px rgba(255, 92, 35, 0.7),
-    0 4px 14px rgba(255, 92, 35, 0.45),
+    0 12px 34px -6px rgba(215, 38, 61, 0.7),
+    0 4px 14px rgba(215, 38, 61, 0.45),
     inset 0 1px 0 rgba(255, 255, 255, 0.4);
   filter: brightness(1.06);
 }
 .dock-cta[aria-current="page"] {
   box-shadow:
     0 0 0 3px color-mix(in oklch, var(--primary) 60%, transparent),
-    0 10px 30px -6px rgba(255, 92, 35, 0.75),
-    0 3px 10px rgba(255, 92, 35, 0.4),
+    0 10px 30px -6px rgba(215, 38, 61, 0.75),
+    0 3px 10px rgba(215, 38, 61, 0.4),
     inset 0 1px 0 rgba(255, 255, 255, 0.35);
-}
-
-/* Waveform bars inside the CTA — same rhythm as the Logo mark */
-.dock-wave-bar {
-  transform-origin: center;
-  animation: dock-eq 1.3s ease-in-out infinite;
-}
-@keyframes dock-eq {
-  50% { transform: scaleY(0.62); }
-}
-@media (prefers-reduced-motion: reduce) {
-  .dock-wave-bar { animation: none; }
 }
 
 /* Nav sheet (vaul) — surface + drag handle restyle */

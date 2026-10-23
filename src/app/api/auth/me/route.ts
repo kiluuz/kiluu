@@ -2,8 +2,8 @@ import { NextResponse } from "next/server";
 import { getCurrentUser, toPublicUser } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { isCreator } from "@/lib/rbac";
-import { getXpTotal, levelFromXp } from "@/lib/xp";
-import { calculateBadges } from "@/lib/level-utils";
+import { getXpTotal } from "@/lib/xp";
+import { calculateBadges, calculateLevel } from "@/lib/level-utils";
 
 export async function GET() {
   const user = await getCurrentUser();
@@ -21,18 +21,12 @@ export async function GET() {
   ]);
 
   const totalPurchases = nativePurchases + allBotOrders;
-  const levelInfo = levelFromXp(xpTotal);
+  const levelInfo = calculateLevel(xpTotal);
   const badges = calculateBadges({
     isCreator: isCreator(user),
     createdAnimes,
     purchasedAnimes: totalPurchases,
-    levelInfo: {
-      level: levelInfo.level,
-      xp: levelInfo.xp,
-      nextLevelXp: levelInfo.nextLevelXp,
-      titleJa: "",
-      titleUz: "",
-    },
+    levelInfo,
   });
 
   return NextResponse.json({

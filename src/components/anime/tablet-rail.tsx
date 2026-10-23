@@ -5,9 +5,9 @@ import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
 import { PanelLeftClose, Sun, Moon } from "lucide-react";
 import { useTheme } from "next-themes";
 import { useAppStore } from "./store";
-import { useResolvedNav, EXCHANGE_REQUIRED } from "./nav-config";
+import { useResolvedNav } from "./nav-config";
 import { Sidebar } from "./shell";
-import { Avatar } from "./ui-bits";
+import { FramedAvatar } from "./ui-bits";
 import { Logo } from "./logo";
 import { toast } from "sonner";
 import {
@@ -29,7 +29,7 @@ function RailButton({ id, onNavigate }: { id: import("./types").ViewName; onNavi
   if (!item) return null;
   const { def, active, badgeText, locked } = item;
   const Icon = def.icon;
-  const label = `${def.label}${badgeText ? ` · ${def.id === "exchange" ? `${item.ownedCount}/${EXCHANGE_REQUIRED}` : badgeText}` : ""}`;
+  const label = `${def.label}${badgeText ? ` · ${badgeText}` : ""}`;
 
   return (
     <Tooltip delayDuration={250}>
@@ -156,14 +156,7 @@ export function TabletRail() {
               className="rounded-full hover:ring-2 ring-primary/50 transition outline-none focus-visible:ring-2 focus-visible:ring-ring"
               aria-label="Open my profile"
             >
-              <Avatar
-                src={user.avatarUrl}
-                name={user.displayName || user.username}
-                accent={user.accentColor}
-                accentTo={user.accentTo}
-                frame={user.avatarFrame}
-                size={38}
-              />
+              <FramedAvatar user={user} size={38} />
             </button>
           ) : (
             <button

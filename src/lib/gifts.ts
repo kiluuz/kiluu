@@ -5,6 +5,7 @@ import { evaluateAchievements } from "./achievements";
 import { grantPurchase } from "./bot-api";
 import { officialVersionId, userOwnsVersion } from "./owns";
 import { sendGiftNotificationEmail } from "./email";
+import { emitEvent } from "./events";
 
 export function giftExpiryDate(from = new Date()) {
   const d = new Date(from);
@@ -155,6 +156,7 @@ export async function sendGift(opts: {
   });
 
   await evaluateAchievements(sender.id);
+  await emitEvent(sender, "gift_sent", { giftId: gift.id, recipientUsername: opts.recipientUsername });
   if (version.creatorId && version.creatorId !== sender.id) {
     await evaluateAchievements(version.creatorId);
   }

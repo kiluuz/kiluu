@@ -8,7 +8,7 @@ export const APP_CONFIG = {
   creatorSharePercent: Number(env("CREATOR_SHARE_PERCENT", "70")),
   platformSharePercent: Number(env("PLATFORM_SHARE_PERCENT", "30")),
   giftExpiryDays: Number(env("GIFT_EXPIRY_DAYS", "14")),
-  defaultLocale: env("DEFAULT_LOCALE", "uz"),
+  defaultLocale: env("DEFAULT_LOCALE", "en"),
   watchPartyRequireOwn: env("WATCH_PARTY_REQUIRE_OWN", "true") !== "false",
   awardCost: 10,
   minAnimePrice: 10,

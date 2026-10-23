@@ -4,6 +4,9 @@ import { getCurrentUser, toPublicUser } from "@/lib/auth";
 import { parseOnboardingRole } from "@/lib/rbac";
 import { sanitizeText } from "@/lib/sanitize";
 import { parseProfilePrivacy } from "@/lib/profile-privacy";
+import { ANIME_GENRES, parseFavoriteGenres } from "@/lib/anime-preferences";
+import { presetBannerUrl } from "@/components/anime/profile-assets";
+import { normalizeDisplayName } from "@/lib/display-name";
 
 const HEX = /^#[0-9a-fA-F]{6}$/;
 
@@ -14,7 +17,7 @@ export async function PATCH(req: NextRequest) {
 
   try {
     const body = await req.json();
-    const data: Record<string, string | boolean> = {};
+    const data: Record<string, string | boolean | null> = {};
 
     // Onboarding: role selection
     if (typeof body.role === "string") {
@@ -31,10 +34,43 @@ export async function PATCH(req: NextRequest) {
 
     // ---- Identity ----
     if (typeof body.displayName === "string") {
-      if (body.displayName.trim().length < 1 || body.displayName.trim().length > 32) {
-        return NextResponse.json({ error: "Display name must be 1-32 characters" }, { status: 400 });
+      const displayName = normalizeDisplayName(body.displayName);
+      if (!displayName) {
+        return NextResponse.json({ error: "Display name must be 2-20 characters and contain no control characters" }, { status: 400 });
       }
-      data.displayName = body.displayName.trim();
+      data.displayName = displayName;
+    }
+    for (const [field, type] of [
+      ["equippedAvatarFrameId", "avatar"],
+      ["equippedNameFrameId", "name"],
+    ] as const) {
+      if (!(field in body)) continue;
+      const value: unknown = body[field];
+      if (value === null || value === "") {
+        data[field] = null;
+        continue;
+      }
+      if (typeof value !== "string") {
+        return NextResponse.json({ error: "Invalid frame selection" }, { status: 400 });
+      }
+      const frame = await db.frame.findFirst({
+        where: { id: value, type, isActive: true },
+        select: { id: true },
+      });
+      if (!frame) return NextResponse.json({ error: "Choose an active frame of the correct type" }, { status: 400 });
+      const owned = await db.userFrame.findUnique({
+        where: { userId_frameId: { userId: user.id, frameId: frame.id } },
+        select: { frameId: true },
+      });
+      if (!owned) return NextResponse.json({ error: "You must own this frame before equipping it" }, { status: 403 });
+      data[field] = frame.id;
+    }
+    if (body.favoriteGenres !== undefined) {
+      const favoriteGenres = parseFavoriteGenres(body.favoriteGenres);
+      if (!favoriteGenres) {
+        return NextResponse.json({ error: "Choose at least one valid anime genre" }, { status: 400 });
+      }
+      data.favoriteGenres = favoriteGenres.join(",");
     }
     if (typeof body.bio === "string") {
       if (body.bio.length > 500) {
@@ -125,8 +161,18 @@ export async function PATCH(req: NextRequest) {
 
     // ---- Banner preset ----
     if (typeof body.bannerPreset === "string") {
-      if (body.bannerPreset.length > 400) return NextResponse.json({ error: "Bad preset" }, { status: 400 });
-      data.bannerPreset = body.bannerPreset.trim() || "";
+      const presetId = body.bannerPreset.trim();
+      if (presetId) {
+        const bannerUrl = presetBannerUrl(presetId);
+        if (!bannerUrl) return NextResponse.json({ error: "Choose a banner from the preset gallery" }, { status: 400 });
+        if (typeof body.bannerUrl === "string" && body.bannerUrl !== bannerUrl) {
+          return NextResponse.json({ error: "Choose a banner from the preset gallery" }, { status: 400 });
+        }
+        data.bannerPreset = presetId;
+        data.bannerUrl = bannerUrl;
+      } else {
+        data.bannerPreset = "";
+      }
     }
 
     // ---- Showcase (JSON) ----
@@ -175,8 +221,8 @@ export async function PATCH(req: NextRequest) {
         }
         const genres = Array.isArray(config.genres)
           ? [...new Set(config.genres.filter((genre): genre is string =>
-              typeof genre === "string" && ["Action", "Adventure", "Fantasy", "Sci-Fi", "Drama", "Comedy", "Romance", "Horror", "Mystery", "Thriller", "Sports", "Slice of Life", "Mecha", "Supernatural"].includes(genre)
-            ))].slice(0, 8)
+              typeof genre === "string" && (ANIME_GENRES as readonly string[]).includes(genre)
+            ))]
           : [];
         const order = Array.isArray(config.order)
           ? [...new Set(config.order.filter((section): section is string =>
@@ -226,8 +272,11 @@ export async function PATCH(req: NextRequest) {
     if (typeof body.avatarUrl === "string" && body.avatarUrl.length < 500) {
       data.avatarUrl = body.avatarUrl || "";
     }
-    if (typeof body.bannerUrl === "string" && body.bannerUrl.length < 500) {
-      data.bannerUrl = body.bannerUrl || "";
+    if (body.bannerUrl !== undefined) {
+      const presetId = typeof body.bannerPreset === "string" ? body.bannerPreset.trim() : "";
+      if (!presetId || presetBannerUrl(presetId) !== body.bannerUrl) {
+        return NextResponse.json({ error: "Choose a banner from the preset gallery" }, { status: 400 });
+      }
     }
 
     if (Object.keys(data).length === 0) {

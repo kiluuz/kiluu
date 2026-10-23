@@ -2,6 +2,7 @@ import { db } from "@/lib/db";
 import { APP_CONFIG } from "./config";
 import { awardXpInTransaction } from "./xp";
 import { evaluateAchievements } from "./achievements";
+import { emitEvent } from "./events";
 import { grantPurchase } from "./bot-api";
 import { officialVersionId, userOwnsVersion } from "./owns";
 import { log } from "./logger";
@@ -125,6 +126,7 @@ export async function purchaseAnimeAtomic(opts: {
 
   try {
     await evaluateAchievements(opts.userId);
+    await emitEvent({ id: opts.userId }, "purchase", { animeId: opts.animeId, versionId: opts.versionId });
   } catch (error) {
     log.error("Purchase committed but buyer achievement evaluation failed", {
       userId: opts.userId,

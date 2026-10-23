@@ -40,7 +40,7 @@ async function upsertTelegramUser(opts: {
       role: "user",
       telegramId: opts.telegramId,
       telegramUsername: opts.username || null,
-      locale: "uz",
+      locale: "en",
       onboardingDone: false,
     },
   });

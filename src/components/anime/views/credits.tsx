@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Wallet, Zap, Gift, History, Check, Loader2, Sparkles } from "lucide-react";
+import { Zap, Gift, History, Check, Loader2, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { useAppStore } from "../store";
@@ -9,6 +9,8 @@ import type { CreditPackage, CreditTx } from "../types";
 import { formatCredits, timeAgo } from "../ui-bits";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import { useI18n } from "@/components/i18n-provider";
+import { FramesShop } from "../frame-shop";
 
 interface CreditsData {
   packages: CreditPackage[];
@@ -18,10 +20,12 @@ interface CreditsData {
 
 export function CreditsView() {
   const { user, setAuthOpen } = useAppStore();
+  const { t } = useI18n();
   const [loadedData, setLoadedData] = useState<{ userId: string | null; value: CreditsData } | null>(null);
   const data = loadedData?.userId === (user?.id ?? null) ? loadedData.value : null;
   const [checkout, setCheckout] = useState<CreditPackage | null>(null);
   const [processing, setProcessing] = useState(false);
+  const [activeTab, setActiveTab] = useState<"credits" | "frames">("credits");
 
   useEffect(() => {
     let active = true;
@@ -29,10 +33,10 @@ export function CreditsView() {
       try {
         const response = await fetch("/api/credits", { cache: "no-store" });
         const result = await response.json();
-        if (!response.ok) throw new Error(result.error || "Failed to load credits data");
+        if (!response.ok) throw new Error(result.error || t("credits.loadError"));
         if (active) setLoadedData({ userId: user?.id ?? null, value: result });
       } catch (error) {
-        if (active) toast.error(error instanceof Error ? error.message : "Failed to load credits data");
+        if (active) toast.error(error instanceof Error ? error.message : t("credits.loadError"));
       }
     };
     void load();
@@ -54,16 +58,16 @@ export function CreditsView() {
       });
       const d = await res.json();
       if (!res.ok) {
-        toast.error(d.error || "Invoice failed");
+        toast.error(d.error || t("credits.invoiceError"));
         return;
       }
       if (d.invoiceLink) {
         window.open(d.invoiceLink, "_blank");
-        toast.success("Telegram Stars invoice opened. Your balance will update after payment.");
+        toast.success(t("credits.invoiceOpened"));
         setCheckout(null);
       }
     } catch {
-      toast.error("Network error");
+      toast.error(t("auth.networkErrorShort"));
     } finally {
       setProcessing(false);
     }
@@ -73,26 +77,24 @@ export function CreditsView() {
 
   return (
     <div className="max-w-[1100px] mx-auto px-4 sm:px-8 py-6 pb-10">
-      <div className="aurora relative overflow-hidden rounded-3xl border p-6 sm:p-10 mb-8">
-        <div className="relative flex items-center justify-between gap-6 flex-wrap">
-          <div>
-            <h1 className="text-2xl sm:text-4xl font-black flex items-center gap-3">
-              <span className="w-11 h-11 rounded-2xl brand-gradient flex items-center justify-center">
-                <Wallet className="w-6 h-6 text-white" />
-              </span>
-              Get Credits
-            </h1>
-            <p className="text-sm sm:text-base text-muted-foreground mt-2 max-w-md">
-              Get credits with Telegram Stars (XTR). The price is the number of Stars in the package, not dollars.
-            </p>
-          </div>
-          <div className="text-right">
-            <p className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Your balance</p>
+      <h1 className="sr-only">{t("nav.credits")}</h1>
+      <div className="mb-6 flex gap-2">
+        <Button variant={activeTab === "credits" ? "default" : "outline"} className="rounded-full" onClick={() => setActiveTab("credits")}>
+          {t("credits.credits")}
+        </Button>
+        <Button variant={activeTab === "frames" ? "default" : "outline"} className="rounded-full" onClick={() => setActiveTab("frames")}>
+          Frames
+        </Button>
+      </div>
+      {activeTab === "frames" ? <FramesShop /> : (
+      <>
+      <div className="mb-8 flex justify-end">
+        <div className="text-right rounded-2xl border bg-card/60 px-5 py-3">
+            <p className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">{t("credits.balance")}</p>
             <p className="text-4xl sm:text-5xl font-black bg-gradient-to-r from-amber-400 to-amber-600 bg-clip-text text-transparent tabular-nums">
               {formatCredits(user?.credits ?? 0)}
             </p>
-            <p className="text-xs text-muted-foreground">credits</p>
-          </div>
+            <p className="text-xs text-muted-foreground">{t("credits.credits")}</p>
         </div>
       </div>
 
@@ -110,7 +112,7 @@ export function CreditsView() {
           >
             {pkg.popular && (
               <span className="absolute -top-2.5 left-1/2 -translate-x-1/2 brand-gradient text-white text-[9px] font-black uppercase tracking-wider px-3 py-1 rounded-full whitespace-nowrap">
-                Most Popular
+                {t("credits.popular")}
               </span>
             )}
             <div className="flex items-center gap-1.5 mb-2">
@@ -119,10 +121,10 @@ export function CreditsView() {
             </div>
             {pkg.bonus > 0 && (
               <p className="text-[10px] font-bold text-emerald-500 bg-emerald-500/10 border border-emerald-500/25 rounded-full px-2 py-0.5 inline-flex items-center gap-1 mb-2">
-                <Gift className="w-3 h-3" /> +{formatCredits(pkg.bonus)} bonus
+                <Gift className="w-3 h-3" /> +{formatCredits(pkg.bonus)} {t("credits.bonus")}
               </p>
             )}
-            <p className="text-xs text-muted-foreground mt-1">total {formatCredits(pkg.credits + pkg.bonus)}</p>
+            <p className="text-xs text-muted-foreground mt-1">{t("credits.total")} {formatCredits(pkg.credits + pkg.bonus)}</p>
             <p className="text-lg font-black mt-2">{starsOf(pkg)} Stars</p>
           </button>
         ))}
@@ -130,11 +132,11 @@ export function CreditsView() {
 
       <div className="glass rounded-3xl p-5 sm:p-6">
         <h2 className="font-bold flex items-center gap-2 mb-4">
-          <History className="w-4.5 h-4.5 text-primary" /> Transaction History
+          <History className="w-4.5 h-4.5 text-primary" /> {t("credits.history")}
         </h2>
         {!user ? (
           <p className="text-sm text-muted-foreground text-center py-6">
-            <Button variant="link" onClick={() => setAuthOpen(true)} className="p-0 h-auto">Sign in</Button> to see your history
+            <Button variant="link" onClick={() => setAuthOpen(true)} className="p-0 h-auto">{t("auth.signIn")}</Button> {t("credits.signInToHistory")}
           </p>
         ) : data && data.transactions.length > 0 ? (
           <div className="space-y-2 max-h-96 overflow-y-auto fancy-scroll pr-1">
@@ -157,7 +159,7 @@ export function CreditsView() {
             ))}
           </div>
         ) : (
-          <p className="text-sm text-muted-foreground text-center py-6">No transactions yet</p>
+          <p className="text-sm text-muted-foreground text-center py-6">{t("credits.noTransactions")}</p>
         )}
       </div>
 
@@ -167,15 +169,15 @@ export function CreditsView() {
             <DialogTitle className="flex items-center gap-2">
               <Sparkles className="w-5 h-5 text-primary" /> Telegram Stars
             </DialogTitle>
-            <DialogDescription>Pay in XTR within Telegram. Credits are added after successful payment.</DialogDescription>
+            <DialogDescription>{t("credits.paymentDescription")}</DialogDescription>
           </DialogHeader>
           {checkout && (
             <div className="space-y-5 pt-2">
               <div className="rounded-2xl border bg-card p-4 flex items-center justify-between">
                 <div>
-                  <p className="font-black text-lg">{formatCredits(checkout.credits)} credits</p>
+                  <p className="font-black text-lg">{formatCredits(checkout.credits)} {t("credits.credits")}</p>
                   {checkout.bonus > 0 && (
-                    <p className="text-xs text-emerald-500 font-bold">+{formatCredits(checkout.bonus)} bonus included</p>
+                    <p className="text-xs text-emerald-500 font-bold">+{formatCredits(checkout.bonus)} {t("credits.bonusIncluded")}</p>
                   )}
                 </div>
                 <p className="text-2xl font-black">{starsOf(checkout)} ★</p>
@@ -187,21 +189,23 @@ export function CreditsView() {
               >
                 {processing ? (
                   <>
-                    <Loader2 className="w-5 h-5 animate-spin" /> Invoice...
+                    <Loader2 className="w-5 h-5 animate-spin" /> {t("credits.invoiceLoading")}
                   </>
                 ) : (
                   <>
-                    <Sparkles className="w-5 h-5" /> Pay {starsOf(checkout)} Stars
+                    <Sparkles className="w-5 h-5" /> {t("credits.payStars", { count: starsOf(checkout) })}
                   </>
                 )}
               </Button>
               <p className="text-[10px] text-center text-muted-foreground flex items-center justify-center gap-1">
-                <Check className="w-3 h-3" /> Real Stars invoice checkout
+                <Check className="w-3 h-3" /> {t("credits.realStarsCheckout")}
               </p>
             </div>
           )}
         </DialogContent>
       </Dialog>
+      </>
+      )}
     </div>
   );
 }

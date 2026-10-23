@@ -9,6 +9,7 @@ import { VideoPlayer } from "../player";
 import { SmartImage, timeAgo } from "../ui-bits";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import { useI18n } from "@/components/i18n-provider";
 
 interface DetailResponse {
   anime: AnimeDetail;
@@ -17,6 +18,7 @@ interface DetailResponse {
 
 export function WatchView() {
   const { view, user, navigate, goBack } = useAppStore();
+  const { t } = useI18n();
   const [data, setData] = useState<DetailResponse | null>(null);
   const [dataForAnime, setDataForAnime] = useState<string | null>(null);
   const [localEpisodes, setLocalEpisodes] = useState<EpisodeItem[]>([]);
@@ -40,7 +42,7 @@ export function WatchView() {
           }
         }
       })
-      .catch(() => toast.error("Failed to load"));
+      .catch(() => toast.error(t("watch.loadError")));
     return () => {
       alive = false;
     };
@@ -63,8 +65,8 @@ export function WatchView() {
   if (!data || !currentEpisode) {
     return (
       <div className="text-center py-32">
-        <p className="font-bold text-lg">Episode not found</p>
-        <Button variant="outline" className="mt-4 rounded-full" onClick={() => navigate("home")}>Back to Home</Button>
+        <p className="font-bold text-lg">{t("watch.episodeNotFound")}</p>
+        <Button variant="outline" className="mt-4 rounded-full" onClick={() => navigate("home")}>{t("watch.backHome")}</Button>
       </div>
     );
   }
@@ -78,15 +80,15 @@ export function WatchView() {
     return (
       <div className="max-w-[900px] mx-auto px-4 py-24 text-center">
         <p className="text-6xl mb-4">🔒</p>
-        <h1 className="text-2xl font-black mb-2">This anime is locked</h1>
+        <h1 className="text-2xl font-black mb-2">{t("watch.lockedTitle")}</h1>
         <p className="text-muted-foreground mb-6">
-          Purchase &ldquo;{anime.title}&rdquo; with {anime.price} credits to unlock all episodes.
+          {t("watch.purchaseUnlock", { title: anime.title, price: anime.price })}
         </p>
         <div className="flex gap-3 justify-center">
           <Button className="rounded-full brand-gradient text-white font-bold" onClick={() => navigate("detail", { animeId: anime.slug })}>
-            View details
+            {t("watch.viewDetails")}
           </Button>
-          <Button variant="outline" className="rounded-full" onClick={goBack}>Go back</Button>
+          <Button variant="outline" className="rounded-full" onClick={goBack}>{t("common.back")}</Button>
         </div>
       </div>
     );
@@ -105,11 +107,11 @@ export function WatchView() {
         onEpisodeSelect={(epId) => navigate("watch", { animeId, episodeId: epId })}
         onEnded={() => {
           if (next) {
-            toast.success("Next episode starting...", {
-              action: { label: "Play now", onClick: () => navigate("watch", { animeId, episodeId: next.id }) },
+            toast.success(t("watch.nextStarting"), {
+              action: { label: t("watch.playNow"), onClick: () => navigate("watch", { animeId, episodeId: next.id }) },
             });
           } else {
-            toast.success("You finished this anime! 🎉");
+            toast.success(t("watch.finished"));
           }
         }}
       />
@@ -142,7 +144,7 @@ export function WatchView() {
               onClick={() => prev && navigate("watch", { animeId, episodeId: prev.id })}
               className="rounded-full"
             >
-              <ChevronLeft className="w-4 h-4" /> Prev
+              <ChevronLeft className="w-4 h-4" /> {t("watch.previous")}
             </Button>
             <Button
               size="sm"
@@ -150,7 +152,7 @@ export function WatchView() {
               onClick={() => next && navigate("watch", { animeId, episodeId: next.id })}
               className="rounded-full brand-gradient text-white font-bold"
             >
-              Next Episode <ChevronRight className="w-4 h-4" />
+              {t("watch.nextEpisode")} <ChevronRight className="w-4 h-4" />
             </Button>
             <Button
               variant="ghost"
@@ -158,7 +160,7 @@ export function WatchView() {
               onClick={() => navigate("watch-together")}
               className="rounded-full ml-auto"
             >
-              <Sparkles className="w-4 h-4" /> Watch Together
+              <Sparkles className="w-4 h-4" /> {t("nav.watch-together")}
             </Button>
           </div>
         </div>
@@ -167,9 +169,9 @@ export function WatchView() {
         <aside className="glass rounded-2xl p-4 self-start">
           <div className="flex items-center justify-between mb-3">
             <h3 className="text-sm font-bold flex items-center gap-2">
-              <Clock3 className="w-4 h-4 text-primary" /> Up Next
+              <Clock3 className="w-4 h-4 text-primary" /> {t("watch.upNext")}
             </h3>
-            <span className="text-[10px] text-muted-foreground">{localEpisodes.length} episodes</span>
+            <span className="text-[10px] text-muted-foreground">{t("watch.episodeCount", { count: localEpisodes.length })}</span>
           </div>
           <div className="space-y-1.5 max-h-[420px] overflow-y-auto fancy-scroll pr-1">
             {localEpisodes.map((ep) => {

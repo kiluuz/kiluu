@@ -4,6 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev -p 3000 2>&1 | tee dev.log",
+    "prebuild": "npm run brand:icons",
     "build": "next build --webpack && cp -r .next/static .next/standalone/.next/ && cp -r public .next/standalone/",
     "start": "NODE_ENV=production node .next/standalone/server.js",
     "watch-party": "npm --prefix mini-services/watch-party run start",
@@ -13,6 +14,8 @@
     "db:migrate": "prisma migrate deploy",
     "db:migrate:dev": "prisma migrate dev",
     "db:reset": "prisma migrate reset",
+    "brand:icons": "node scripts/generate-brand-icons.mjs",
+    "frames:sync": "node --env-file-if-exists=.env --experimental-strip-types scripts/frames-sync.mjs",
     "test": "node scripts/run-tests.mjs"
   },
   "dependencies": {

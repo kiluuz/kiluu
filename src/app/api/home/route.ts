@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { getCurrentUser } from "@/lib/auth";
 import { unstable_cache } from "next/cache";
+import { rankAnimeByFavoriteGenres } from "@/lib/anime-preferences";
 
 // ─── Cached public home data (60 s revalidation, tag: "home") ────────────────
 const getCachedHomeData = unstable_cache(
@@ -49,13 +50,14 @@ const getCachedHomeData = unstable_cache(
     const homeFeatured = featured.length > 0 ? featured : trending.slice(0, 5);
 
     type AnimeRow = (typeof trending)[number];
-    const mapAnime = (a: AnimeRow) => ({
+    const mapAnime = (a: AnimeRow, recommended = false) => ({
       id: a.id,
       slug: a.slug,
       title: a.title,
       coverImage: a.coverImage,
       bannerImage: a.bannerImage,
       featured: a.featured,
+      recommended,
       rating: a.rating,
       year: a.year,
       type: a.type,
@@ -68,11 +70,11 @@ const getCachedHomeData = unstable_cache(
     });
 
     return {
-      featured: homeFeatured.map(mapAnime),
-      trending: trending.map(mapAnime),
-      newReleases: newReleases.map(mapAnime),
-      topRated: topRated.map(mapAnime),
-      freeAnimes: freeAnimes.map(mapAnime),
+      featured: homeFeatured.map((anime) => mapAnime(anime)),
+      trending: trending.map((anime) => mapAnime(anime)),
+      newReleases: newReleases.map((anime) => mapAnime(anime)),
+      topRated: topRated.map((anime) => mapAnime(anime)),
+      freeAnimes: freeAnimes.map((anime) => mapAnime(anime)),
       genres: Array.from(genreSet).sort(),
     };
   },
@@ -100,9 +102,11 @@ export async function GET() {
   }> = [];
 
   let ownedIds = new Set<string>();
+  let personalizedFeatured: typeof publicData.featured = [];
 
   if (user) {
-    const [progress, purchases] = await Promise.all([
+    const favoriteGenres = user.favoriteGenres.split(",").map((genre) => genre.trim()).filter(Boolean);
+    const [progress, purchases, recommendations] = await Promise.all([
       db.watchProgress.findMany({
         where: { userId: user.id, completed: false, position: { gt: 10 } },
         orderBy: { updatedAt: "desc" },
@@ -118,6 +122,19 @@ export async function GET() {
         where: { userId: user.id },
         select: { animeId: true },
       }),
+      favoriteGenres.length
+        ? db.anime.findMany({
+            where: {
+              hidden: false,
+              moderationStatus: "APPROVED",
+              OR: favoriteGenres.map((genre) => ({
+                genres: { contains: genre, mode: "insensitive" },
+              })),
+            },
+            orderBy: [{ trending: "desc" }, { rating: "desc" }],
+            take: 20,
+          })
+        : Promise.resolve([]),
     ]);
 
     continueWatching = progress.map((p) => ({
@@ -133,19 +150,42 @@ export async function GET() {
     }));
 
     ownedIds = new Set(purchases.map((p) => p.animeId));
+
+    personalizedFeatured = rankAnimeByFavoriteGenres(recommendations, favoriteGenres)
+      .slice(0, 5)
+      .map((anime) => ({
+        id: anime.id,
+        slug: anime.slug,
+        title: anime.title,
+        coverImage: anime.coverImage,
+        bannerImage: anime.bannerImage,
+        featured: anime.featured,
+        recommended: true,
+        rating: anime.rating,
+        year: anime.year,
+        type: anime.type,
+        genres: anime.genres.split(",").filter(Boolean),
+        isFree: anime.isFree,
+        price: anime.price,
+        description: anime.description,
+        source: anime.source,
+        creator: null as { username: string; displayName: string | null } | null,
+      }));
   }
 
   // Merge owned status into cached data (fast — just a Set lookup)
   const withOwned = (items: (typeof publicData.featured)) =>
     items.map((a) => ({ ...a, owned: ownedIds.has(a.id) }));
+  const hasPersonalizedFeatured = personalizedFeatured.length > 0;
 
   return NextResponse.json({
-    featured: withOwned(publicData.featured),
+    featured: withOwned(hasPersonalizedFeatured ? personalizedFeatured : publicData.featured),
     trending: withOwned(publicData.trending),
     newReleases: withOwned(publicData.newReleases),
     topRated: withOwned(publicData.topRated),
     freeAnimes: withOwned(publicData.freeAnimes),
     continueWatching,
     genres: publicData.genres,
+    personalized: hasPersonalizedFeatured,
   });
 }

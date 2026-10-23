@@ -5,6 +5,7 @@ import { createCommunityNotification } from "@/lib/community";
 import { rateLimit } from "@/lib/rate-limit";
 import { awardXpInTransaction } from "@/lib/xp";
 import { evaluateAchievements } from "@/lib/achievements";
+import { emitEvent } from "@/lib/events";
 
 export async function POST(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const user = await getCurrentUser();
@@ -39,6 +40,9 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ id
   if (!result) return NextResponse.json({ error: "Post not found" }, { status: 404 });
   if (result.authorId !== user.id) {
     await evaluateAchievements(result.authorId);
+  }
+  if (result.liked) {
+    await emitEvent(user, "like_given", { postId: id, authorId: result.authorId });
   }
   return NextResponse.json({ liked: result.liked, likeCount: result.likeCount });
 }

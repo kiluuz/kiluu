@@ -9,17 +9,27 @@ import {
 import { useTheme } from "next-themes";
 import { useAppStore } from "./store";
 import { useI18n } from "@/components/i18n-provider";
-import { Avatar, formatCredits } from "./ui-bits";
+import { avatarNameGap, FramedAvatar, NameWithFrame, formatCredits } from "./ui-bits";
 import { Logo } from "./logo";
-import {
-  useResolvedNav, EXCHANGE_REQUIRED,
-  type NavGroup, type ResolvedNavItem,
-} from "./nav-config";
+import { useResolvedNav, type NavGroup, type ResolvedNavItem } from "./nav-config";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import type { AnimeSummary } from "./types";
 import type { ViewName } from "./types";
+
+interface UserSearchResult {
+  id: string;
+  username: string;
+  displayName: string | null;
+  avatarUrl: string | null;
+  avatarFrame?: string | null;
+  equippedAvatarFrameId?: string | null;
+  equippedNameFrameId?: string | null;
+  role: string;
+  accentColor: string;
+  accentTo: string | null;
+}
 
 /** Brand lockup — Kiluu logo (animated mark + wordmark), links home */
 export function BrandLockup() {
@@ -39,36 +49,75 @@ export function BrandLockup() {
 
 function SearchBox() {
   const navigate = useAppStore((s) => s.navigate);
+  const view = useAppStore((s) => s.view);
   const searchOpen = useAppStore((s) => s.searchOpen);
   const setSearchOpen = useAppStore((s) => s.setSearchOpen);
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<AnimeSummary[]>([]);
+  const [userResults, setUserResults] = useState<UserSearchResult[]>([]);
   const [searching, setSearching] = useState(false);
+  const [searchingPeople, setSearchingPeople] = useState(false);
+  const [userSearchError, setUserSearchError] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
+  const peopleOnly = view.name === "community";
 
   useEffect(() => {
     if (searchOpen && inputRef.current) inputRef.current.focus();
   }, [searchOpen]);
 
   useEffect(() => {
-    if (query.trim().length < 2) {
-      setResults([]);
-      return;
-    }
-    setSearching(true);
+    const q = query.trim();
+    if (peopleOnly || q.length < 2) return;
+
+    const controller = new AbortController();
     const t = setTimeout(async () => {
       try {
-        const res = await fetch(`/api/animes?search=${encodeURIComponent(query.trim())}`);
+        setSearching(true);
+        const res = await fetch(`/api/animes?search=${encodeURIComponent(q)}`, { signal: controller.signal });
+        if (!res.ok) throw new Error(`Anime search failed (${res.status})`);
         const data = await res.json();
         setResults((data.animes || []).slice(0, 6));
-      } catch {
+      } catch (error) {
+        if (error instanceof DOMException && error.name === "AbortError") return;
+        console.error("anime search request failed", error);
         setResults([]);
       } finally {
-        setSearching(false);
+        if (!controller.signal.aborted) setSearching(false);
       }
     }, 300);
-    return () => clearTimeout(t);
-  }, [query]);
+    return () => {
+      clearTimeout(t);
+      controller.abort();
+    };
+  }, [peopleOnly, query]);
+
+  useEffect(() => {
+    const q = query.trim();
+    if (!peopleOnly || q.length < 2) return;
+
+    const controller = new AbortController();
+    const timer = setTimeout(async () => {
+      try {
+        setSearchingPeople(true);
+        const res = await fetch(`/api/users/search?q=${encodeURIComponent(q)}`, { signal: controller.signal });
+        if (!res.ok) throw new Error(`User search failed (${res.status})`);
+        const data = await res.json();
+        setUserResults(data.users ?? []);
+        setUserSearchError(false);
+      } catch (error) {
+        if (error instanceof DOMException && error.name === "AbortError") return;
+        console.error("user search request failed", error);
+        setUserResults([]);
+        setUserSearchError(true);
+      } finally {
+        if (!controller.signal.aborted) setSearchingPeople(false);
+      }
+    }, 250);
+    return () => {
+      clearTimeout(timer);
+      controller.abort();
+    };
+  }, [peopleOnly, query]);
 
   if (!searchOpen) {
     return (
@@ -78,7 +127,7 @@ function SearchBox() {
         aria-label="Open search"
       >
         <Search className="w-4 h-4 shrink-0" />
-        <span className="hidden sm:inline truncate">Search animes...</span>
+        <span className="hidden sm:inline truncate">{peopleOnly ? "Search people..." : "Search anime..."}</span>
         <kbd className="ml-auto hidden md:flex items-center gap-0.5 text-[10px] font-mono opacity-60 border rounded px-1.5 py-0.5">
           /
         </kbd>
@@ -92,8 +141,16 @@ function SearchBox() {
       <Input
         ref={inputRef}
         value={query}
-        onChange={(e) => setQuery(e.target.value)}
-        placeholder="Search animes, genres, studios..."
+        onChange={(e) => {
+          const value = e.target.value;
+          setQuery(value);
+          setResults([]);
+          setUserResults([]);
+          setSearching(false);
+          setSearchingPeople(peopleOnly && value.trim().length >= 2);
+          setUserSearchError(false);
+        }}
+        placeholder={peopleOnly ? "Search people..." : "Search anime..."}
         className="pl-9 pr-10 h-10 rounded-xl bg-background/70"
         aria-label="Search"
       />
@@ -102,18 +159,63 @@ function SearchBox() {
           setSearchOpen(false);
           setQuery("");
           setResults([]);
+          setUserResults([]);
+          setSearching(false);
+          setSearchingPeople(false);
+          setUserSearchError(false);
         }}
         className="absolute right-2.5 p-1 rounded-md hover:bg-accent transition"
         aria-label="Close search"
       >
         ×
       </button>
-      {(results.length > 0 || searching) && (
+      {(query.trim().length >= 2 && (
+        peopleOnly
+          ? userResults.length > 0 || searchingPeople || userSearchError || !searchingPeople && userResults.length === 0
+          : results.length > 0 || searching
+      )) && (
         <div className="absolute top-12 left-0 right-0 glass-strong rounded-2xl shadow-2xl border overflow-hidden z-50 max-h-[60vh] overflow-y-auto">
-          {searching && results.length === 0 ? (
-            <div className="p-4 text-sm text-muted-foreground">Searching...</div>
-          ) : (
-            results.map((a) => (
+          {!peopleOnly && searching && results.length === 0 ? (
+            <div className="p-4 text-sm text-muted-foreground">Searching anime...</div>
+          ) : null}
+          {peopleOnly && searchingPeople && userResults.length === 0 && <div className="px-3 py-2 text-xs text-muted-foreground">Searching people...</div>}
+          {peopleOnly && userResults.length > 0 && (
+            <>
+              <p className="px-3 pt-3 pb-1 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">People</p>
+              {userResults.map((person) => (
+                <button
+                  key={person.id}
+                  className="w-full flex items-center gap-3 p-2.5 hover:bg-accent transition text-left"
+                  onClick={() => {
+                    navigate("user-profile", { username: person.username });
+                    setSearchOpen(false);
+                    setQuery("");
+                    setResults([]);
+                    setUserResults([]);
+                    setSearching(false);
+                    setSearchingPeople(false);
+                  }}
+                >
+                  <FramedAvatar user={person} size={40} />
+                  <span className="flex-1 min-w-0" style={{ marginLeft: avatarNameGap(person, 40) }}>
+                    <NameWithFrame user={person} compact className="block truncate text-sm font-semibold" avatarSize={0} />
+                    <span className="block text-xs text-muted-foreground truncate">@{person.username} · {person.role}</span>
+                  </span>
+                  <ChevronRight className="w-4 h-4 text-muted-foreground" />
+                </button>
+              ))}
+            </>
+          )}
+          {peopleOnly && userSearchError && <p className="px-3 py-2 text-sm text-destructive">Couldn’t search people. Try again.</p>}
+          {peopleOnly && !searchingPeople && !userSearchError && userResults.length === 0 && (
+            <p className="p-4 text-sm text-muted-foreground">No matching people.</p>
+          )}
+          {!peopleOnly && !searching && results.length === 0 && (
+            <p className="p-4 text-sm text-muted-foreground">No matching anime.</p>
+          )}
+          {!peopleOnly && results.length > 0 && (
+            <>
+              {results.map((a) => (
               <button
                 key={a.id}
                 className="w-full flex items-center gap-3 p-2.5 hover:bg-accent transition text-left"
@@ -122,6 +224,9 @@ function SearchBox() {
                   setSearchOpen(false);
                   setQuery("");
                   setResults([]);
+                  setUserResults([]);
+                  setSearching(false);
+                  setSearchingPeople(false);
                 }}
               >
                 <img src={a.coverImage} alt="" className="w-10 h-14 object-cover rounded-md" loading="lazy" />
@@ -134,7 +239,8 @@ function SearchBox() {
                 </div>
                 <ChevronRight className="w-4 h-4 text-muted-foreground" />
               </button>
-            ))
+              ))}
+            </>
           )}
         </div>
       )}
@@ -164,13 +270,7 @@ function NavButton({ item, onClick }: { item: ResolvedNavItem; onClick: () => vo
         locked && "opacity-60"
       )}
       aria-current={active ? "page" : undefined}
-      aria-label={
-        def.id === "exchange" && locked
-          ? `Exchange — locked, ${item.ownedCount} of ${EXCHANGE_REQUIRED} animes owned`
-          : locked
-            ? `${def.label} — locked`
-            : def.label
-      }
+      aria-label={locked ? `${def.label} — locked` : def.label}
     >
       {active && (
         <span className="absolute left-0 top-1/2 -translate-y-1/2 -translate-x-[9px] w-[3px] h-6 rounded-full brand-gradient" />
@@ -266,17 +366,10 @@ export function Sidebar({
               )}
               aria-label="Open my profile"
             >
-              <Avatar
-                src={user.avatarUrl}
-                name={user.displayName || user.username}
-                accent={user.accentColor}
-                accentTo={user.accentTo}
-                frame={user.avatarFrame}
-                size={36}
-              />
-              <span className="flex-1 min-w-0 text-left">
+              <FramedAvatar user={user} size={36} />
+              <span className="flex-1 min-w-0 text-left" style={{ marginLeft: avatarNameGap(user, 36) }}>
                 <span className="block text-[13px] font-bold truncate">
-                  {user.displayName || user.username}
+                  <NameWithFrame user={user} compact className="block truncate" avatarSize={0} />
                 </span>
                 <span className="block text-[11px] text-muted-foreground truncate">
                   @{user.username} · {user.role === "CREATOR" ? "Creator" : "Viewer"}
@@ -383,6 +476,7 @@ type SiteNotification = {
   type: string;
   title: string;
   body: string;
+  previewUrl: string | null;
   readAt: string | null;
   createdAt: string;
 };
@@ -607,7 +701,7 @@ export function TopBar() {
             </button>
             {notificationsOpen && (
               <div
-                className="absolute right-0 top-[calc(100%+0.5rem)] z-[60] w-[min(22rem,calc(100vw-1rem))] max-h-[min(24rem,70vh)] overflow-y-auto rounded-2xl border bg-background p-3 shadow-xl"
+                className="fixed inset-x-2 top-[calc(3.5rem+0.5rem+env(safe-area-inset-top))] z-[60] max-h-[min(24rem,calc(100dvh-5rem-env(safe-area-inset-bottom)))] min-w-0 overflow-y-auto rounded-2xl border bg-background p-3 shadow-xl min-[1100px]:absolute min-[1100px]:inset-x-auto min-[1100px]:right-0 min-[1100px]:top-[calc(100%+0.5rem)] min-[1100px]:w-[min(22rem,calc(100vw-1rem))]"
                 role="dialog"
                 aria-label="Notifications"
               >
@@ -635,6 +729,9 @@ export function TopBar() {
                         !notification.readAt && "bg-primary/5"
                       )}
                     >
+                      {notification.previewUrl && (
+                        <img src={notification.previewUrl} alt="" className="mb-2 h-12 w-16 rounded-lg object-contain" loading="lazy" />
+                      )}
                       <span className="font-bold">{notification.title}</span>
                       <span className="mt-1 block text-muted-foreground">{notification.body}</span>
                     </button>
@@ -650,14 +747,7 @@ export function TopBar() {
               className="rounded-full hover:ring-2 ring-primary/50 transition min-h-[44px] min-w-[44px] flex items-center justify-center"
               aria-label="Open my profile"
             >
-              <Avatar
-                src={user.avatarUrl}
-                name={user.displayName || user.username}
-                accent={user.accentColor}
-                accentTo={user.accentTo}
-                frame={user.avatarFrame}
-                size={34}
-              />
+              <FramedAvatar user={user} size={34} />
             </button>
           )}
         </div>

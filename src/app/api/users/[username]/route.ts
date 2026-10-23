@@ -15,6 +15,7 @@ const ANIME_CARD = {
 
 const USER_MINI = {
   id: true, username: true, displayName: true, avatarUrl: true, accentColor: true, accentTo: true, role: true,
+  avatarFrame: true, equippedAvatarFrameId: true, equippedNameFrameId: true,
 } as const;
 
 function safeParse<T>(json: string | null | undefined, fallback: T): T {
@@ -79,6 +80,7 @@ export async function GET(
     const xpTotal = Number(stats.xp ?? 0);
     const levelInfo = levelFromXp(xpTotal);
     const count = (value: bigint | number) => Number(value);
+    const isOnline = Boolean(user.lastSeenAt && Date.now() - new Date(user.lastSeenAt).getTime() < 3 * 60_000);
 
     return NextResponse.json({
       profile: {
@@ -89,11 +91,16 @@ export async function GET(
         isVerified: isVerifiedByFollowerCount(count(stats.followers)),
         avatarUrl: user.avatarUrl || null,
         bannerUrl: user.bannerUrl || null,
+        bannerPreset: user.bannerPreset || null,
         bio: user.bio,
         accentColor: user.accentColor,
         accentTo: user.accentTo || null,
         avatarFrame: user.avatarFrame || null,
+        equippedAvatarFrameId: user.equippedAvatarFrameId,
+        equippedNameFrameId: user.equippedNameFrameId,
         createdAt: user.createdAt,
+        isOnline,
+        lastSeenAt: user.lastSeenAt ? user.lastSeenAt.toISOString() : null,
         pronouns: user.pronouns || null,
         tagline: user.tagline || null,
         country: user.country || null,
@@ -225,19 +232,19 @@ export async function GET(
   ).values()];
   const purchaseCount = ownedAnimes.length;
 
-  const { calculateBadges } = await import("@/lib/level-utils");
+  const { calculateBadges, calculateLevel } = await import("@/lib/level-utils");
   const createdAnimesCount = await db.anime.count({ where: { creatorId: user.id } });
   const totalPurchases = purchaseCount;
   const [xpTotal, achievements] = await Promise.all([
     getXpTotal(user.id),
     getUserAchievementStates(user.id),
   ]);
-  const levelInfo = levelFromXp(xpTotal);
+  const levelInfo = calculateLevel(xpTotal);
   const badges = calculateBadges({
     isCreator: user.role === "CREATOR",
     createdAnimes: createdAnimesCount,
     purchasedAnimes: totalPurchases,
-    levelInfo: { ...levelInfo, titleJa: "", titleUz: "" },
+    levelInfo,
   });
 
   const stats = {
@@ -259,6 +266,8 @@ export async function GET(
     updatedAt: latestProgress.updatedAt.toISOString(),
   } : null;
 
+  const isOnline = Boolean(user.lastSeenAt && Date.now() - new Date(user.lastSeenAt).getTime() < 3 * 60_000);
+
   return NextResponse.json({
     profile: {
       id: user.id,
@@ -272,7 +281,11 @@ export async function GET(
       accentColor: user.accentColor,
       accentTo: user.accentTo || null,
       avatarFrame: user.avatarFrame || null,
+      equippedAvatarFrameId: user.equippedAvatarFrameId,
+      equippedNameFrameId: user.equippedNameFrameId,
       createdAt: user.createdAt,
+      isOnline,
+      lastSeenAt: user.lastSeenAt ? user.lastSeenAt.toISOString() : null,
       // identity
       pronouns: user.pronouns || null,
       tagline: user.tagline || null,
@@ -282,6 +295,10 @@ export async function GET(
       statusEmoji: user.statusEmoji || null,
       statusText: user.statusText || null,
       showcase,
+      bannerPreset: user.bannerPreset || null,
+      favoriteGenres: isMe
+        ? (user.favoriteGenres || "").split(",").filter(Boolean)
+        : undefined,
       privacy: isMe ? privacy : undefined,
       canFollow: privacy.allowFollows,
       stats: {

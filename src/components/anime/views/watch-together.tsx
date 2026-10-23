@@ -13,7 +13,7 @@ import { Label } from "@/components/ui/label";
 import { useAppStore } from "../store";
 import type { AnimeDetail, EpisodeItem, AnimeSummary } from "../types";
 import { VideoPlayer, PlayerControls } from "../player";
-import { Avatar, SmartImage, timeAgo } from "../ui-bits";
+import { FramedAvatar, NameWithFrame, SmartImage, timeAgo } from "../ui-bits";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { expectedPlaybackPosition, playbackCorrection } from "@/lib/watch-party-sync";
@@ -45,6 +45,9 @@ interface Participant {
   displayName: string;
   avatarUrl: string | null;
   accentColor: string;
+  avatarFrame?: string | null;
+  equippedAvatarFrameId?: string | null;
+  equippedNameFrameId?: string | null;
   isHost: boolean;
 }
 
@@ -340,6 +343,9 @@ export function WatchTogetherView() {
         displayName: user.displayName || user.username,
         avatarUrl: user.avatarUrl,
         accentColor: user.accentColor,
+        avatarFrame: user.avatarFrame,
+        equippedAvatarFrameId: user.equippedAvatarFrameId,
+        equippedNameFrameId: user.equippedNameFrameId,
         isHost: true,
       };
       setCreateOpen(false);
@@ -512,8 +518,8 @@ export function WatchTogetherView() {
                     key={p.socketId}
                     className="flex items-center gap-2 pl-1 pr-3 py-1 rounded-full bg-secondary/60 border"
                   >
-                    <Avatar src={p.avatarUrl} name={p.displayName} accent={p.accentColor} size={26} />
-                    <span className="text-xs font-semibold">{p.displayName}</span>
+                    <FramedAvatar user={p} size={26} />
+                    <NameWithFrame user={p} compact className="text-xs font-semibold" avatarSize={26} />
                     {p.isHost && <Crown className="w-3.5 h-3.5 text-amber-400" />}
                   </div>
                 ))}
@@ -550,18 +556,7 @@ export function WatchTogetherView() {
   // ============ LOBBY ============
   return (
     <div className="max-w-[1100px] mx-auto px-4 sm:px-8 py-6 pb-10">
-      <div className="mb-6">
-        <h1 className="text-2xl sm:text-3xl font-black flex items-center gap-3">
-          <span className="w-10 h-10 rounded-xl brand-gradient flex items-center justify-center">
-            <Users className="w-5 h-5 text-white" />
-          </span>
-          Watch Together
-        </h1>
-        <p className="text-sm text-muted-foreground mt-1.5">
-          Synced playback with friends — host controls the video, everyone reacts with emojis
-        </p>
-      </div>
-
+      <h1 className="sr-only">Watch Together</h1>
       {/* Actions */}
       <div className="grid sm:grid-cols-2 gap-4 mb-8">
         <button

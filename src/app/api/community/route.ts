@@ -8,6 +8,7 @@ import { sanitizeText } from "@/lib/sanitize";
 import { awardXpInTransaction, getXpTotals, levelFromXp } from "@/lib/xp";
 import { evaluateAchievements } from "@/lib/achievements";
 import { isVerifiedByFollowerCount } from "@/lib/verification";
+import { emitEvent } from "@/lib/events";
 
 const USER_FIELDS = {
   id: true,
@@ -15,6 +16,10 @@ const USER_FIELDS = {
   displayName: true,
   avatarUrl: true,
   accentColor: true,
+  accentTo: true,
+  avatarFrame: true,
+  equippedAvatarFrameId: true,
+  equippedNameFrameId: true,
   role: true,
 } as const;
 
@@ -179,6 +184,12 @@ export async function POST(req: NextRequest) {
         userId: user.id,
         error,
       });
+    }
+
+    try {
+      await emitEvent(user, "post_created", { postId: created.post.id, content: created.post.content });
+    } catch (e) {
+      console.error("emitEvent post_created error:", e);
     }
   });
 

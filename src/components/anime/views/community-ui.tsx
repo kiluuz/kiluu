@@ -8,26 +8,28 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { Avatar as UiAvatar, timeAgo, SmartImage } from "../ui-bits";
+import { avatarNameGap, FramedAvatar, NameWithFrame, timeAgo, SmartImage } from "../ui-bits";
 import { cn } from "@/lib/utils";
 import type { CommunityPost, CommentItem, AuthUser, AnimeSummary, PostType, CommunityStats } from "../types";
 import { useAppStore, useOpenProfile } from "../store";
 import { toast } from "sonner";
 import { readApiJson } from "@/lib/api-response";
+import { useI18n } from "@/components/i18n-provider";
 
 // ==========================================
 // Right Sidebar Widgets
 // ==========================================
 
 export function RightSidebar({ user, stats }: { user: AuthUser | null; stats: CommunityStats | null }) {
+  const { t } = useI18n();
   return (
     <div className="w-[320px] shrink-0 hidden lg:flex flex-col gap-5 sticky top-[88px] max-h-[calc(100vh-88px)] overflow-y-auto fancy-scroll pb-10">
       {user && (
         <div className="glass rounded-2xl p-4 flex flex-col gap-3">
           <div className="flex items-center gap-3">
-            <UiAvatar src={user.avatarUrl} name={user.displayName || user.username} accent={user.accentColor} size={48} />
-            <div>
-              <p className="font-bold leading-tight">{user.displayName || user.username}</p>
+            <FramedAvatar user={user} size={48} />
+            <div className="min-w-0" style={{ marginLeft: avatarNameGap(user, 48) }}>
+              <NameWithFrame user={user} className="font-bold leading-tight" avatarSize={0} height={26} />
               <p className="text-xs text-muted-foreground">@{user.username}</p>
             </div>
           </div>
@@ -36,9 +38,9 @@ export function RightSidebar({ user, stats }: { user: AuthUser | null; stats: Co
 
       <div className="glass rounded-2xl p-5">
         <h3 className="font-black flex items-center gap-2 mb-4">
-          <TrendingUp className="w-4 h-4 text-primary" /> Trending Anime
+          <TrendingUp className="w-4 h-4 text-primary" /> {t("community.trendingAnime")}
         </h3>
-        {!stats?.trending.length ? <p className="text-xs text-muted-foreground">No anime posts in the last 7 days.</p> : (
+        {!stats?.trending.length ? <p className="text-xs text-muted-foreground">{t("community.noTrending")}</p> : (
           <div className="space-y-4">
             {stats.trending.map((anime, index) => (
               <div key={anime.id} className="flex items-center gap-3">
@@ -58,9 +60,9 @@ export function RightSidebar({ user, stats }: { user: AuthUser | null; stats: Co
 
       <div className="glass rounded-2xl p-5">
         <h3 className="font-black flex items-center gap-2 mb-4">
-          <PlayCircle className="w-4 h-4 text-primary" /> Watch Parties
+          <PlayCircle className="w-4 h-4 text-primary" /> {t("nav.watch-together")}
         </h3>
-        {!stats?.watchParties.length ? <p className="text-xs text-muted-foreground">No active watch parties right now.</p> : (
+        {!stats?.watchParties.length ? <p className="text-xs text-muted-foreground">{t("community.noWatchParties")}</p> : (
           <div className="space-y-3">
             {stats.watchParties.map((party) => (
               <div key={party.id} className="bg-secondary/40 rounded-xl p-3">
@@ -76,13 +78,13 @@ export function RightSidebar({ user, stats }: { user: AuthUser | null; stats: Co
         <h3 className="font-black flex items-center gap-2 mb-4">
           <Award className="w-4 h-4 text-primary" /> Top Contributors
         </h3>
-        {!stats?.contributors.length ? <p className="text-xs text-muted-foreground">No community activity yet.</p> : (
+        {!stats?.contributors.length ? <p className="text-xs text-muted-foreground">{t("community.noActivity")}</p> : (
           <div className="space-y-3">
             {stats.contributors.map((contributor) => (
               <div key={contributor.id} className="flex items-center gap-3">
-                <UiAvatar src={contributor.avatarUrl} name={contributor.displayName || contributor.username} accent={contributor.accentColor} size={32} />
+                <FramedAvatar user={contributor} size={32} />
                 <div className="flex-1 min-w-0">
-                  <p className="text-sm font-bold truncate">{contributor.displayName || contributor.username}</p>
+                  <NameWithFrame user={contributor} compact className="text-sm font-bold truncate" avatarSize={32} />
                   <p className="text-[11px] text-primary">Lv.{contributor.level} · {contributor.postCount} posts · {contributor.likeCount} likes</p>
                 </div>
               </div>
@@ -92,16 +94,7 @@ export function RightSidebar({ user, stats }: { user: AuthUser | null; stats: Co
       </div>
 
       <div className="glass rounded-2xl p-5 text-xs text-muted-foreground">
-        <div className="flex justify-between mb-3">
-          <span>Online now</span><strong className="text-foreground">{stats?.online ?? "—"}</strong>
-        </div>
-        <div className="flex justify-between">
-          <span>Posts today</span><strong className="text-foreground">{stats?.postsToday ?? "—"}</strong>
-        </div>
-      </div>
-
-      <div className="glass rounded-2xl p-5 text-xs text-muted-foreground">
-        <h4 className="font-bold text-foreground mb-2 flex items-center gap-2"><Shield className="w-4 h-4" /> Community Rules</h4>
+        <h4 className="font-bold text-foreground mb-2 flex items-center gap-2"><Shield className="w-4 h-4" /> {t("community.rules")}</h4>
         <ul className="space-y-2 mb-4">
           <li>1. Treat people respectfully; harassment and hate speech are not allowed.</li>
           <li>2. Mark spoilers so other viewers can avoid them.</li>
@@ -130,6 +123,7 @@ type ComposerData = {
 };
 
 export function PostComposer({ user, animes, onPost }: { user: AuthUser | null, animes: AnimeSummary[], onPost: (data: ComposerData) => Promise<boolean> }) {
+  const { t } = useI18n();
   const [expanded, setExpanded] = useState(false);
   const [content, setContent] = useState("");
   const [type, setType] = useState<PostType>("Discussions");
@@ -173,13 +167,13 @@ export function PostComposer({ user, animes, onPost }: { user: AuthUser | null, 
   return (
     <div className={cn("glass rounded-2xl p-4 mb-6 transition-all duration-300", expanded ? "shadow-lg border border-primary/20" : "")}>
       <div className="flex gap-3">
-        <UiAvatar src={user?.avatarUrl} name={user?.displayName || user?.username || "?"} accent={user?.accentColor} size={40} className="mt-0.5 shrink-0" />
+        {user && <FramedAvatar user={user} size={40} className="mt-0.5 shrink-0" />}
         <div className="flex-1 space-y-3 min-w-0">
           <Textarea
             value={content}
             onChange={(e) => setContent(e.target.value)}
             onFocus={() => setExpanded(true)}
-            placeholder={user ? "What's on your mind? Share your anime thoughts..." : "Sign in to join the conversation"}
+            placeholder={user ? t("community.composerPlaceholder") : t("community.signInToComment")}
             disabled={!user}
             maxLength={1000}
             className={cn("w-full rounded-xl border-0 bg-background/60 focus-visible:ring-1 transition-all resize-none", expanded ? "min-h-[120px]" : "min-h-[44px] h-[44px] overflow-hidden")}
@@ -188,20 +182,20 @@ export function PostComposer({ user, animes, onPost }: { user: AuthUser | null, 
           {expanded && (
             <div className="space-y-3 animate-in fade-in slide-in-from-top-2 duration-300">
               <div className="flex gap-2 overflow-x-auto fancy-scroll pb-2">
-                {POST_TYPES.map((t) => (
+                {POST_TYPES.map((category) => (
                   <button
-                    key={t}
-                    onClick={() => { setType(t); if (t !== "Reviews") setRating(0); }}
-                    className={cn("px-3 py-1.5 rounded-full text-xs font-bold whitespace-nowrap transition-colors border", type === t ? "border-primary bg-primary text-white" : "border-transparent bg-secondary/60 text-muted-foreground hover:bg-secondary")}
+                    key={category}
+                    onClick={() => { setType(category); if (category !== "Reviews") setRating(0); }}
+                    className={cn("px-3 py-1.5 rounded-full text-xs font-bold whitespace-nowrap transition-colors border", type === category ? "border-primary bg-primary text-white" : "border-transparent bg-secondary/60 text-muted-foreground hover:bg-secondary")}
                   >
-                    {t}
+                    {t(`community.category.${category.toLowerCase().replaceAll(" ", "")}`)}
                   </button>
                 ))}
               </div>
 
               {type === "Reviews" && (
                 <div className="flex items-center gap-2 bg-secondary/30 p-3 rounded-xl border border-dashed">
-                  <span className="text-xs font-bold mr-2">Your Score:</span>
+                  <span className="text-xs font-bold mr-2">{t("community.yourScore")}</span>
                   {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((star) => (
                     <button key={star} onClick={() => setRating(star)} className="focus:outline-none">
                       <Star className={cn("w-5 h-5 transition-transform hover:scale-110", star <= rating ? "fill-orange-400 text-orange-400" : "text-muted-foreground/30")} />
@@ -223,14 +217,14 @@ export function PostComposer({ user, animes, onPost }: { user: AuthUser | null, 
 
               {imageUrl && (
                 <div className="relative w-fit">
-                  <SmartImage src={imageUrl} alt="Post attachment" className="max-h-48 max-w-full rounded-xl object-contain" />
-                  <button type="button" onClick={() => setImageUrl(null)} className="absolute -right-2 -top-2 rounded-full bg-background px-2 py-1 text-xs shadow">Remove image</button>
+                  <SmartImage src={imageUrl} alt={t("community.postAttachment")} className="max-h-48 max-w-full rounded-xl object-contain" />
+                  <button type="button" onClick={() => setImageUrl(null)} className="absolute -right-2 -top-2 rounded-full bg-background px-2 py-1 text-xs shadow">{t("community.removeImage")}</button>
                 </div>
               )}
 
               <div className="flex items-center justify-between gap-2 flex-wrap pt-2 border-t border-border/50">
                 <div className="flex items-center gap-1.5">
-                  <Button variant="ghost" size="icon" className="w-8 h-8 rounded-full text-muted-foreground" title="Add Image" disabled={uploading} onClick={() => imageInput.current?.click()}>
+                  <Button variant="ghost" size="icon" className="w-8 h-8 rounded-full text-muted-foreground" title={t("community.addImage")} disabled={uploading} onClick={() => imageInput.current?.click()}>
                     <ImageIcon className="w-4 h-4" />
                   </Button>
                   <input
@@ -262,13 +256,13 @@ export function PostComposer({ user, animes, onPost }: { user: AuthUser | null, 
                       }
                     }}
                   />
-                  <Button variant="ghost" size="icon" className="w-8 h-8 rounded-full text-muted-foreground" onClick={() => setAttachOpen(!attachOpen)} title="Attach Anime">
+                  <Button variant="ghost" size="icon" className="w-8 h-8 rounded-full text-muted-foreground" onClick={() => setAttachOpen(!attachOpen)} title={t("community.attachAnime")}>
                     <Sparkles className="w-4 h-4" />
                   </Button>
-                  <Button variant="ghost" size="icon" className="w-8 h-8 rounded-full text-muted-foreground" title="Add Emoji">
+                  <Button variant="ghost" size="icon" className="w-8 h-8 rounded-full text-muted-foreground" title={t("community.addEmoji")}>
                     <Smile className="w-4 h-4" />
                   </Button>
-                  <Button variant="ghost" size="icon" className="w-8 h-8 rounded-full text-muted-foreground" title="Add Poll">
+                  <Button variant="ghost" size="icon" className="w-8 h-8 rounded-full text-muted-foreground" title={t("community.addPoll")}>
                     <AlignLeft className="w-4 h-4" />
                   </Button>
                   <div className="w-px h-4 bg-border mx-1" />
@@ -297,7 +291,7 @@ export function PostComposer({ user, animes, onPost }: { user: AuthUser | null, 
 
               {attachOpen && (
                 <div className="border rounded-xl p-3 max-h-48 overflow-y-auto fancy-scroll bg-secondary/20 mt-2">
-                  <p className="text-xs font-bold text-muted-foreground mb-3 uppercase tracking-wider">Select Anime</p>
+                  <p className="text-xs font-bold text-muted-foreground mb-3 uppercase tracking-wider">{t("community.selectAnime")}</p>
                   <div className="grid grid-cols-4 sm:grid-cols-6 lg:grid-cols-8 gap-2">
                     {animes.map((a) => (
                       <button
@@ -349,18 +343,19 @@ export function PostCard({
   isOwn: boolean;
 }) {
   const openProfile = useOpenProfile();
+  const { t } = useI18n();
   const [spoilerRevealed, setSpoilerRevealed] = useState(!(post.spoiler ?? post.isSpoiler));
   const { navigate } = useAppStore();
 
   return (
     <article id={`post-${post.id}`} className="glass rounded-2xl p-4 sm:p-5 fade-in-up">
-      <div className="flex justify-between items-start mb-3">
-        <div className="flex items-center gap-3">
-          <UiAvatar src={post.user.avatarUrl} name={post.user.displayName} accent={post.user.accentColor} size={44} onClick={() => openProfile(post.user.username)} />
-          <div>
+      <div className="flex justify-between items-start gap-2 mb-3">
+        <div className="flex min-w-0 flex-1 items-center gap-3">
+          <FramedAvatar user={post.user} size={44} onClick={() => openProfile(post.user.username)} />
+          <div className="min-w-0" style={{ marginLeft: avatarNameGap(post.user, 44) }}>
             <div className="flex items-center gap-1.5 flex-wrap">
-              <button className="font-bold hover:text-primary transition truncate text-sm" onClick={() => openProfile(post.user.username)}>
-                {post.user.displayName || post.user.username}
+              <button className="min-w-0 max-w-full overflow-visible font-bold hover:text-primary transition text-sm" onClick={() => openProfile(post.user.username)}>
+                <NameWithFrame user={post.user} className="text-sm" height={26} avatarSize={0} />
               </button>
               {post.user.isVerified && <CheckCircle2 className="w-3.5 h-3.5 text-primary shrink-0" />}
               {post.user.level && <span className="text-[10px] font-bold bg-secondary/80 px-1.5 py-0.5 rounded text-muted-foreground shrink-0">Lv.{post.user.level}</span>}
@@ -369,16 +364,16 @@ export function PostCard({
                   {b.label}
                 </span>
               ))}
-              <span className="text-[10px] font-bold bg-primary/10 text-primary px-1.5 py-0.5 rounded shrink-0">{post.category || post.type}</span>
+              <span className="text-[10px] font-bold bg-primary/10 text-primary px-1.5 py-0.5 rounded shrink-0">{t(`community.category.${(post.category || post.type).toLowerCase().replaceAll(" ", "")}`)}</span>
             </div>
             <p className="text-[11px] text-muted-foreground">@{post.user.username} · {timeAgo(post.createdAt)}</p>
           </div>
         </div>
         <div className="flex gap-1 shrink-0">
-          {!isOwn && <Button variant="ghost" size="sm" className="h-8 text-xs" onClick={onFollow}>{post.user.following ? "Following" : "Follow"}</Button>}
-          {isOwn && <Button variant="ghost" size="icon" className="w-8 h-8 rounded-full text-muted-foreground" title="Edit post" onClick={onEdit}><MoreHorizontal className="w-4 h-4" /></Button>}
-          {isOwn && <Button variant="ghost" size="sm" className="h-8 text-xs text-destructive" onClick={onDelete}>Delete</Button>}
-          {!isOwn && <Button variant="ghost" size="icon" className="w-8 h-8 rounded-full text-muted-foreground" title="Report post" onClick={onReport}><ShieldAlert className="w-4 h-4" /></Button>}
+          {!isOwn && <Button variant="ghost" size="sm" className="h-8 text-xs" onClick={onFollow}>{post.user.following ? t("community.following") : t("community.follow")}</Button>}
+          {isOwn && <Button variant="ghost" size="icon" className="w-8 h-8 rounded-full text-muted-foreground" title={t("community.editPost")} onClick={onEdit}><MoreHorizontal className="w-4 h-4" /></Button>}
+          {isOwn && <Button variant="ghost" size="sm" className="h-8 text-xs text-destructive" onClick={onDelete}>{t("community.delete")}</Button>}
+          {!isOwn && <Button variant="ghost" size="icon" className="w-8 h-8 rounded-full text-muted-foreground" title={t("community.reportPost")} onClick={onReport}><ShieldAlert className="w-4 h-4" /></Button>}
         </div>
       </div>
 
@@ -386,8 +381,8 @@ export function PostCard({
         {(post.spoiler ?? post.isSpoiler) && !spoilerRevealed && (
           <div className="absolute inset-0 z-10 backdrop-blur-xl bg-background/40 flex flex-col items-center justify-center rounded-xl border border-red-500/20 cursor-pointer overflow-hidden transition-all hover:bg-background/20" onClick={() => setSpoilerRevealed(true)}>
              <ShieldAlert className="w-8 h-8 text-red-500 mb-2" />
-             <span className="font-bold text-sm">Spoiler Content</span>
-             <span className="text-xs text-muted-foreground mt-1">Tap to reveal</span>
+             <span className="font-bold text-sm">{t("community.spoilerContent")}</span>
+             <span className="text-xs text-muted-foreground mt-1">{t("community.tapToReveal")}</span>
           </div>
         )}
         
@@ -402,7 +397,7 @@ export function PostCard({
 
           {(post.category === "Reviews" || post.type === "Reviews") && post.rating && (
             <div className="flex items-center gap-2 mt-3 bg-secondary/30 w-fit px-3 py-1.5 rounded-xl">
-              <span className="text-xs font-bold text-muted-foreground">Rating:</span>
+              <span className="text-xs font-bold text-muted-foreground">{t("community.rating")}</span>
               <div className="flex items-center">
                 <Star className="w-4 h-4 fill-orange-400 text-orange-400 mr-1" />
                 <span className="font-bold text-sm">{post.rating}/10</span>
@@ -420,11 +415,11 @@ export function PostCard({
                   <h4 className="font-bold text-sm sm:text-base truncate group-hover:text-primary transition">{post.anime.title}</h4>
                   <div className="flex items-center gap-2 mt-1 text-xs text-muted-foreground flex-wrap">
                     {post.anime.rating && <span className="flex items-center gap-0.5"><Star className="w-3 h-3 fill-orange-400 text-orange-400" /> {post.anime.rating}%</span>}
-                    {post.anime.episodeCount && <span>• {post.anime.episodeCount} Eps</span>}
+                    {post.anime.episodeCount && <span>• {post.anime.episodeCount} {t("episodes")}</span>}
                     {post.anime.genres && post.anime.genres.length > 0 && <span>• {post.anime.genres[0]}</span>}
                   </div>
                   <div className="mt-3 flex items-center gap-1 text-xs font-bold text-primary opacity-0 group-hover:opacity-100 transition transform translate-x-[-10px] group-hover:translate-x-0">
-                    View Anime <ChevronRight className="w-3 h-3" />
+                    {t("community.viewAnime")} <ChevronRight className="w-3 h-3" />
                   </div>
                 </div>
               </div>
@@ -450,8 +445,8 @@ export function PostCard({
           <button onClick={() => {
             const link = `${window.location.origin}${window.location.pathname}#post-${post.id}`;
             void navigator.clipboard.writeText(link)
-              .then(() => toast.success("Share link copied"))
-              .catch(() => toast.error("Could not copy share link"));
+              .then(() => toast.success(t("community.shareLinkCopied")))
+              .catch(() => toast.error(t("community.copyLinkError")));
           }} className="flex items-center gap-1.5 text-xs font-bold text-muted-foreground hover:text-primary transition hover:scale-110">
             <Share2 className="w-5 h-5" />
           </button>

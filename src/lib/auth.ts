@@ -74,6 +74,7 @@ export interface PublicUser {
   accentColor: string;
   credits: number;
   onboardingDone: boolean;
+  favoriteGenres: string[];
   createdAt: string;
   telegramId: string | null;
   telegramUsername: string | null;
@@ -88,6 +89,8 @@ export interface PublicUser {
   statusText: string | null;
   accentTo: string | null;
   avatarFrame: string | null;
+  equippedAvatarFrameId: string | null;
+  equippedNameFrameId: string | null;
   bannerPreset: string | null;
   showcase: string | null;
   privacy: string | null;
@@ -105,6 +108,7 @@ export function toPublicUser(user: {
   accentColor: string;
   credits: number;
   onboardingDone: boolean;
+  favoriteGenres?: string | null;
   createdAt: Date;
   telegramId?: string | null;
   telegramUsername?: string | null;
@@ -118,6 +122,8 @@ export function toPublicUser(user: {
   statusText?: string | null;
   accentTo?: string | null;
   avatarFrame?: string | null;
+  equippedAvatarFrameId?: string | null;
+  equippedNameFrameId?: string | null;
   bannerPreset?: string | null;
   showcase?: string | null;
   privacy?: string | null;
@@ -134,11 +140,12 @@ export function toPublicUser(user: {
     accentColor: user.accentColor,
     credits: user.credits,
     onboardingDone: user.onboardingDone,
+    favoriteGenres: user.favoriteGenres?.split(",").filter(Boolean) ?? [],
     createdAt: user.createdAt.toISOString(),
     telegramId: user.telegramId ?? null,
     telegramUsername: user.telegramUsername ?? null,
     telegramLinked: Boolean(user.telegramId),
-    locale: user.locale || "uz",
+    locale: user.locale || "en",
     pronouns: user.pronouns ?? null,
     tagline: user.tagline ?? null,
     country: user.country ?? null,
@@ -148,6 +155,8 @@ export function toPublicUser(user: {
     statusText: user.statusText ?? null,
     accentTo: user.accentTo ?? null,
     avatarFrame: user.avatarFrame ?? null,
+    equippedAvatarFrameId: user.equippedAvatarFrameId ?? null,
+    equippedNameFrameId: user.equippedNameFrameId ?? null,
     bannerPreset: user.bannerPreset ?? null,
     showcase: user.showcase ?? null,
     privacy: user.privacy ?? null,

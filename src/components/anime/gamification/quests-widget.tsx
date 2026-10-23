@@ -1,0 +1,369 @@
+// src/components/anime/gamification/quests-widget.tsx
+"use client";
+
+import { useEffect, useState } from "react";
+import {
+  Flame,
+  Shield,
+  Gift,
+  Check,
+  RefreshCw,
+  Sparkles,
+  Trophy,
+  Coins,
+  Clock,
+  ChevronRight,
+  Loader2,
+} from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { useAppStore } from "../store";
+import { toast } from "sonner";
+import { cn } from "@/lib/utils";
+
+interface QuestItem {
+  id: string;
+  title: string;
+  description?: string;
+  category: string;
+  progress: number;
+  targetCount: number;
+  status: "active" | "completed" | "claimed";
+  xpReward: number;
+  creditReward: number;
+  difficulty: string;
+  expiresAt: string;
+}
+
+interface StreakStatus {
+  streakCount: number;
+  hasClaimedToday: boolean;
+  streakFreezeCount: number;
+  todayDate: string;
+  nextMilestone: number;
+  daysToNextMilestone: number;
+}
+
+export function QuestsWidget({ compact = false }: { compact?: boolean }) {
+  const { user, setAuthOpen } = useAppStore();
+
+  const [streak, setStreak] = useState<StreakStatus | null>(null);
+  const [dailyQuests, setDailyQuests] = useState<QuestItem[]>([]);
+  const [weeklyQuests, setWeeklyQuests] = useState<QuestItem[]>([]);
+  const [activeTab, setActiveTab] = useState<"daily" | "weekly">("daily");
+  const [loading, setLoading] = useState(true);
+  const [claimingStreak, setClaimingStreak] = useState(false);
+  const [claimingQuestId, setClaimingQuestId] = useState<string | null>(null);
+  const [rerollingQuestId, setRerollingQuestId] = useState<string | null>(null);
+
+  const fetchData = async () => {
+    if (!user) {
+      setLoading(false);
+      return;
+    }
+    try {
+      const [streakRes, questsRes] = await Promise.all([
+        fetch("/api/streaks"),
+        fetch("/api/quests"),
+      ]);
+
+      if (streakRes.ok) {
+        const d = await streakRes.json();
+        setStreak(d.status);
+      }
+      if (questsRes.ok) {
+        const d = await questsRes.json();
+        setDailyQuests(d.daily || []);
+        setWeeklyQuests(d.weekly || []);
+      }
+    } catch (e) {
+      console.warn("Failed to load quests data:", e);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchData();
+  }, [user?.id]);
+
+  const handleClaimStreak = async () => {
+    if (!user) return setAuthOpen(true);
+    setClaimingStreak(true);
+    try {
+      const res = await fetch("/api/streaks", { method: "POST" });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
+
+      toast.success(data.message || "Kunlik mukofot qabul qilindi!");
+      fetchData();
+    } catch (e: any) {
+      toast.error(e.message || "Xatolik yuz berdi");
+    } finally {
+      setClaimingStreak(false);
+    }
+  };
+
+  const handleClaimQuest = async (questId: string) => {
+    if (!user) return setAuthOpen(true);
+    setClaimingQuestId(questId);
+    try {
+      const res = await fetch("/api/quests/claim", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userQuestId: questId }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
+
+      toast.success(data.message || "Vazifa mukofoti berildi!");
+      fetchData();
+    } catch (e: any) {
+      toast.error(e.message || "Xatolik");
+    } finally {
+      setClaimingQuestId(null);
+    }
+  };
+
+  const handleRerollQuest = async (questId: string) => {
+    if (!user) return setAuthOpen(true);
+    setRerollingQuestId(questId);
+    try {
+      const res = await fetch("/api/quests/reroll", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userQuestId: questId }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
+
+      toast.info(data.message || "Vazifa yangilandi");
+      fetchData();
+    } catch (e: any) {
+      toast.error(e.message || "Xatolik");
+    } finally {
+      setRerollingQuestId(null);
+    }
+  };
+
+  if (!user) {
+    return (
+      <div className="glass rounded-3xl p-6 border text-center space-y-3">
+        <div className="w-12 h-12 rounded-2xl bg-primary/10 text-primary mx-auto flex items-center justify-center text-2xl">
+          🔥
+        </div>
+        <h3 className="font-black text-base">Kunlik Vazifalar va Streak</h3>
+        <p className="text-xs text-muted-foreground">
+          Har kuni kirib mukofotlar oling, vazifalarni bajaring va darajangizni oshiring!
+        </p>
+        <Button onClick={() => setAuthOpen(true)} className="rounded-xl font-bold text-xs">
+          Hisobga kirish
+        </Button>
+      </div>
+    );
+  }
+
+  const currentQuests = activeTab === "daily" ? dailyQuests : weeklyQuests;
+
+  return (
+    <div className="glass rounded-3xl border overflow-hidden shadow-sm space-y-4 p-5 sm:p-6">
+      {/* Streak Header Card */}
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 p-4 rounded-2xl bg-linear-to-r from-primary/15 via-primary/5 to-secondary/30 border border-primary/20">
+        <div className="flex items-center gap-3">
+          <div className="w-12 h-12 rounded-2xl bg-primary/20 border border-primary/30 flex items-center justify-center text-2xl shadow-inner shrink-0">
+            🔥
+          </div>
+          <div>
+            <div className="flex items-center gap-2">
+              <h4 className="font-black text-base flex items-center gap-1.5">
+                {streak?.streakCount || 0} Kunlik Streak
+              </h4>
+              {streak && streak.streakFreezeCount > 0 && (
+                <Badge
+                  variant="outline"
+                  className="text-[10px] h-4.5 px-1.5 border-cyan-500/30 text-cyan-500 bg-cyan-500/10 gap-1"
+                  title="Streak muzlatgichi (uzilishdan himoya)"
+                >
+                  🧊 {streak.streakFreezeCount} freeze
+                </Badge>
+              )}
+            </div>
+            <p className="text-[11px] text-muted-foreground">
+              {streak?.hasClaimedToday
+                ? "Bugungi kirish qayd etildi! Ertaga davom eting."
+                : `Keyingi marra: ${streak?.nextMilestone} kun (${streak?.daysToNextMilestone} kun qoldi)`}
+            </p>
+          </div>
+        </div>
+
+        <Button
+          size="sm"
+          disabled={claimingStreak || streak?.hasClaimedToday}
+          onClick={handleClaimStreak}
+          className={cn(
+            "rounded-xl font-black text-xs h-9 px-4 shrink-0 transition-all shadow-sm",
+            streak?.hasClaimedToday
+              ? "bg-secondary text-muted-foreground hover:bg-secondary cursor-default"
+              : "brand-gradient text-white animate-pulse"
+          )}
+        >
+          {claimingStreak ? (
+            <Loader2 className="w-4 h-4 animate-spin" />
+          ) : streak?.hasClaimedToday ? (
+            <>
+              <Check className="w-3.5 h-3.5 mr-1" /> Bugun olingan
+            </>
+          ) : (
+            <>
+              <Sparkles className="w-3.5 h-3.5 mr-1.5" /> Kunlik mukofot
+            </>
+          )}
+        </Button>
+      </div>
+
+      {/* Quests Header & Tabs */}
+      <div className="flex items-center justify-between pt-1">
+        <div className="flex items-center gap-2">
+          <Trophy className="w-4 h-4 text-primary" />
+          <h3 className="font-black text-sm">Vazifalar</h3>
+        </div>
+
+        <Tabs value={activeTab} onValueChange={(v: any) => setActiveTab(v)}>
+          <TabsList className="h-8 rounded-xl bg-secondary/50 p-0.5 text-xs">
+            <TabsTrigger value="daily" className="rounded-lg px-3 text-[11px] font-bold">
+              Kunlik ({dailyQuests.filter((q) => q.status === "completed").length}/{dailyQuests.length})
+            </TabsTrigger>
+            <TabsTrigger value="weekly" className="rounded-lg px-3 text-[11px] font-bold">
+              Haftalik ({weeklyQuests.filter((q) => q.status === "completed").length}/{weeklyQuests.length})
+            </TabsTrigger>
+          </TabsList>
+        </Tabs>
+      </div>
+
+      {/* Quests List */}
+      {loading ? (
+        <div className="space-y-3 py-2">
+          {[1, 2, 3].map((i) => (
+            <div key={i} className="h-20 rounded-2xl skeleton" />
+          ))}
+        </div>
+      ) : currentQuests.length === 0 ? (
+        <div className="text-center py-8 text-muted-foreground text-xs">
+          Hozircha faol vazifalar yo'q
+        </div>
+      ) : (
+        <div className="space-y-2.5">
+          {currentQuests.map((q) => {
+            const isCompleted = q.progress >= q.targetCount;
+            const isClaimed = q.status === "claimed";
+            const pct = Math.min(100, Math.round((q.progress / q.targetCount) * 100));
+
+            return (
+              <div
+                key={q.id}
+                className={cn(
+                  "p-3 rounded-2xl border transition-all flex flex-col justify-between gap-2.5",
+                  isClaimed
+                    ? "bg-secondary/20 border-border/40 opacity-70"
+                    : isCompleted
+                    ? "bg-primary/5 border-primary/40 shadow-xs"
+                    : "bg-secondary/40 border-border/60 hover:bg-secondary/60"
+                )}
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <h4 className="font-bold text-xs truncate">{q.title}</h4>
+                      {q.difficulty === "hard" && (
+                        <Badge className="text-[9px] h-4 px-1 bg-rose-500/15 text-rose-500 border-rose-500/30">
+                          Qiyin
+                        </Badge>
+                      )}
+                    </div>
+                    {q.description && (
+                      <p className="text-[11px] text-muted-foreground mt-0.5 line-clamp-1">
+                        {q.description}
+                      </p>
+                    )}
+                  </div>
+
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    <span className="text-[11px] font-black text-primary">
+                      +{q.xpReward} XP
+                    </span>
+                    {q.creditReward > 0 && (
+                      <span className="text-[11px] font-black text-amber-500 flex items-center">
+                        +{q.creditReward} <Coins className="w-2.5 h-2.5 ml-0.5" />
+                      </span>
+                    )}
+
+                    {/* Reroll button for daily active quests */}
+                    {activeTab === "daily" && !isCompleted && !isClaimed && (
+                      <button
+                        onClick={() => handleRerollQuest(q.id)}
+                        disabled={rerollingQuestId === q.id}
+                        title="Vazifani almashtirish (1 marta)"
+                        className="p-1 hover:bg-secondary rounded-lg text-muted-foreground hover:text-foreground transition ml-1"
+                      >
+                        {rerollingQuestId === q.id ? (
+                          <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                        ) : (
+                          <RefreshCw className="w-3.5 h-3.5" />
+                        )}
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                {/* Progress bar & Claim button */}
+                <div className="flex items-center justify-between gap-3 pt-0.5">
+                  <div className="flex-1">
+                    <div className="flex items-center justify-between text-[10px] text-muted-foreground mb-1">
+                      <span>Progress</span>
+                      <span className="font-semibold">
+                        {q.progress} / {q.targetCount}
+                      </span>
+                    </div>
+                    <div className="h-1.5 w-full bg-secondary rounded-full overflow-hidden">
+                      <div
+                        className={cn(
+                          "h-full transition-all",
+                          isCompleted ? "bg-emerald-500" : "bg-primary"
+                        )}
+                        style={{ width: `${pct}%` }}
+                      />
+                    </div>
+                  </div>
+
+                  {isClaimed ? (
+                    <Badge variant="outline" className="text-[10px] h-6 px-2 text-muted-foreground border-border">
+                      <Check className="w-3 h-3 mr-1" /> Bajarildi
+                    </Badge>
+                  ) : isCompleted ? (
+                    <Button
+                      size="sm"
+                      onClick={() => handleClaimQuest(q.id)}
+                      disabled={claimingQuestId === q.id}
+                      className="h-7 text-[10px] font-bold px-3 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-white shrink-0 shadow-xs"
+                    >
+                      {claimingQuestId === q.id ? (
+                        <Loader2 className="w-3 h-3 animate-spin" />
+                      ) : (
+                        "Qabul qilish"
+                      )}
+                    </Button>
+                  ) : (
+                    <span className="text-[10px] text-muted-foreground font-semibold shrink-0">
+                      Bajarilmoqda...
+                    </span>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}

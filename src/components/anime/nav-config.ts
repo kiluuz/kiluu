@@ -39,16 +39,14 @@ export interface NavItemDef {
   lockHint?: string;
 }
 
-export const EXCHANGE_REQUIRED = 20;
-
 export const NAV_ITEMS: readonly NavItemDef[] = [
   { id: "home",           label: "Home",          shortLabel: "Home",     icon: Home,         group: "browse", mobilePrimary: true },
   { id: "browse",         label: "Discover",      shortLabel: "Discover", icon: Compass,      group: "browse", mobilePrimary: true },
   { id: "schedule",       label: "Schedule",      shortLabel: "Schedule", icon: CalendarDays, group: "browse" },
   { id: "dubbing",        label: "AI Dubbing",    shortLabel: "AI Dub",   icon: AudioLines,   group: "browse", mobileCenter: true, badge: "soon" },
-  { id: "community",      label: "Community",     shortLabel: "Community",icon: Users,        group: "browse" },
+  { id: "community",      label: "Community",     shortLabel: "Community",icon: Users,        group: "browse", mobilePrimary: true },
   { id: "watch-together", label: "Watch Together",shortLabel: "Together", icon: Video,        group: "browse" },
-  { id: "library",        label: "My Library",    shortLabel: "Library",  icon: Clock,        group: "my",    mobilePrimary: true },
+  { id: "library",        label: "My Library",    shortLabel: "Library",  icon: Clock,        group: "my" },
   { id: "gifts",          label: "Gifts",         shortLabel: "Gifts",    icon: Gift,         group: "my" },
   { id: "credits",        label: "Get Credits",   shortLabel: "Credits",  icon: Wallet,       group: "my" },
   { id: "studio",         label: "Creator Studio",shortLabel: "Studio",   icon: Clapperboard, group: "creator", creatorOnly: true,
@@ -83,7 +81,6 @@ export interface ResolvedNavItem {
   def: NavItemDef;
   active: boolean;
   badgeText?: string;
-  /** exchange lock */
   locked: boolean;
   ownedCount: number;
   /** dot indicator (e.g. something airs today) */
@@ -105,13 +102,14 @@ export function useResolvedNav(): ResolvedNavItem[] {
     const locked =
       (!!def.creatorOnly && !!user && !isCreator) ||
       (!!def.adminOnly && !!user && !isAdmin);
-    const badgeText = def.badge === "soon" ? "Soon" : undefined;
+    const badgeText = def.badge === "soon" ? t("nav.soon") : undefined;
     const dot = def.id === "schedule" ? scheduleAirsToday : undefined;
     return {
       def: {
         ...def,
         label: t(`nav.${def.id}`),
         shortLabel: t(`nav.${def.id}`),
+        lockHint: def.lockHint ? t(`nav.lock.${def.id}`) : undefined,
       },
       active,
       badgeText,

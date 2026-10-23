@@ -149,4 +149,7 @@ test("achievement progress, seasonal and secret unlocks are persisted idempotent
   const hidden = states.find((state) => state.id === "secret_owl");
   assert.equal(hidden?.name, "Secret achievement");
   assert.equal(hidden?.current, 0);
+  const revealed = states.find((state) => state.id === "secret_palindrome");
+  assert.equal(revealed?.name, "Mirror Name");
+  assert.equal(revealed?.desc, "Have a username that reads the same backward.");
 });

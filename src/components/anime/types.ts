@@ -38,6 +38,7 @@ export interface AuthUser {
   accentColor: string;
   credits: number;
   onboardingDone: boolean;
+  favoriteGenres: string[];
   createdAt: string;
   telegramLinked?: boolean;
   // customization
@@ -50,6 +51,8 @@ export interface AuthUser {
   statusText: string | null;
   accentTo: string | null;
   avatarFrame: string | null;
+  equippedAvatarFrameId: string | null;
+  equippedNameFrameId: string | null;
   bannerPreset: string | null;
   showcase: string | null;
   privacy: string | null;
@@ -81,6 +84,7 @@ export interface AnimeSummary {
   status?: string;
   trending?: number;
   featured?: boolean;
+  recommended?: boolean;
   creator?: {
     username: string;
     displayName: string | null;
@@ -132,6 +136,9 @@ export interface AnimeDetail extends AnimeSummary {
     avatarUrl: string | null;
     accentColor: string;
     role: string;
+    avatarFrame?: string | null;
+    equippedAvatarFrameId?: string | null;
+    equippedNameFrameId?: string | null;
     isVerified?: boolean;
   } | null;
   versions?: AnimeVersionCard[];
@@ -145,6 +152,7 @@ export interface HomeData {
   freeAnimes: AnimeSummary[];
   continueWatching: ContinueWatchingItem[];
   genres: string[];
+  personalized: boolean;
 }
 
 export interface ContinueWatchingItem {
@@ -180,6 +188,9 @@ export interface CommunityPost {
     username: string;
     displayName: string | null;
     avatarUrl: string | null;
+    avatarFrame?: string | null;
+    equippedAvatarFrameId?: string | null;
+    equippedNameFrameId?: string | null;
     accentColor: string;
     role: string;
     isVerified?: boolean;
@@ -224,6 +235,9 @@ export interface CommentItem {
     username: string;
     displayName: string | null;
     avatarUrl: string | null;
+    avatarFrame?: string | null;
+    equippedAvatarFrameId?: string | null;
+    equippedNameFrameId?: string | null;
     accentColor: string;
     role: string;
     level?: number;
@@ -243,6 +257,9 @@ export interface CommunityStats {
     username: string;
     displayName: string | null;
     avatarUrl: string | null;
+    avatarFrame?: string | null;
+    equippedAvatarFrameId?: string | null;
+    equippedNameFrameId?: string | null;
     accentColor: string;
     postCount: number;
     likeCount: number;
@@ -259,11 +276,16 @@ export interface PublicProfile {
   isVerified?: boolean;
   avatarUrl: string | null;
   bannerUrl: string | null;
+  bannerPreset?: string | null;
   bio: string | null;
   accentColor: string;
   accentTo: string | null;
   avatarFrame: string | null;
+  equippedAvatarFrameId?: string | null;
+  equippedNameFrameId?: string | null;
   createdAt: string;
+  isOnline?: boolean;
+  lastSeenAt?: string | null;
   // identity
   pronouns: string | null;
   tagline: string | null;
@@ -273,6 +295,7 @@ export interface PublicProfile {
   statusEmoji: string | null;
   statusText: string | null;
   showcase: ShowcaseConfig;
+  favoriteGenres?: string[];
   privacy?: PrivacyConfig;
   stats: {
     purchaseCount: number | null;

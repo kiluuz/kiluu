@@ -9,6 +9,7 @@ import { SmartImage, formatCredits } from "../ui-bits";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import type { ScheduleItem } from "../types";
+import { useI18n } from "@/components/i18n-provider";
 
 // AniList types
 interface AniListEntry {
@@ -75,37 +76,38 @@ function formatDetailCountdown(ms: number): string {
   return parts.join(" ");
 }
 
-function getSeasonName(season: string | null) {
-  if (season === "WINTER") return "Winter";
-  if (season === "SPRING") return "Spring";
-  if (season === "SUMMER") return "Summer";
-  if (season === "FALL") return "Fall";
+function getSeasonName(season: string | null, t: (key: string) => string) {
+  if (season === "WINTER") return t("schedule.season.winter");
+  if (season === "SPRING") return t("schedule.season.spring");
+  if (season === "SUMMER") return t("schedule.season.summer");
+  if (season === "FALL") return t("schedule.season.fall");
   return season || "";
 }
 
-function translateStatus(status: string) {
-  if (status === "RELEASING") return "Airing";
-  if (status === "NOT_YET_RELEASED") return "Upcoming";
-  if (status === "FINISHED") return "Finished";
-  if (status === "CANCELLED") return "Cancelled";
-  if (status === "HIATUS") return "On hiatus";
+function translateStatus(status: string, t: (key: string) => string) {
+  if (status === "RELEASING") return t("schedule.status.airing");
+  if (status === "NOT_YET_RELEASED") return t("schedule.status.upcoming");
+  if (status === "FINISHED") return t("schedule.status.finished");
+  if (status === "CANCELLED") return t("schedule.status.cancelled");
+  if (status === "HIATUS") return t("schedule.status.hiatus");
   return status;
 }
 
-function translateFormat(format: string) {
+function translateFormat(format: string, t: (key: string) => string) {
   const labels: Record<string, string> = {
-    TV: "TV series",
-    TV_SHORT: "Short TV series",
-    MOVIE: "Movie",
-    SPECIAL: "Special",
+    TV: t("schedule.format.tv"),
+    TV_SHORT: t("schedule.format.tvShort"),
+    MOVIE: t("schedule.format.movie"),
+    SPECIAL: t("schedule.format.special"),
     OVA: "OVA",
     ONA: "ONA",
-    MUSIC: "Musiqiy video",
+    MUSIC: t("schedule.format.music"),
   };
   return labels[format] || format.replaceAll("_", " ").toLowerCase().replace(/^\w/, (letter) => letter.toUpperCase());
 }
 
 export function ScheduleView() {
+  const { t, locale } = useI18n();
   const { navigate, user } = useAppStore();
   const [items, setItems] = useState<ScheduleItem[] | null>(null);
   const [day, setDay] = useState<number>(() => new Date().getDay());
@@ -122,6 +124,13 @@ export function ScheduleView() {
   const [searchResults, setSearchResults] = useState<any[] | null>(null);
 
   const [selectedSearchAnime, setSelectedSearchAnime] = useState<any | null>(null);
+  const localeTag = locale === "uz" ? "uz-UZ" : locale === "ru" ? "ru-RU" : locale === "kk" ? "kk-KZ" : locale === "ky" ? "ky-KG" : "en-US";
+  const dayLabels = Array.from({ length: 7 }, (_, index) =>
+    new Intl.DateTimeFormat(localeTag, { weekday: "long" }).format(new Date(2024, 0, 7 + index))
+  );
+  const dayShortLabels = Array.from({ length: 7 }, (_, index) =>
+    new Intl.DateTimeFormat(localeTag, { weekday: "short" }).format(new Date(2024, 0, 7 + index))
+  );
 
   useEffect(() => {
     if (!searchQuery.trim()) {
@@ -301,29 +310,21 @@ export function ScheduleView() {
 
   return (
     <div className="pb-10">
+      <h1 className="sr-only">{t("globalSchedule")}</h1>
       {/* Header */}
       <div className="max-w-[1280px] mx-auto px-4 sm:px-8 pt-8 pb-6">
-        <div className="flex items-end justify-between gap-4 flex-wrap">
-          <div>
-            <h1 className="font-display text-3xl sm:text-4xl font-black tracking-tight flex items-center gap-3">
-              <CalendarDays className="w-8 h-8 text-primary" />
-              Global Jadval
-            </h1>
-            <p className="text-muted-foreground text-sm mt-2">
-              All anime releases in the next 7 days
-            </p>
-          </div>
+        <div className="flex items-center justify-end gap-4 flex-wrap">
           <div className="flex items-center gap-2 text-xs text-muted-foreground bg-card border rounded-full px-3.5 py-2">
             <Tv className="w-3.5 h-3.5 text-primary" />
-            {ongoingCount} ongoing series · {airingToday.length} more today
+            {ongoingCount} {t("schedule.ongoingSeries")} · {airingToday.length} {t("schedule.moreToday")}
           </div>
         </div>
 
         {/* Search Bar */}
-        <div className="mt-6 relative max-w-md">
+        <div className="mt-2 relative max-w-md">
           <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-muted-foreground" />
           <Input
-            placeholder="Search upcoming anime..."
+            placeholder={t("schedule.searchPlaceholder")}
             value={searchQuery}
             onChange={(e) => {
               setSearchQuery(e.target.value);
@@ -348,17 +349,17 @@ export function ScheduleView() {
         <div className="max-w-[1280px] mx-auto px-4 sm:px-8 mb-10 min-h-[40vh]">
           {isSearching ? (
             <div className="flex items-center justify-center py-20 text-muted-foreground">
-              <Loader2 className="w-6 h-6 animate-spin mr-2" /> Qidirilmoqda...
+              <Loader2 className="w-6 h-6 animate-spin mr-2" /> {t("schedule.searching")}
             </div>
           ) : searchResults?.length === 0 ? (
             <div className="text-center py-20 text-muted-foreground font-medium border rounded-2xl bg-card/30 border-dashed">
-              No anime found
+              {t("browse.noResults")}
             </div>
           ) : (
             <div className="space-y-3">
               {searchResults?.map(res => {
                 const msLeft = res.nextEpisode ? (res.nextEpisode.airingAt * 1000) - now : -1;
-                const timeStr = res.nextEpisode ? new Date(res.nextEpisode.airingAt * 1000).toLocaleString("uz-UZ", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" }) : "";
+                const timeStr = res.nextEpisode ? new Date(res.nextEpisode.airingAt * 1000).toLocaleString(localeTag, { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" }) : "";
 
                 return (
                   <div
@@ -373,11 +374,11 @@ export function ScheduleView() {
                       <h3 className="font-bold truncate text-base leading-tight">{res.title}</h3>
                       <div className="flex items-center gap-2 mt-1.5 text-xs">
                         <span className="px-2 py-0.5 rounded-full bg-secondary text-muted-foreground font-semibold">
-                          {translateStatus(res.status)}
+                          {translateStatus(res.status, t)}
                         </span>
                         {res.nextEpisode && (
                           <span className="font-bold text-primary px-2 py-0.5 rounded-full bg-primary/10">
-                            Episode {res.nextEpisode.episode}
+                            {t("schedule.episode")} {res.nextEpisode.episode}
                           </span>
                         )}
                       </div>
@@ -386,12 +387,12 @@ export function ScheduleView() {
                       {res.nextEpisode && msLeft > 0 ? (
                         <>
                           <div className="text-sm font-black tabular-nums">{timeStr}</div>
-                          <div className="text-[10px] font-bold text-primary mt-0.5">in {formatCountdown(msLeft)}</div>
+                          <div className="text-[10px] font-bold text-primary mt-0.5">{t("schedule.in")} {formatCountdown(msLeft)}</div>
                         </>
                       ) : res.status === "RELEASING" ? (
-                        <span className="text-xs font-bold text-amber-500">Coming soon</span>
+                        <span className="text-xs font-bold text-amber-500">{t("dubbing.soon")}</span>
                       ) : (
-                        <span className="text-xs font-bold text-muted-foreground">Unknown</span>
+                        <span className="text-xs font-bold text-muted-foreground">{t("schedule.unknown")}</span>
                       )}
                     </div>
                   </div>
@@ -417,13 +418,13 @@ export function ScheduleView() {
         <div className="max-w-[1280px] mx-auto px-4 sm:px-8 pb-6">
           <div className="rounded-2xl border aurora relative overflow-hidden p-4 sm:p-5">
             <p className="text-[11px] font-black uppercase tracking-[0.16em] text-primary flex items-center gap-2 mb-3">
-              <Sparkles className="w-3.5 h-3.5" /> Still to come today
+              <Sparkles className="w-3.5 h-3.5" /> {t("schedule.stillToCome")}
             </p>
             <div className="flex gap-3 overflow-x-auto no-scrollbar">
               {airingToday.map(({ entry, local }) => {
                 const msLeft = (entry.airingAt * 1000) - now;
                 const cd = formatCountdown(msLeft);
-                const timeStr = new Date(entry.airingAt * 1000).toLocaleTimeString("uz-UZ", { hour: "2-digit", minute: "2-digit" });
+                const timeStr = new Date(entry.airingAt * 1000).toLocaleTimeString(localeTag, { hour: "2-digit", minute: "2-digit" });
                 return (
                   <div
                     key={entry.scheduleId}
@@ -439,7 +440,7 @@ export function ScheduleView() {
                     <span className="text-left flex flex-col justify-center">
                       <span className="block text-[13px] font-bold truncate max-w-[150px]">{local ? local.title : entry.media.title}</span>
                       <span className="block text-[11px] text-muted-foreground mt-0.5">
-                        {timeStr} <span className="text-primary font-medium px-1">Ep {entry.episode}</span> · in <span className="text-primary font-bold">{cd}</span>
+                        {timeStr}                         <span className="text-primary font-medium px-1">{t("schedule.episodeShort")} {entry.episode}</span> · {t("schedule.in")} <span className="text-primary font-bold">{cd}</span>
                       </span>
                     </span>
                   </div>
@@ -481,7 +482,7 @@ export function ScheduleView() {
                     : "text-muted-foreground hover:text-foreground hover:bg-accent/60"
                 )}
               >
-                <span className="text-[10px] font-bold tracking-widest opacity-80">{d.short}</span>
+                <span className="text-[10px] font-bold tracking-widest opacity-80">{dayShortLabels[dayIndex]}</span>
                 <span className={cn("relative text-lg sm:text-xl font-black leading-none", isToday && !selected && "text-primary")}>
                   {dateNum}
                   {isToday && <span className="absolute -top-1 -right-2 w-1.5 h-1.5 rounded-full bg-emerald-400 live-dot" />}
@@ -492,7 +493,7 @@ export function ScheduleView() {
                     selected ? "text-white/75" : "text-muted-foreground/70"
                   )}
                 >
-                  {isToday ? "today" : `${count} show${count === 1 ? "" : "s"}`}
+                  {isToday ? t("schedule.today") : `${count} ${t(count === 1 ? "schedule.showSingular" : "schedule.showPlural")}`}
                 </span>
               </button>
             );
@@ -503,19 +504,19 @@ export function ScheduleView() {
       {/* Day list */}
       <div className="max-w-[1280px] mx-auto px-4 sm:px-8 mt-6 space-y-3">
         <h2 className="text-sm font-bold text-muted-foreground uppercase tracking-[0.14em]">
-          {DAYS[day].label}
-          {day === today && <span className="text-primary normal-case tracking-normal ml-2">— today</span>}
+          {dayLabels[day]}
+          {day === today && <span className="text-primary normal-case tracking-normal ml-2">— {t("schedule.today")}</span>}
         </h2>
 
         {todaysList.length === 0 ? (
           <div className="rounded-2xl border border-dashed p-12 text-center">
             <CalendarDays className="w-10 h-10 mx-auto text-muted-foreground/50 mb-3" />
-            <p className="font-bold">No broadcasts on {DAYS[day].label}s</p>
+            <p className="font-bold">{t("schedule.noBroadcasts")} {dayLabels[day]}</p>
             <p className="text-sm text-muted-foreground mt-1">
-              Perfect day to raid your library or start something new.
+              {t("schedule.emptyHint")}
             </p>
             <Button variant="outline" size="sm" className="rounded-full mt-4" onClick={() => navigate("browse")}>
-              Browse animes
+              {t("nav.browse")}
               <ChevronRight className="w-4 h-4" />
             </Button>
           </div>
@@ -523,8 +524,8 @@ export function ScheduleView() {
           todaysList.map(({ entry, local }) => {
             const airingMs = entry.airingAt * 1000;
             const msLeft = airingMs - now;
-            const timeStr = new Date(airingMs).toLocaleTimeString("uz-UZ", { hour: "2-digit", minute: "2-digit" });
-            const seasonStr = getSeasonName(entry.media.season);
+            const timeStr = new Date(airingMs).toLocaleTimeString(localeTag, { hour: "2-digit", minute: "2-digit" });
+            const seasonStr = getSeasonName(entry.media.season, t);
 
             return (
               <div
@@ -539,9 +540,9 @@ export function ScheduleView() {
                   <Clock className="w-3.5 h-3.5 text-primary mb-1" />
                   <span className="text-lg sm:text-xl font-black tabular-nums leading-none">{timeStr}</span>
                   {msLeft > 0 ? (
-                    <span className="text-[9.5px] font-bold text-primary mt-1.5">in {formatCountdown(msLeft)}</span>
+                    <span className="text-[9.5px] font-bold text-primary mt-1.5">{t("schedule.in")} {formatCountdown(msLeft)}</span>
                   ) : (
-                    <span className="text-[9.5px] font-bold text-muted-foreground mt-1.5">released</span>
+                    <span className="text-[9.5px] font-bold text-muted-foreground mt-1.5">{t("schedule.released")}</span>
                   )}
                 </div>
 
@@ -593,7 +594,7 @@ export function ScheduleView() {
                   </div>
                   <div className="flex items-center gap-2 mt-1.5 text-[11px] text-muted-foreground flex-wrap">
                     <span className="font-bold text-primary px-1.5 py-0.5 rounded-md bg-primary/10">
-                      Episode {entry.episode}
+                      {t("schedule.episode")} {entry.episode}
                     </span>
                     {(seasonStr || entry.media.seasonYear) && (
                       <span className="font-bold text-emerald-400 px-1.5 py-0.5 rounded-md bg-emerald-400/10 flex items-center gap-1">
@@ -616,7 +617,7 @@ export function ScheduleView() {
                       <>
                         {entry.media.score && <span className="font-semibold text-foreground/80">★ {(entry.media.score / 10).toFixed(1)}</span>}
                         <span>·</span>
-                        <span>{translateFormat(entry.media.format)}</span>
+                        <span>{translateFormat(entry.media.format, t)}</span>
                         <span>·</span>
                         <span>{entry.media.genres.slice(0, 3).join(", ")}</span>
                         {entry.media.totalEpisodes && (
@@ -632,15 +633,15 @@ export function ScheduleView() {
                     <div className="mt-2 flex items-center gap-2 flex-wrap">
                       {local.isFree ? (
                         <span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">
-                          FREE
+                          {t("home.free")}
                         </span>
                       ) : local.owned ? (
                         <span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-primary/15 text-primary border border-primary/30">
-                          OWNED
+                          {t("schedule.owned")}
                         </span>
                       ) : (
                         <span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-500 border border-amber-500/30">
-                          {formatCredits(local.price)} CREDITS
+                          {formatCredits(local.price)} {t("home.credits")}
                         </span>
                       )}
                     </div>
@@ -656,14 +657,14 @@ export function ScheduleView() {
                       onClick={() => navigate("detail", { animeId: local.slug })}
                     >
                       <Play className="w-3.5 h-3.5 fill-white" />
-                      {local.owned || local.isFree ? "Watch" : "Details"}
+                      {local.owned || local.isFree ? t("schedule.watch") : t("home.viewDetails")}
                     </Button>
                   )}
                   <Button
                     size="sm"
                     variant="ghost"
                     className="rounded-full px-2.5"
-                    aria-label={subscribedIds.has(entry.media.anilistId) ? "Cancel reminder" : "Notify me when the episode is released"}
+                    aria-label={subscribedIds.has(entry.media.anilistId) ? t("notifyCancel") : t("schedule.notifyWhenReleased")}
                     aria-pressed={subscribedIds.has(entry.media.anilistId)}
                     disabled={reminderBusyIds.has(entry.media.anilistId)}
                     onClick={() => void toggleReminder(entry)}
@@ -683,14 +684,14 @@ export function ScheduleView() {
               className="rounded-full px-6 font-bold"
               onClick={() => setIsExpanded(true)}
             >
-              Ko'proq ko'rsatish ({todaysFullList.length - 5})
+              {t("schedule.showMore")} ({todaysFullList.length - 5})
             </Button>
           </div>
         )}
       </div>
 
       <p className="text-[10px] text-muted-foreground text-center mt-6">
-        Updates every second
+        {t("schedule.updatesEverySecond")}
       </p>
         </>
       )}
@@ -714,22 +715,22 @@ export function ScheduleView() {
                  <SmartImage src={selectedSearchAnime.coverImage} alt={selectedSearchAnime.title} className="w-full h-full object-cover" />
               </div>
               <h2 className="text-2xl font-black mb-1 leading-tight">{selectedSearchAnime.title}</h2>
-              <p className="text-sm text-muted-foreground font-semibold mb-6">{translateStatus(selectedSearchAnime.status)}</p>
+              <p className="text-sm text-muted-foreground font-semibold mb-6">{translateStatus(selectedSearchAnime.status, t)}</p>
 
               {selectedSearchAnime.nextEpisode ? (
                 <div className="p-5 rounded-3xl border-2 border-primary/20 bg-primary/5 inline-block min-w-[280px] shadow-lg shadow-primary/5 relative overflow-hidden">
                   <div className="absolute top-0 left-0 w-full h-1 bg-primary/20" />
                   <div className="absolute top-0 left-0 h-1 bg-primary transition-all duration-1000" style={{ width: `${Math.max(0, Math.min(100, 100 - (((selectedSearchAnime.nextEpisode.airingAt * 1000) - now) / (7 * 24 * 60 * 60 * 1000)) * 100))}%` }} />
-                  <p className="text-xs font-black uppercase tracking-wider text-primary mb-1">Next episode</p>
-                  <h3 className="text-3xl font-black mb-3">Episode {selectedSearchAnime.nextEpisode.episode}</h3>
-                  <p className="text-xs text-muted-foreground font-semibold mb-1">Qolgan vaqt</p>
+                  <p className="text-xs font-black uppercase tracking-wider text-primary mb-1">{t("schedule.nextEpisode")}</p>
+                  <h3 className="text-3xl font-black mb-3">{t("schedule.episode")} {selectedSearchAnime.nextEpisode.episode}</h3>
+                  <p className="text-xs text-muted-foreground font-semibold mb-1">{t("schedule.remainingTime")}</p>
                   <div className="font-display text-2xl font-black tabular-nums text-foreground">
                     {formatDetailCountdown((selectedSearchAnime.nextEpisode.airingAt * 1000) - now)}
                   </div>
                 </div>
               ) : (
                 <div className="p-5 rounded-2xl border border-dashed bg-secondary/30">
-                  <p className="font-bold text-muted-foreground">The next episode date is unknown</p>
+                  <p className="font-bold text-muted-foreground">{t("schedule.nextEpisodeUnknown")}</p>
                 </div>
               )}
             </div>

@@ -10,8 +10,8 @@ import {
 } from "lucide-react";
 import { Drawer, DrawerContent, DrawerTitle, DrawerDescription } from "@/components/ui/drawer";
 import { useAppStore } from "./store";
-import { useResolvedNav, EXCHANGE_REQUIRED, type NavGroup, type ResolvedNavItem } from "./nav-config";
-import { Avatar, formatCredits } from "./ui-bits";
+import { useResolvedNav, type NavGroup, type ResolvedNavItem } from "./nav-config";
+import { FramedAvatar, NameWithFrame, formatCredits } from "./ui-bits";
 import { cn } from "@/lib/utils";
 import type { ViewName } from "./types";
 import { LOCALES, type Locale } from "@/lib/i18n";
@@ -22,7 +22,7 @@ import { useI18n } from "@/components/i18n-provider";
    Draggable (vaul): swipe down / scrim / Esc to close, snap points
    half/full, focus trap + scroll lock (radix dialog core).
    Header: user card + credit balance chip. Body: grouped tile grid
-   with badges, lock states and a mini progress ring for Exchange.
+   with badges and lock states.
    Footer: theme / language / notifications / settings / log out.
    ============================================================ */
 
@@ -34,27 +34,9 @@ const LANGS: { code: Locale; name: string }[] = [
   { code: "ky", name: "Кыргызча" },
 ];
 
-/** Mini progress ring — owned/20 toward Exchange unlock */
-function ProgressRing({ value, max }: { value: number; max: number }) {
-  const r = 7;
-  const c = 2 * Math.PI * r;
-  const pct = Math.min(1, value / max);
-  return (
-    <svg width="18" height="18" viewBox="0 0 18 18" className="shrink-0" aria-hidden="true">
-      <circle cx="9" cy="9" r={r} fill="none" stroke="currentColor" strokeWidth="2.5" className="text-muted-foreground/25" />
-      <circle
-        cx="9" cy="9" r={r} fill="none" strokeWidth="2.5" strokeLinecap="round"
-        className="text-primary origin-center -rotate-90"
-        strokeDasharray={c}
-        strokeDashoffset={c * (1 - pct)}
-      />
-    </svg>
-  );
-}
-
 function NavTile({ item, index, onGo }: { item: ResolvedNavItem; index: number; onGo: (id: ViewName) => void }) {
-  const { def, active, badgeText, locked, ownedCount, dot } = item;
-  const user = useAppStore((s) => s.user);
+  const { def, active, badgeText, locked, dot } = item;
+  const { t } = useI18n();
   const Icon = def.icon;
   const isCreatorBadge = def.id === "studio";
   const reducedMotion = useReducedMotion();
@@ -66,13 +48,7 @@ function NavTile({ item, index, onGo }: { item: ResolvedNavItem; index: number; 
       transition={{ delay: 0.03 * index, duration: 0.28, ease: "easeOut" }}
       onClick={() => {
         if (locked && def.lockHint) {
-          const guestExchange = def.id === "exchange" && !user;
-          toast.info(
-            guestExchange
-              ? `Sign in and start collecting — the Exchange unlocks once you own ${EXCHANGE_REQUIRED} animes.`
-              : def.lockHint,
-            { duration: 5000, id: `lock-${def.id}` }
-          );
+          toast.info(def.lockHint, { duration: 5000, id: `lock-${def.id}` });
           return;
         }
         onGo(def.id);
@@ -85,13 +61,7 @@ function NavTile({ item, index, onGo }: { item: ResolvedNavItem; index: number; 
           : "border-border/70 bg-card/50 hover:bg-accent/50"
       )}
       aria-current={active ? "page" : undefined}
-      aria-label={
-        def.id === "exchange"
-          ? `Exchange${locked ? ` — locked, ${ownedCount} of ${EXCHANGE_REQUIRED} animes owned` : ""}`
-          : def.id === "dubbing"
-            ? "AI Dubbing — coming soon"
-            : def.label
-      }
+      aria-label={def.id === "dubbing" ? `${def.label} — ${t("dubbing.soon")}` : def.label}
     >
       <div className="flex items-start justify-between gap-2">
         <span className={cn(
@@ -115,23 +85,17 @@ function NavTile({ item, index, onGo }: { item: ResolvedNavItem; index: number; 
         )}
         {isCreatorBadge && !locked && (
           <span className="flex items-center gap-0.5 text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-amber-500/15 text-amber-500 border border-amber-500/30">
-            <Crown className="w-2.5 h-2.5" /> Creator
+            <Crown className="w-2.5 h-2.5" /> {t("settings.creator")}
           </span>
         )}
       </div>
       <span className="flex items-center gap-1.5 text-[12px] font-bold leading-tight">
         <span className="truncate">{def.label}</span>
-        {locked && <Lock className="w-3 h-3 shrink-0 text-muted-foreground" aria-label="locked" />}
+        {locked && <Lock className="w-3 h-3 shrink-0 text-muted-foreground" aria-label={t("nav.locked")} />}
       </span>
-      {def.id === "exchange" && (
-        <span className="flex items-center gap-1.5 -mt-1.5 text-[10px] text-muted-foreground font-semibold">
-          <ProgressRing value={ownedCount} max={EXCHANGE_REQUIRED} />
-          {locked ? `${ownedCount}/${EXCHANGE_REQUIRED} owned` : "Market unlocked"}
-        </span>
-      )}
       {def.id === "dubbing" && (
         <span className="flex items-center gap-1 -mt-1.5 text-[10px] text-muted-foreground font-semibold">
-          AI dubbing is coming soon
+          {t("dubbing.soon")}
         </span>
       )}
     </motion.button>
@@ -192,9 +156,9 @@ export function NavSheet({ open, onOpenChange }: { open: boolean; onOpenChange: 
         className="nav-sheet rounded-t-[28px]"
         style={{ height: "94dvh", maxHeight: "none", marginTop: 0 }}
       >
-        <DrawerTitle className="sr-only">Navigation menu</DrawerTitle>
+        <DrawerTitle className="sr-only">{t("nav.menu")}</DrawerTitle>
         <DrawerDescription className="sr-only">
-          All Kiluu destinations, your account and quick settings
+          {t("nav.menuDescription")}
         </DrawerDescription>
         <div className="flex flex-col h-full min-h-0">
           {/* ---- header: user card + credits ---- */}
@@ -209,17 +173,10 @@ export function NavSheet({ open, onOpenChange }: { open: boolean; onOpenChange: 
                   className="flex flex-1 min-w-0 items-center gap-3 rounded-2xl border border-border/70 bg-card/60 p-2.5 text-left outline-none focus-visible:ring-2 focus-visible:ring-ring transition active:scale-[0.98]"
                   aria-label="Open my profile"
                 >
-                  <Avatar
-                    src={user.avatarUrl}
-                    name={user.displayName || user.username}
-                    accent={user.accentColor}
-                    accentTo={user.accentTo}
-                    frame={user.avatarFrame}
-                    size={42}
-                  />
+                  <FramedAvatar user={user} size={42} />
                   <span className="flex-1 min-w-0">
                     <span className="flex items-center gap-1.5">
-                      <span className="text-[14px] font-bold truncate">{user.displayName || user.username}</span>
+                      <NameWithFrame user={user} compact className="text-[14px] font-bold truncate" avatarSize={42} />
                     </span>
                     <span className="flex items-center gap-1.5 min-w-0">
                       <span className="text-[11.5px] text-muted-foreground truncate">@{user.username}</span>
@@ -248,7 +205,7 @@ export function NavSheet({ open, onOpenChange }: { open: boolean; onOpenChange: 
                 className="w-full flex items-center gap-3 rounded-2xl brand-gradient p-3 text-white font-bold text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring transition active:scale-[0.98]"
               >
                 <LogIn className="w-4.5 h-4.5" />
-                Sign in to Kiluu
+                {t("nav.signInToKiluu")}
                 <ChevronRight className="w-4 h-4 ml-auto opacity-80" />
               </button>
             )}
@@ -260,10 +217,10 @@ export function NavSheet({ open, onOpenChange }: { open: boolean; onOpenChange: 
                 requestAnimationFrame(() => useAppStore.getState().setMobileSearchOpen(true));
               }}
               className="w-full flex items-center gap-2.5 h-11 px-4 rounded-xl bg-background/70 border text-muted-foreground text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring transition"
-              aria-label="Open search"
+              aria-label={t("nav.search")}
             >
               <Search className="w-4 h-4 shrink-0" />
-              <span className="truncate">Search animes, genres, studios…</span>
+              <span className="truncate">{t("nav.searchPlaceholder")}</span>
               <kbd className="ml-auto text-[10px] font-mono opacity-60 border rounded px-1.5 py-0.5">/</kbd>
             </button>
           </div>
@@ -289,7 +246,7 @@ export function NavSheet({ open, onOpenChange }: { open: boolean; onOpenChange: 
           {/* ---- footer row ---- */}
           <div className="border-t border-border/70 px-4 pt-2.5 pb-[calc(env(safe-area-inset-bottom,0px)+10px)]">
             {langOpen && (
-              <div className="flex flex-wrap gap-1.5 pb-2.5" role="group" aria-label="Interface language">
+              <div className="flex flex-wrap gap-1.5 pb-2.5" role="group" aria-label={t("language")}>
                 {LANGS.map((l) => (
                   <button
                     key={l.code}
@@ -307,7 +264,7 @@ export function NavSheet({ open, onOpenChange }: { open: boolean; onOpenChange: 
                 ))}
               </div>
             )}
-            <div className="flex items-stretch justify-between gap-1" role="toolbar" aria-label="Quick settings">
+            <div className="flex items-stretch justify-between gap-1" role="toolbar" aria-label={t("nav.quickSettings")}>
               <button
                 onClick={cycleTheme}
                 className="flex-1 flex flex-col items-center justify-center gap-1 py-1.5 rounded-xl min-h-[44px] text-muted-foreground hover:text-foreground hover:bg-accent/60 transition outline-none focus-visible:ring-2 focus-visible:ring-ring"
@@ -320,7 +277,7 @@ export function NavSheet({ open, onOpenChange }: { open: boolean; onOpenChange: 
                 onClick={() => setLangOpen((v) => !v)}
                 aria-expanded={langOpen}
                 className="flex-1 flex flex-col items-center justify-center gap-1 py-1.5 rounded-xl min-h-[44px] text-muted-foreground hover:text-foreground hover:bg-accent/60 transition outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                aria-label="Interface language"
+                aria-label={t("language")}
               >
                 <Globe className="w-[18px] h-[18px]" />
                 <span className="text-[9.5px] font-bold uppercase">{locale}</span>
@@ -331,29 +288,29 @@ export function NavSheet({ open, onOpenChange }: { open: boolean; onOpenChange: 
                   "flex-1 flex flex-col items-center justify-center gap-1 py-1.5 rounded-xl min-h-[44px] transition outline-none focus-visible:ring-2 focus-visible:ring-ring",
                   view.name === "settings" ? "text-primary" : "text-muted-foreground hover:text-foreground hover:bg-accent/60"
                 )}
-                aria-label="Settings"
+                aria-label={t("settings.title")}
                 aria-current={view.name === "settings" ? "page" : undefined}
               >
                 <SettingsIcon className="w-[18px] h-[18px]" />
-                <span className="text-[9.5px] font-bold">Settings</span>
+                <span className="text-[9.5px] font-bold">{t("settings.title")}</span>
               </button>
               {user ? (
                 <button
                   onClick={logout}
                   className="flex-1 flex flex-col items-center justify-center gap-1 py-1.5 rounded-xl min-h-[44px] text-muted-foreground hover:text-red-400 hover:bg-red-500/10 transition outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                  aria-label="Sign out"
+                  aria-label={t("settings.signOut")}
                 >
                   <LogOut className="w-[18px] h-[18px]" />
-                  <span className="text-[9.5px] font-bold">Sign out</span>
+                  <span className="text-[9.5px] font-bold">{t("settings.signOut")}</span>
                 </button>
               ) : (
                 <button
                   onClick={() => go("login")}
                   className="flex-1 flex flex-col items-center justify-center gap-1 py-1.5 rounded-xl min-h-[44px] text-primary hover:bg-primary/10 transition outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                  aria-label="Sign in"
+                  aria-label={t("signIn")}
                 >
                   <LogIn className="w-[18px] h-[18px]" />
-                  <span className="text-[9.5px] font-bold">Sign in</span>
+                  <span className="text-[9.5px] font-bold">{t("signIn")}</span>
                 </button>
               )}
             </div>

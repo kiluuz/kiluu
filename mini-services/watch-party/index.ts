@@ -19,6 +19,9 @@ interface Participant {
   displayName: string;
   avatarUrl: string | null;
   accentColor: string;
+  avatarFrame: string | null;
+  equippedAvatarFrameId: string | null;
+  equippedNameFrameId: string | null;
   isHost: boolean;
 }
 
@@ -131,7 +134,10 @@ async function getParticipants(partyId: string): Promise<Participant[]> {
   const [users, party] = await Promise.all([
     db.user.findMany({
       where: { id: { in: userIds } },
-      select: { id: true, username: true, displayName: true, avatarUrl: true, accentColor: true },
+      select: {
+        id: true, username: true, displayName: true, avatarUrl: true, accentColor: true,
+        avatarFrame: true, equippedAvatarFrameId: true, equippedNameFrameId: true,
+      },
     }),
     db.watchParty.findUnique({ where: { id: partyId }, select: { hostId: true } }),
   ]);
@@ -146,6 +152,9 @@ async function getParticipants(partyId: string): Promise<Participant[]> {
       displayName: user.displayName || user.username,
       avatarUrl: user.avatarUrl,
       accentColor: user.accentColor,
+      avatarFrame: user.avatarFrame,
+      equippedAvatarFrameId: user.equippedAvatarFrameId,
+      equippedNameFrameId: user.equippedNameFrameId,
       isHost: user.id === party?.hostId,
     }];
   });

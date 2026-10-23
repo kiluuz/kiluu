@@ -2,7 +2,7 @@ import { Prisma } from "@prisma/client";
 import { db } from "@/lib/db";
 
 export const XP_CONFIG = {
-  curve: { base: 250, exponent: 1.65, maxLevel: 100 },
+  curve: { base: 250, exponent: 1.18, maxLevel: 100 },
   amounts: {
     purchase: 250,
     gift_sent: 80,
@@ -16,8 +16,40 @@ export const XP_CONFIG = {
     achievement: 20,
     party_hosted: 50,
     party_joined: 15,
+    chat_message: 5,
+    daily_streak: 20,
+    quest_complete: 25,
   } satisfies Record<string, number>,
 };
+
+export const DAILY_ACTIVITY_CAPS: Record<string, number> = {
+  post: 50,     // 2 ta post
+  comment: 40,  // 5 ta comment
+  like: 30,     // 10 ta like
+  chat: 50,     // 10 ta chat xabari
+};
+
+/**
+ * Level 1-100 simulyatsiyasi (kunlik faollik bo'yicha)
+ */
+export function simulateLevelProgression(dailyXp: number, targetDays: number = 365) {
+  let totalXp = 0;
+  const history: Array<{ day: number; level: number; totalXp: number }> = [];
+  let reached100Day = -1;
+
+  for (let day = 1; day <= targetDays; day++) {
+    totalXp += dailyXp;
+    const { level } = levelFromXp(totalXp);
+    if (level >= 100 && reached100Day === -1) {
+      reached100Day = day;
+    }
+    if (day % 30 === 0 || day === targetDays) {
+      history.push({ day, level, totalXp });
+    }
+  }
+
+  return { dailyXp, reached100Day, history, finalXp: totalXp };
+}
 
 const LEVEL_COSMETICS: Record<number, string> = {
   5: "frame:gold",

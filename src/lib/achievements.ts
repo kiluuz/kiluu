@@ -3,10 +3,12 @@ import { db } from "@/lib/db";
 import { ACHIEVEMENT_SEEDS } from "./achievements-catalog";
 import { sqlTable } from "./sql-table";
 import { awardXpInTransaction } from "./xp";
+import { log } from "./logger";
 
 type Condition = {
   type?: string;
   gte?: number;
+  all?: { type: string; gte: number }[];
   month?: number;
   day?: number;
   limit?: number;
@@ -14,7 +16,7 @@ type Condition = {
   start?: string;
   end?: string;
 };
-type Reward = { cosmetics?: string[]; credits?: number };
+type Reward = { cosmetics?: string[]; credits?: number; frames?: string[] };
 type UserStats = {
   values: Record<string, number>;
   userCreatedAt: Date;
@@ -118,10 +120,7 @@ function maxWatchStreak(dates: Date[], timezone: string | null): number {
 }
 
 async function getUserStats(userId: string): Promise<UserStats | null> {
-  const [user, purchases, orders, gifts, followerCount, posts, comments, awardsGiven,
-    watchEvents, completedProgress, partiesHosted, partyMembers, partiesJoined, approvedAnimeCount,
-    creatorSales, creatorEarnings, dubVersions, spentResult, activityEvents, sets,
-    favoriteCount] = await Promise.all([
+  const [user, purchases, orders, gifts, followerCount] = await Promise.all([
     db.user.findUnique({ where: { id: userId }, select: { createdAt: true, timezone: true, credits: true, username: true } }),
     db.purchase.findMany({
       where: { userId, episodeNumber: 0 },
@@ -140,6 +139,8 @@ async function getUserStats(userId: string): Promise<UserStats | null> {
       select: { recipientId: true, recipientUsername: true, createdAt: true },
     }),
     db.follow.count({ where: { followedId: userId } }),
+  ]);
+  const [posts, comments, awardsGiven, watchEvents, completedProgress] = await Promise.all([
     db.post.findMany({
       where: { userId, hidden: false },
       select: { _count: { select: { likes: true } } },
@@ -154,11 +155,15 @@ async function getUserStats(userId: string): Promise<UserStats | null> {
       where: { userId, completed: true },
       select: { animeId: true, episodeId: true },
     }),
+  ]);
+  const [partiesHosted, partyMembers, partiesJoined, approvedAnimeCount, creatorSales] = await Promise.all([
     db.watchParty.count({ where: { createdById: userId } }),
     db.watchPartyMember.count({ where: { party: { hostId: userId } } }),
     db.watchPartyMember.count({ where: { userId } }),
     db.anime.count({ where: { creatorId: userId, moderationStatus: "APPROVED", hidden: false } }),
     db.purchase.count({ where: { episodeNumber: 0, anime: { creatorId: userId } } }),
+  ]);
+  const [creatorEarnings, dubVersions, spentResult, activityEvents, sets] = await Promise.all([
     db.creditTransaction.aggregate({
       where: { userId, amount: { gt: 0 }, refType: "version" },
       _sum: { amount: true },
@@ -170,8 +175,8 @@ async function getUserStats(userId: string): Promise<UserStats | null> {
       select: { createdAt: true },
     }),
     db.animeSet.findMany({ include: { items: { select: { animeId: true } } } }),
-    db.favoriteAnime.count({ where: { userId } }),
   ]);
+  const favoriteCount = await db.favoriteAnime.count({ where: { userId } });
   if (!user) return null;
 
   const orderedAnime = orders.length
@@ -270,6 +275,7 @@ async function getUserStats(userId: string): Promise<UserStats | null> {
       parties_hosted: partiesHosted,
       party_guests: partyMembers,
       parties_joined: partiesJoined,
+      episodes_watched: new Set(completedProgress.map((row) => row.episodeId)).size,
       creator_sales: creatorSales,
       creator_earnings: creatorEarnings._sum.amount || 0,
       dub_versions: dubVersions,
@@ -286,6 +292,12 @@ async function getUserStats(userId: string): Promise<UserStats | null> {
 }
 
 function progressFor(condition: Condition, stats: UserStats): { current: number; target: number; unlocked: boolean } {
+  if (condition.all?.length) {
+    const current = condition.all.filter((requirement) =>
+      (stats.values[requirement.type] || 0) >= requirement.gte
+    ).length;
+    return { current, target: condition.all.length, unlocked: current === condition.all.length };
+  }
   const target = condition.gte ?? 1;
   let current = stats.values[condition.type || ""] || 0;
   if (condition.type === "joined_before") {
@@ -319,6 +331,10 @@ async function applyReward(tx: Prisma.TransactionClient, userId: string, achieve
     ? reward.cosmetics.filter((item): item is string => typeof item === "string")
     : [];
   const credits = Number.isInteger(reward.credits) ? Math.max(0, reward.credits || 0) : 0;
+  const frameIds = Array.isArray(reward.frames)
+    ? [...new Set(reward.frames.filter((item): item is string => typeof item === "string"))]
+    : [];
+  const newlyGrantedFrames: { id: string; name: string; imageUrl: string | null }[] = [];
   if (cosmetics.length) {
     const user = await tx.user.findUniqueOrThrow({ where: { id: userId }, select: { showcase: true } });
     let showcase: Record<string, unknown> = {};
@@ -353,6 +369,33 @@ async function applyReward(tx: Prisma.TransactionClient, userId: string, achieve
       },
     });
   }
+  if (frameIds.length) {
+    const frames = await tx.frame.findMany({
+      where: { id: { in: frameIds }, isActive: true },
+      select: { id: true, name: true, imageUrl: true },
+    });
+    if (frames.length !== frameIds.length) {
+      throw new Error(`Achievement ${achievementId} references an inactive or missing frame`);
+    }
+    const previous = await tx.userFrame.findMany({
+      where: { userId, frameId: { in: frameIds } },
+      select: { frameId: true },
+    });
+    const alreadyOwned = new Set(previous.map((row) => row.frameId));
+    const available = frames.filter((frame) => !alreadyOwned.has(frame.id));
+    if (available.length) {
+      const values = available.map((frame) => Prisma.sql`(${userId}, ${frame.id}, CURRENT_TIMESTAMP, 'mission')`);
+      const inserted = await tx.$queryRaw<Array<{ frame_id: string }>>(Prisma.sql`
+        INSERT INTO ${sqlTable("user_frames")} ("user_id", "frame_id", "acquired_at", "source")
+        VALUES ${Prisma.join(values)}
+        ON CONFLICT ("user_id", "frame_id") DO NOTHING
+        RETURNING "frame_id"
+      `);
+      const insertedIds = new Set(inserted.map((row) => row.frame_id));
+      newlyGrantedFrames.push(...available.filter((frame) => insertedIds.has(frame.id)));
+    }
+  }
+  return newlyGrantedFrames;
 }
 
 export async function evaluateAchievements(userId: string) {
@@ -363,6 +406,7 @@ export async function evaluateAchievements(userId: string) {
   ]);
   if (!stats) return [];
   const unlockedIds: string[] = [];
+  const unlockedFrames: { id: string; name: string; imageUrl: string | null }[] = [];
   await db.$transaction(async (tx) => {
     for (const set of stats.completedSets) {
       if (set.bonusCredits <= 0) continue;
@@ -415,7 +459,19 @@ export async function evaluateAchievements(userId: string) {
         },
       });
       if (progress.unlocked && !wasUnlocked) {
-        await applyReward(tx, userId, achievement.id, parseReward(achievement.rewardJson));
+        const frames = await applyReward(tx, userId, achievement.id, parseReward(achievement.rewardJson));
+        for (const frame of frames) {
+          unlockedFrames.push(frame);
+          await tx.notification.create({
+            data: {
+              userId,
+              type: "FRAME",
+              title: `You unlocked ${frame.name}`,
+              body: `Mission reward: ${frame.name}`,
+              dataJson: JSON.stringify({ frameId: frame.id, previewUrl: frame.imageUrl, achievementId: achievement.id }),
+            },
+          });
+        }
         await awardXpInTransaction(tx, userId, "achievement", achievement.id);
         await tx.notification.create({
           data: {
@@ -429,7 +485,42 @@ export async function evaluateAchievements(userId: string) {
       }
       if (progress.unlocked) unlockedIds.push(achievement.id);
     }
-  });
+  }, { maxWait: 10_000, timeout: 30_000 });
+  if (unlockedFrames.length) {
+    const linkedUser = await db.user.findUnique({
+      where: { id: userId },
+      select: { telegramId: true },
+    });
+    const token = process.env.TELEGRAM_BOT_TOKEN;
+    if (linkedUser?.telegramId && !token) {
+      log.error("Frame reward committed but Telegram notifications are not configured", { userId });
+    }
+    if (linkedUser?.telegramId && token) {
+      for (const frame of unlockedFrames) {
+        try {
+          const response = await fetch(`https://api.telegram.org/bot${token}/sendPhoto`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              chat_id: linkedUser.telegramId,
+              photo: frame.imageUrl,
+              caption: `You unlocked ${frame.name}!`,
+            }),
+            signal: AbortSignal.timeout(8_000),
+          });
+          if (!response.ok) throw new Error(`Telegram returned HTTP ${response.status}`);
+          const result = await response.json() as { ok?: boolean; description?: string };
+          if (!result.ok) throw new Error(result.description || "Telegram rejected the frame notification");
+        } catch (error) {
+          log.error("Frame reward committed but Telegram notification failed", {
+            userId,
+            frameId: frame.id,
+            error: error instanceof Error ? error.message : String(error),
+          });
+        }
+      }
+    }
+  }
   return unlockedIds;
 }
 

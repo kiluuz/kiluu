@@ -1,65 +1,77 @@
 "use client";
 
-import { createContext, useCallback, useContext, useEffect, useMemo, useSyncExternalStore } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 import { DEFAULT_LOCALE, isLocale, t as translate, type Locale } from "@/lib/i18n";
 
 const KEY = "dubanix.lang";
-const CHANGE_EVENT = "kiluu-locale-change";
-let memoryLocale: Locale = DEFAULT_LOCALE;
-
-function getLocaleSnapshot(): Locale {
-  try {
-    const saved = localStorage.getItem(KEY);
-    if (isLocale(saved)) {
-      memoryLocale = saved;
-      return saved;
-    }
-  } catch {
-    // Use the in-memory selection when storage is unavailable.
-  }
-  return memoryLocale;
-}
-
-function subscribeToLocale(callback: () => void) {
-  window.addEventListener(CHANGE_EVENT, callback);
-  window.addEventListener("storage", callback);
-  return () => {
-    window.removeEventListener(CHANGE_EVENT, callback);
-    window.removeEventListener("storage", callback);
-  };
-}
+const COOKIE = "kiluu-locale";
 
 const I18nContext = createContext<{
   locale: Locale;
   setLocale: (l: Locale) => void;
-  t: (key: string) => string;
+  t: (key: string, values?: Record<string, string | number>) => string;
 }>({
   locale: DEFAULT_LOCALE,
   setLocale: () => {},
   t: (k) => k,
 });
 
-export function I18nProvider({ children }: { children: React.ReactNode }) {
-  const locale = useSyncExternalStore(subscribeToLocale, getLocaleSnapshot, () => DEFAULT_LOCALE);
+export function I18nProvider({
+  children,
+  initialLocale,
+}: {
+  children: React.ReactNode;
+  initialLocale: Locale;
+}) {
+  const [locale, setCurrentLocale] = useState<Locale>(initialLocale);
+
+  useEffect(() => {
+    let initialLocaleTimer: number | undefined;
+    let savedLocale: string | null = null;
+    try {
+      savedLocale = localStorage.getItem(KEY);
+    } catch {
+      // The server-provided cookie remains the locale source of truth.
+    }
+    const hasLocaleCookie = document.cookie
+      .split("; ")
+      .some((cookie) => cookie.startsWith(`${COOKIE}=`));
+    if (!hasLocaleCookie && isLocale(savedLocale) && savedLocale !== initialLocale) {
+      document.cookie = `${COOKIE}=${savedLocale}; Path=/; Max-Age=31536000; SameSite=Lax${location.protocol === "https:" ? "; Secure" : ""}`;
+      initialLocaleTimer = window.setTimeout(() => setCurrentLocale(savedLocale), 0);
+    }
+
+    const syncLocale = (event: StorageEvent) => {
+      if (event.key !== KEY || !isLocale(event.newValue)) return;
+      setCurrentLocale(event.newValue);
+      document.cookie = `${COOKIE}=${event.newValue}; Path=/; Max-Age=31536000; SameSite=Lax${location.protocol === "https:" ? "; Secure" : ""}`;
+    };
+    window.addEventListener("storage", syncLocale);
+    return () => {
+      if (initialLocaleTimer !== undefined) window.clearTimeout(initialLocaleTimer);
+      window.removeEventListener("storage", syncLocale);
+    };
+  }, []);
+
   useEffect(() => {
     document.documentElement.lang = locale;
   }, [locale]);
 
   const setLocale = useCallback((l: Locale) => {
-    memoryLocale = l;
     try {
       localStorage.setItem(KEY, l);
     } catch {
-      // Keep the selection for this session when storage is unavailable.
+      // The cookie still persists the locale when storage is unavailable.
     }
-    window.dispatchEvent(new Event(CHANGE_EVENT));
+    document.cookie = `${COOKIE}=${l}; Path=/; Max-Age=31536000; SameSite=Lax${location.protocol === "https:" ? "; Secure" : ""}`;
+    setCurrentLocale(l);
   }, []);
 
   const value = useMemo(
     () => ({
       locale,
       setLocale,
-      t: (key: string) => translate(locale, key),
+      t: (key: string, values?: Record<string, string | number>) => translate(locale, key, values),
     }),
     [locale, setLocale]
   );

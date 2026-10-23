@@ -4,6 +4,7 @@ import { getCurrentUser } from "@/lib/auth";
 import { watchDeltaSeconds } from "@/lib/watch-time";
 import { awardXpInTransaction } from "@/lib/xp";
 import { evaluateAchievements } from "@/lib/achievements";
+import { emitEvent } from "@/lib/events";
 
 // POST /api/progress - save watch position
 export async function POST(req: NextRequest) {
@@ -83,6 +84,7 @@ export async function POST(req: NextRequest) {
     });
 
     await evaluateAchievements(user.id);
+    await emitEvent(user, "episode_watched", { episodeId, animeId: anime.id, isCompleted });
     return NextResponse.json({ success: true });
   } catch (e) {
     console.error("progress error", e);

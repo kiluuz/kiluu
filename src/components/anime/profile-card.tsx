@@ -2,12 +2,12 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { X, Crown, BadgeCheck, CalendarDays, Loader2, Check, Users, Send, Trophy, Heart } from "lucide-react";
+import { X, Crown, BadgeCheck, CalendarDays, Loader2, Check, Users, Trophy, Heart } from "lucide-react";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { useAppStore } from "./store";
 import type { PublicProfile, AnimeSummary } from "./types";
-import { Avatar, SmartImage, timeAgo } from "./ui-bits";
+import { FramedAvatar, NameWithFrame, nameFrameContentInset, SmartImage, timeAgo } from "./ui-bits";
 import {
   userAccentVars, textOn, Equalizer, getAchievementStates, SocialLinksRow,
 } from "./profile";
@@ -68,7 +68,7 @@ export function ProfilePopupCard({
   return (
     <div
       className={cn(
-        "relative w-full max-w-[420px] overflow-hidden rounded-3xl border bg-card text-card-foreground shadow-2xl",
+        "relative w-full max-w-[420px] overflow-visible rounded-3xl border bg-card text-card-foreground shadow-2xl",
         "border-[color-mix(in_srgb,var(--user-accent)_35%,transparent)]"
       )}
       style={userAccentVars(profile.accentColor, profile.accentTo)}
@@ -111,28 +111,22 @@ export function ProfilePopupCard({
       <div className="px-6 pb-6">
         <div className="flex items-end justify-between -mt-14 relative z-10">
           <div className="rounded-full bg-card p-1 shadow-xl">
-            <Avatar
-              src={profile.avatarUrl}
-              name={profile.displayName || profile.username}
-              accent={profile.accentColor}
-              accentTo={profile.accentTo}
-              frame={profile.avatarFrame}
-              size={88}
-            />
+            <FramedAvatar user={profile} size={88} />
           </div>
           {/* online dot */}
           <span
             className={cn(
               "mb-1 w-4 h-4 rounded-full border-[3px] border-card",
-              watching ? "bg-emerald-500 live-dot" : "bg-muted-foreground/40"
+              (profile.isOnline ?? Boolean(watching)) ? "bg-emerald-500 live-dot" : "bg-muted-foreground/40"
             )}
+            title={(profile.isOnline ?? Boolean(watching)) ? (watching ? "Online — tomosha qilmoqda" : "Online") : "Oflayn"}
           />
         </div>
 
-        <div className="mt-2.5 min-w-0">
+        <div className="mt-4 min-w-0" style={{ "--profile-name-frame-inset": `${nameFrameContentInset(profile, 34)}px` } as React.CSSProperties}>
           <div className="flex items-center gap-1.5 flex-wrap">
-            <h3 className="font-display text-lg font-bold leading-tight truncate">
-              {profile.displayName || profile.username}
+            <h3 className="m-0 flex min-w-0 items-center font-display text-lg font-bold leading-none">
+              <NameWithFrame user={profile} height={34} avatarSize={88} />
             </h3>
             {profile.isVerified && <BadgeCheck className="w-4 h-4 text-[var(--user-accent)] shrink-0" />}
             {profile.role === "CREATOR" && (
@@ -144,13 +138,13 @@ export function ProfilePopupCard({
               </span>
             )}
           </div>
-          <p className="text-xs text-muted-foreground">
+          <p className="profile-name-frame-follow text-xs text-muted-foreground">
             @{profile.username}{profile.pronouns ? ` · ${profile.pronouns}` : ""}
             {profile.stats.level !== undefined && <span className="ml-1.5 rounded bg-secondary px-1.5 py-0.5 font-bold">Lv.{profile.stats.level}</span>}
           </p>
 
           {/* status line */}
-          <div className="mt-2 min-h-[24px]">
+          <div className="profile-name-frame-follow mt-2 min-h-[24px]">
             {watching ? (
               <span className="inline-flex items-center gap-1.5 text-[11px] font-medium bg-accent rounded-full px-2.5 py-1 max-w-full">
                 <Equalizer className="h-2.5" />
@@ -264,15 +258,6 @@ export function ProfilePopupCard({
                 {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : following ? <Check className="w-4 h-4" /> : <Users className="w-4 h-4" />}
                 {following ? "Following" : "Follow"}
               </Button>}
-              <Button
-                size="sm"
-                variant="outline"
-                className="h-9 rounded-full px-3"
-                onClick={() => toast.info("Messages are coming soon!")}
-                aria-label="Send message"
-              >
-                <Send className="w-4 h-4" />
-              </Button>
             </>
           ) : (
             <Button

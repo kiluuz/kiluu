@@ -2,10 +2,24 @@
 
 import { useEffect, useRef, useState } from "react";
 import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
-import { Search, X, ChevronRight, TrendingUp, Clock } from "lucide-react";
+import { Search, X, ChevronRight, TrendingUp, Clock, Users } from "lucide-react";
 import { useAppStore } from "./store";
 import { cn } from "@/lib/utils";
 import type { AnimeSummary } from "./types";
+import { FramedAvatar, NameWithFrame } from "./ui-bits";
+
+interface UserSearchResult {
+  id: string;
+  username: string;
+  displayName: string | null;
+  avatarUrl: string | null;
+  avatarFrame?: string | null;
+  equippedAvatarFrameId?: string | null;
+  equippedNameFrameId?: string | null;
+  role: string;
+  accentColor: string;
+  accentTo: string | null;
+}
 
 /* ============================================================
    MOBILE SEARCH — full-screen command-style search
@@ -17,11 +31,16 @@ export function MobileSearch() {
   const open = useAppStore((s) => s.mobileSearchOpen);
   const setOpen = useAppStore((s) => s.setMobileSearchOpen);
   const navigate = useAppStore((s) => s.navigate);
+  const view = useAppStore((s) => s.view);
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<AnimeSummary[]>([]);
+  const [userResults, setUserResults] = useState<UserSearchResult[]>([]);
   const [searching, setSearching] = useState(false);
+  const [userSearching, setUserSearching] = useState(false);
+  const [userSearchError, setUserSearchError] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const reducedMotion = useReducedMotion();
+  const peopleOnly = view.name === "community";
 
   /* focus + reset whenever opened */
   useEffect(() => {
@@ -52,25 +71,66 @@ export function MobileSearch() {
 
   /* debounced search — empty query shows popular (trending order) */
   useEffect(() => {
-    setSearching(true);
+    if (!open || peopleOnly) return;
+    const controller = new AbortController();
     const t = setTimeout(async () => {
       try {
         const q = query.trim();
-        const res = await fetch(`/api/animes?sort=trending${q ? `&search=${encodeURIComponent(q)}` : ""}`);
+        setSearching(true);
+        const res = await fetch(`/api/animes?sort=trending${q ? `&search=${encodeURIComponent(q)}` : ""}`, { signal: controller.signal });
+        if (!res.ok) throw new Error(`Anime search failed (${res.status})`);
         const data = await res.json();
         setResults((data.animes || []).slice(0, 12));
-      } catch {
+      } catch (error) {
+        if (error instanceof DOMException && error.name === "AbortError") return;
+        console.error("anime search request failed", error);
         setResults([]);
       } finally {
-        setSearching(false);
+        if (!controller.signal.aborted) setSearching(false);
       }
     }, query.trim() ? 280 : 0);
-    return () => clearTimeout(t);
-  }, [query]);
+    return () => {
+      clearTimeout(t);
+      controller.abort();
+    };
+  }, [open, peopleOnly, query]);
+
+  useEffect(() => {
+    const q = query.trim();
+    if (!open || !peopleOnly || q.length < 2) return;
+
+    const controller = new AbortController();
+    const timer = setTimeout(async () => {
+      try {
+        setUserSearching(true);
+        const res = await fetch(`/api/users/search?q=${encodeURIComponent(q)}`, { signal: controller.signal });
+        if (!res.ok) throw new Error(`User search failed (${res.status})`);
+        const data = await res.json();
+        setUserResults(data.users ?? []);
+        setUserSearchError(false);
+      } catch (error) {
+        if (error instanceof DOMException && error.name === "AbortError") return;
+        console.error("user search request failed", error);
+        setUserResults([]);
+        setUserSearchError(true);
+      } finally {
+        if (!controller.signal.aborted) setUserSearching(false);
+      }
+    }, 250);
+    return () => {
+      clearTimeout(timer);
+      controller.abort();
+    };
+  }, [open, peopleOnly, query]);
 
   function go(a: AnimeSummary) {
     setOpen(false);
     setQuery("");
+    setResults([]);
+    setUserResults([]);
+    setSearching(false);
+    setUserSearching(false);
+    setUserSearchError(false);
     requestAnimationFrame(() => navigate("detail", { animeId: a.slug }));
   }
 
@@ -80,7 +140,7 @@ export function MobileSearch() {
         <motion.div
           role="dialog"
           aria-modal="true"
-          aria-label="Search animes"
+          aria-label={peopleOnly ? "Search people" : "Search anime"}
           initial={reducedMotion ? false : { opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={reducedMotion ? undefined : { opacity: 0 }}
@@ -101,14 +161,33 @@ export function MobileSearch() {
               <input
                 ref={inputRef}
                 value={query}
-                onChange={(e) => setQuery(e.target.value)}
-                placeholder="Search animes, genres, studios…"
+                onChange={(e) => {
+                  const value = e.target.value;
+                  setQuery(value);
+                  setResults([]);
+                  setUserResults([]);
+                  setSearching(false);
+                  setUserSearching(peopleOnly && value.trim().length >= 2);
+                  setUserSearchError(false);
+                }}
+                placeholder={peopleOnly ? "Search people…" : "Search anime…"}
                 className="flex-1 bg-transparent outline-none text-[15px] placeholder:text-muted-foreground"
                 aria-label="Search query"
                 enterKeyHint="search"
               />
               {query && (
-                <button onClick={() => setQuery("")} className="p-1 rounded-md hover:bg-accent transition" aria-label="Clear query">
+                <button
+                  onClick={() => {
+                    setQuery("");
+                    setResults([]);
+                    setUserResults([]);
+                    setSearching(false);
+                    setUserSearching(false);
+                    setUserSearchError(false);
+                  }}
+                  className="p-1 rounded-md hover:bg-accent transition"
+                  aria-label="Clear query"
+                >
                   <X className="w-4 h-4 text-muted-foreground" />
                 </button>
               )}
@@ -117,17 +196,57 @@ export function MobileSearch() {
 
           {/* results */}
           <div className="flex-1 overflow-y-auto overscroll-contain px-3 py-3" role="listbox" aria-label="Search results">
-            {!query.trim() && (
+            {!query.trim() && !peopleOnly && (
               <p className="flex items-center gap-2 px-3 pb-2 text-[10.5px] font-bold uppercase tracking-[0.14em] text-muted-foreground/70">
                 <TrendingUp className="w-3.5 h-3.5" /> Popular right now
               </p>
             )}
-            {query.trim() && searching && results.length === 0 && (
+            {!peopleOnly && query.trim() && searching && results.length === 0 && (
               <p className="flex items-center gap-2 px-3 py-6 text-sm text-muted-foreground justify-center">
                 <Clock className="w-4 h-4 animate-pulse" /> Searching…
               </p>
             )}
-            {results.map((a, i) => (
+            {peopleOnly && userSearching && userResults.length === 0 && (
+              <p className="flex items-center gap-2 px-3 py-3 text-sm text-muted-foreground justify-center">
+                <Clock className="w-4 h-4 animate-pulse" /> Searching people…
+              </p>
+            )}
+            {peopleOnly && userResults.length > 0 && (
+              <section className="mb-4">
+                <p className="flex items-center gap-2 px-3 pb-2 text-[10.5px] font-bold uppercase tracking-[0.14em] text-muted-foreground/70">
+                  <Users className="w-3.5 h-3.5" /> People
+                </p>
+                {userResults.map((person) => (
+                  <motion.button
+                    key={person.id}
+                    role="option"
+                    aria-selected={false}
+                    initial={reducedMotion ? false : { opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    onClick={() => {
+                      setOpen(false);
+                      setQuery("");
+                      setResults([]);
+                      setUserResults([]);
+                      setSearching(false);
+                      setUserSearching(false);
+                      setUserSearchError(false);
+                      requestAnimationFrame(() => navigate("user-profile", { username: person.username }));
+                    }}
+                    className="w-full flex items-center gap-3.5 p-2.5 rounded-2xl hover:bg-accent/60 active:bg-accent transition text-left outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  >
+                    <FramedAvatar user={person} size={44} />
+                    <span className="flex-1 min-w-0">
+                      <NameWithFrame user={person} compact className="block truncate text-[14px] font-bold" avatarSize={44} />
+                      <span className="block text-[11.5px] text-muted-foreground truncate">@{person.username} · {person.role}</span>
+                    </span>
+                    <ChevronRight className="w-4 h-4 text-muted-foreground shrink-0" />
+                  </motion.button>
+                ))}
+              </section>
+            )}
+            {peopleOnly && userSearchError && <p className="px-3 py-3 text-center text-sm text-destructive">Couldn’t search people. Try again.</p>}
+            {!peopleOnly && results.map((a, i) => (
               <motion.button
                 key={a.id}
                 role="option"
@@ -164,10 +283,12 @@ export function MobileSearch() {
                 <ChevronRight className="w-4 h-4 text-muted-foreground shrink-0" />
               </motion.button>
             ))}
-            {query.trim() && !searching && results.length === 0 && (
+            {query.trim() && !userSearchError && (peopleOnly
+              ? !userSearching && userResults.length === 0
+              : !searching && results.length === 0) && (
               <div className="px-6 py-12 text-center">
                 <p className="text-sm font-bold">No results for “{query.trim()}”</p>
-                <p className="text-[12.5px] text-muted-foreground mt-1">Try a different title, genre or studio.</p>
+                <p className="text-[12.5px] text-muted-foreground mt-1">{peopleOnly ? "Try a different username." : "Try a different anime title."}</p>
               </div>
             )}
             <div className="h-[calc(env(safe-area-inset-bottom,0px)+24px)]" />

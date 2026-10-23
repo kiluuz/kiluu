@@ -11,7 +11,7 @@ export interface NavigateOptions {
 export function viewToPath(view: View): string {
   switch (view.name) {
     case "home":
-      return "/";
+      return "/app";
     case "schedule":
       return "/schedule";
     case "browse": {
@@ -59,6 +59,9 @@ export function pathToView(pathname: string, search: string = ""): View {
   const cleanPath = (pathname || "/").replace(/\/+$/, "") || "/";
   const params = new URLSearchParams(search);
 
+  if (cleanPath === "/app") {
+    return { name: "home" };
+  }
   if (cleanPath === "/" || cleanPath === "") {
     return { name: "home" };
   }

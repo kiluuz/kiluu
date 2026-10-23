@@ -9,6 +9,9 @@ import { Toaster } from "@/components/ui/sonner";
 import { ThemeProvider } from "@/components/theme-provider";
 import { I18nProvider } from "@/components/i18n-provider";
 import { QueryProvider } from "@/components/query-provider";
+import { cookies } from "next/headers";
+import { DEFAULT_LOCALE, isLocale } from "@/lib/i18n";
+import { FirstVisitSplash } from "@/components/brand/FirstVisitSplash";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -83,13 +86,14 @@ const ptSerif = PT_Serif({
 
 export const metadata: Metadata = {
   metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000"),
-  title: "Kiluu — Stream, Collect & Exchange Anime",
+  title: "Kiluu — Stream, Collect & Gift Anime",
   description:
-    "Premium anime streaming universe. Watch free and exclusive animes, collect credits, trade with collectors, and host synced watch parties with friends. Voice it your way.",
-  keywords: ["anime", "streaming", "watch together", "anime exchange", "Kiluu", "anime dubbing"],
+    "Premium anime streaming universe. Watch free and exclusive anime, collect credits, gift series to friends, and host synced watch parties. Voice it your way.",
+  keywords: ["anime", "streaming", "watch together", "anime gifts", "Kiluu", "anime dubbing"],
   manifest: "/manifest.webmanifest",
   icons: {
     icon: [
+      { url: "/icon.svg", type: "image/svg+xml" },
       { url: "/favicon.svg", type: "image/svg+xml" },
       { url: "/favicon.ico", sizes: "48x48" },
     ],
@@ -98,16 +102,16 @@ export const metadata: Metadata = {
   openGraph: {
     title: "Kiluu",
     siteName: "Kiluu",
-    description: "Stream, collect and exchange premium anime. Voice it your way.",
-    images: [{ url: "/og-image.png", width: 1200, height: 630, type: "image/png" }],
+    description: "Stream, collect and gift premium anime. Voice it your way.",
+    images: [{ url: "/opengraph-image", width: 1200, height: 630, type: "image/png" }],
     locale: "en_US",
     type: "website",
   },
   twitter: {
     card: "summary_large_image",
     title: "Kiluu",
-    description: "Stream, collect and exchange premium anime. Voice it your way.",
-    images: ["/og-image.png"],
+    description: "Stream, collect and gift premium anime. Voice it your way.",
+    images: ["/opengraph-image"],
   },
 };
 
@@ -116,23 +120,33 @@ export const viewport: Viewport = {
   initialScale: 1,
   viewportFit: "cover",
   themeColor: [
-    { media: "(prefers-color-scheme: dark)", color: "#12100d" },
-    { media: "(prefers-color-scheme: light)", color: "#f7f4ee" },
+    { media: "(prefers-color-scheme: dark)", color: "#15110e" },
+    { media: "(prefers-color-scheme: light)", color: "#f7f0e0" },
   ],
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const cookieStore = await cookies();
+  const savedLocale = cookieStore.get("kiluu-locale")?.value;
+  const initialLocale = isLocale(savedLocale) ? savedLocale : DEFAULT_LOCALE;
+
   return (
-    <html lang="uz" suppressHydrationWarning>
+    <html lang={initialLocale} suppressHydrationWarning>
       <body
         className={`${geistSans.variable} ${geistMono.variable} ${spaceGrotesk.variable} ${unbounded.variable} ${shipporiMincho.variable} ${fraunces.variable} ${cormorantGaramond.variable} ${playfairDisplay.variable} ${notoSerifSC.variable} ${amiri.variable} ${ptSerif.variable} antialiased bg-background text-foreground`}
       >
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `(()=>{try{if(sessionStorage.getItem("kiluu-splash-v1")){document.documentElement.classList.add("kiluu-splash-seen")}else{sessionStorage.setItem("kiluu-splash-v1","1")}}catch{}})()`,
+          }}
+        />
+        <FirstVisitSplash />
         <ThemeProvider attribute="class" defaultTheme="dark" enableSystem disableTransitionOnChange>
-          <I18nProvider>
+          <I18nProvider initialLocale={initialLocale}>
             <QueryProvider>
               {children}
               <Toaster richColors position="bottom-right" />

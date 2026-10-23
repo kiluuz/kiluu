@@ -8,36 +8,18 @@ import { useAppStore } from "../store";
 import type { AnimeSummary, HomeData } from "../types";
 import { AnimeCard, ContinueCard, SectionHeader, ScrollRow, SmartImage, RankedCard, WideCard, formatCredits } from "../ui-bits";
 import { toast } from "sonner";
-
-const HOME_CACHE_KEY = "dubanix:home:v2";
-const HOME_CACHE_TTL = 5 * 60 * 1000; // 5 min
-
-function readHomeCache(): HomeData | null {
-  try {
-    const raw = localStorage.getItem(HOME_CACHE_KEY);
-    if (!raw) return null;
-    const { data, ts } = JSON.parse(raw) as { data: HomeData; ts: number };
-    if (Date.now() - ts > HOME_CACHE_TTL) return null;
-    return data;
-  } catch {
-    return null;
-  }
-}
-
-function writeHomeCache(d: HomeData) {
-  try {
-    localStorage.setItem(HOME_CACHE_KEY, JSON.stringify({ data: d, ts: Date.now() }));
-  } catch {}
-}
+import { useI18n } from "@/components/i18n-provider";
+import { genreTranslationKey } from "@/lib/i18n";
+import { QuestsWidget } from "../gamification/quests-widget";
+import { WeeklyPollCard } from "../gamification/weekly-poll-card";
+import { SeasonalEventBanner } from "../gamification/seasonal-event-banner";
 
 export function HomeView() {
   const { navigate, user, setAuthOpen } = useAppStore();
-  const [data, setData] = useState<HomeData | null>(() => {
-    // Instantly show cached data on mount (no skeleton flash for returning users)
-    if (typeof window !== "undefined") return readHomeCache();
-    return null;
-  });
+  const { t } = useI18n();
+  const [data, setData] = useState<HomeData | null>(null);
   const [heroIdx, setHeroIdx] = useState(0);
+  const preferenceKey = user?.favoriteGenres.join(",") ?? "";
 
   useEffect(() => {
     let alive = true;
@@ -45,15 +27,15 @@ export function HomeView() {
       .then((r) => r.json())
       .then((d) => {
         if (alive && d) {
+          setHeroIdx(0);
           setData(d);
-          writeHomeCache(d);
         }
       })
-      .catch(() => toast.error("Failed to load home data"));
+      .catch(() => toast.error(t("home.loadError")));
     return () => {
       alive = false;
     };
-  }, [user?.id]);
+  }, [user?.id, preferenceKey, t]);
 
   // Hero auto-rotate
   useEffect(() => {
@@ -90,7 +72,7 @@ export function HomeView() {
         navigate("detail", { animeId: pick.slug });
       }
     } catch {
-      toast.error("Could not pick an anime");
+      toast.error(t("home.randomError"));
     }
   }
 
@@ -98,7 +80,7 @@ export function HomeView() {
     <div className="pb-8">
       {/* ===== HERO ===== */}
       {hero && (
-        <section className="relative h-[64vh] min-h-[420px] max-h-[600px] w-full overflow-hidden" aria-label="Featured anime">
+        <section className="relative h-[64vh] min-h-[420px] max-h-[600px] w-full overflow-hidden" aria-label={t("home.featuredAnime")}>
           <div className="absolute inset-0">
             {data.featured.map((a, i) => {
               const src = a.bannerImage || a.coverImage;
@@ -122,13 +104,17 @@ export function HomeView() {
               <div className="flex items-center gap-2 mb-3 flex-wrap">
                 <Badge className="brand-gradient text-white border-0 gap-1 font-bold">
                   <Sparkles className="w-3 h-3" />
-                  {hero.featured ? `#${heroIdx + 1} Featured` : "From the catalog"}
+                  {hero.recommended
+                    ? t("home.forYourTaste")
+                    : hero.featured
+                      ? `#${heroIdx + 1} ${t("home.featured")}`
+                      : t("home.fromCatalog")}
                 </Badge>
                 {hero.isFree ? (
-                  <Badge className="bg-emerald-500/90 border-0 font-bold">FREE</Badge>
+                  <Badge className="bg-emerald-500/90 border-0 font-bold">{t("home.free")}</Badge>
                 ) : (
                   <Badge className="bg-amber-500/90 border-0 font-bold gap-1">
-                    <Star className="w-3 h-3 fill-white" /> {formatCredits(hero.price)} credits
+                    <Star className="w-3 h-3 fill-white" /> {formatCredits(hero.price)} {t("home.credits")}
                   </Badge>
                 )}
                 <Badge variant="secondary" className="font-semibold">{hero.type}</Badge>
@@ -155,7 +141,7 @@ export function HomeView() {
                   className="h-12 px-7 rounded-full brand-gradient hover:opacity-90 text-white font-bold text-base shadow-xl shadow-primary/30"
                 >
                   <Play className="w-5 h-5 fill-white" />
-                  {hero.owned || hero.isFree ? "Watch Now" : "View Details"}
+                  {hero.owned || hero.isFree ? t("home.watchNow") : t("home.viewDetails")}
                 </Button>
                 <Button
                   size="lg"
@@ -164,17 +150,17 @@ export function HomeView() {
                   className="h-12 px-6 rounded-full glass font-semibold"
                 >
                   <Info className="w-4 h-4" />
-                  More Info
+                  {t("home.moreInfo")}
                 </Button>
                 <Button
                   size="lg"
                   variant="ghost"
                   onClick={surpriseMe}
                   className="h-12 px-5 rounded-full hidden sm:flex"
-                  title="Random anime"
+                  title={t("home.randomAnime")}
                 >
                   <Shuffle className="w-4 h-4" />
-                  Surprise Me
+                  {t("home.surpriseMe")}
                 </Button>
               </div>
             </div>
@@ -188,7 +174,7 @@ export function HomeView() {
                   className={`h-1.5 rounded-full transition-all ${
                     i === heroIdx ? "w-8 brand-gradient" : "w-3 bg-foreground/20 hover:bg-foreground/40"
                   }`}
-                  aria-label={`Go to featured ${i + 1}`}
+                  aria-label={`${t("home.goToFeatured")} ${i + 1}`}
                 />
               ))}
             </div>
@@ -197,13 +183,22 @@ export function HomeView() {
       )}
 
       <div className="max-w-[1280px] mx-auto px-4 sm:px-8 space-y-9 mt-6">
+        {/* ===== SEASONAL EVENT BANNER ===== */}
+        <SeasonalEventBanner />
+
+        {/* ===== GAMIFICATION: QUESTS & WEEKLY POLL ===== */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <QuestsWidget compact />
+          <WeeklyPollCard />
+        </div>
+
         {/* ===== CONTINUE WATCHING ===== */}
         {data.continueWatching.length > 0 && (
-          <section aria-label="Continue watching">
+          <section aria-label={t("home.continueWatching")}>
             <SectionHeader
-              title="Continue Watching"
+              title={t("home.continueWatching")}
               icon={<Clock3 className="w-5 h-5 text-primary" />}
-              actionLabel="My Library"
+              actionLabel={t("nav.library")}
               onAction={() => navigate("library")}
             />
             <ScrollRow>
@@ -218,16 +213,16 @@ export function HomeView() {
         {data.freeAnimes.length > 0 && (
           <section
             className="rounded-3xl border p-5 sm:p-7 aurora relative overflow-hidden"
-            aria-label="Free animes"
+            aria-label={t("home.freeAnime")}
           >
             <div className="relative flex items-center justify-between gap-4 flex-wrap mb-4">
               <div>
                 <h2 className="text-xl sm:text-2xl font-black flex items-center gap-2.5">
                   <Gift className="w-6 h-6 text-emerald-400" />
-                  Free to Watch
+                  {t("home.freeToWatch")}
                 </h2>
                 <p className="text-sm text-muted-foreground mt-1">
-                  No credits needed — just press play and enjoy
+                  {t("home.freeSubtitle")}
                 </p>
               </div>
               <Button
@@ -236,7 +231,7 @@ export function HomeView() {
                 onClick={() => navigate("browse", { filters: { free: "1" } })}
                 className="rounded-full"
               >
-                See all free
+                {t("home.seeAllFree")}
               </Button>
             </div>
             <ScrollRow>
@@ -249,11 +244,11 @@ export function HomeView() {
 
         {/* ===== TRENDING ===== */}
         {data.trending.length > 0 && (
-          <section aria-label="Trending now">
+          <section aria-label={t("home.trendingNow")}>
             <SectionHeader
-              title="Trending Now"
+              title={t("home.trendingNow")}
               icon={<Flame className="w-5 h-5 text-orange-500" />}
-              actionLabel="Discover more"
+              actionLabel={t("home.discoverMore")}
               onAction={() => navigate("browse")}
             />
             <ScrollRow>
@@ -266,9 +261,9 @@ export function HomeView() {
 
         {/* ===== TOP 10 ===== */}
         {data.topRated.length > 0 && (
-          <section aria-label="Top rated">
+          <section aria-label={t("home.hallOfFame")}>
             <SectionHeader
-              title="Hall of Fame"
+              title={t("home.hallOfFame")}
               icon={<Trophy className="w-5 h-5 text-amber-400" />}
             />
             <ScrollRow>
@@ -281,16 +276,16 @@ export function HomeView() {
 
         {/* ===== NEW RELEASES ===== */}
         {data.newReleases.length > 0 && (
-          <section aria-label="New releases">
+          <section aria-label={t("home.freshDrops")}>
             <SectionHeader
-              title="Fresh Drops"
+              title={t("home.freshDrops")}
               icon={<Sparkles className="w-5 h-5 text-primary" />}
-              actionLabel="Discover"
+              actionLabel={t("nav.browse")}
               onAction={() => navigate("browse", { filters: { sort: "newest" } })}
             />
             <ScrollRow>
               {data.newReleases.map((a, i) => (
-                <WideCard key={a.id} anime={a} tag={i === 0 ? "FRESH DROP" : a.status === "ONGOING" ? "NEW EPISODES" : undefined} />
+                <WideCard key={a.id} anime={a} tag={i === 0 ? t("home.freshDrop") : a.status === "ONGOING" ? t("home.newEpisodes") : undefined} />
               ))}
             </ScrollRow>
           </section>
@@ -298,8 +293,8 @@ export function HomeView() {
 
         {/* ===== GENRE PILLS ===== */}
         {data.genres.length > 0 && (
-          <section aria-label="Browse genres" className="pb-4">
-            <SectionHeader title="Explore Genres" />
+          <section aria-label={t("home.exploreGenres")} className="pb-4">
+            <SectionHeader title={t("home.exploreGenres")} />
             <div className="flex flex-wrap gap-2.5">
               {data.genres.map((g, i) => (
                 <button
@@ -308,7 +303,7 @@ export function HomeView() {
                   className="px-4 py-2 rounded-full border bg-card hover:border-primary/60 hover:text-primary hover:-translate-y-0.5 transition-all text-sm font-semibold shadow-sm"
                   style={{ transitionDelay: `${i * 10}ms` }}
                 >
-                  {g}
+                  {t(genreTranslationKey(g))}
                 </button>
               ))}
             </div>
