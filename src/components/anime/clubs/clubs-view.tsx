@@ -49,6 +49,7 @@ interface ClubItem {
   xp: number;
   createdAt: string;
   memberCount: number;
+  onlineCount?: number;
   owner: { id: string; username: string; displayName?: string | null; avatarUrl?: string | null };
   chatRoomId: string;
   myRole?: string | null;
@@ -66,6 +67,7 @@ interface ClubMemberItem {
     avatarUrl?: string | null;
     avatarFrame?: string | null;
     level: number;
+    isOnline?: boolean;
   };
 }
 
@@ -335,7 +337,15 @@ export function ClubsView() {
                 </div>
                 <p className="text-xs text-muted-foreground mt-1 flex items-center gap-3">
                   <span className="flex items-center gap-1">
-                    <Users className="w-3.5 h-3.5" /> {clubDetail.memberCount} a'zo
+                    <Users className="w-3.5 h-3.5" /> {clubDetail.memberCount} a&apos;zo
+                  </span>
+                  <span>•</span>
+                  <span className="inline-flex items-center gap-1.5 font-bold text-emerald-500">
+                    <span className="relative flex h-2 w-2">
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                      <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                    </span>
+                    {clubDetail.onlineCount ?? 1} online
                   </span>
                   <span>•</span>
                   <span>XP: {clubDetail.xp}</span>
@@ -402,7 +412,12 @@ export function ClubsView() {
                   : "border-transparent text-muted-foreground hover:text-foreground"
               )}
             >
-              <Users className="w-4 h-4" /> A'zolar ({clubDetail.memberCount})
+              <Users className="w-4 h-4" /> A&apos;zolar ({clubDetail.memberCount})
+              {clubDetail.onlineCount > 0 && (
+                <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-emerald-500/10 text-emerald-500 font-bold border border-emerald-500/20">
+                  {clubDetail.onlineCount} online
+                </span>
+              )}
             </button>
             {isStaff && (
               <button
@@ -427,7 +442,7 @@ export function ClubsView() {
               <ChatPanel
                 roomId={`club:${clubDetail.id}`}
                 title={`[${clubDetail.tag}] ${clubDetail.name} chati`}
-                subtitle={`${clubDetail.memberCount} ta a'zo`}
+                subtitle={`${clubDetail.memberCount} ta a'zo • ${clubDetail.onlineCount ?? 1} online`}
               />
             </div>
             <div className="space-y-4">
@@ -464,7 +479,12 @@ export function ClubsView() {
               {clubDetail.members.map((m: ClubMemberItem) => (
                 <div key={m.id} className="py-3 flex items-center justify-between gap-3">
                   <div className="flex items-center gap-3">
-                    <FramedAvatar user={m.user as any} size={40} />
+                    <div className="relative">
+                      <FramedAvatar user={m.user as any} size={40} />
+                      {m.user.isOnline && (
+                        <span className="absolute bottom-0 right-0 w-3 h-3 rounded-full bg-emerald-500 border-2 border-background shadow-xs" title="Online" />
+                      )}
+                    </div>
                     <div>
                       <button
                         onClick={() => openProfile(m.user.username)}
@@ -754,8 +774,15 @@ export function ClubsView() {
                 </div>
 
                 <div className="pt-4 border-t mt-4 flex items-center justify-between">
-                  <div className="text-[11px] text-muted-foreground">
-                    <span className="font-bold text-foreground">{c.memberCount}</span> a'zo • XP: {c.xp}
+                  <div className="text-[11px] text-muted-foreground flex items-center gap-1.5">
+                    <span><strong className="text-foreground">{c.memberCount}</strong> a&apos;zo</span>
+                    <span>•</span>
+                    <span className="inline-flex items-center gap-1 text-emerald-500 font-bold">
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+                      {c.onlineCount ?? 1} online
+                    </span>
+                    <span>•</span>
+                    <span>XP: {c.xp}</span>
                   </div>
 
                   <Button

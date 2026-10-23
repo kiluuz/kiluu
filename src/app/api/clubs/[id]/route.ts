@@ -36,6 +36,7 @@ export async function GET(req: NextRequest, context: RouteContext) {
                 displayName: true,
                 avatarUrl: true,
                 avatarFrame: true,
+                lastSeenAt: true,
                 xpEvents: { select: { amount: true } },
               },
             },
@@ -85,9 +86,16 @@ export async function GET(req: NextRequest, context: RouteContext) {
       });
     }
 
+    const presenceCutoff = new Date(Date.now() - 5 * 60_000);
+    const onlineMembersCount = club.members.filter(
+      (m) => (m.user as any).lastSeenAt && (m.user as any).lastSeenAt >= presenceCutoff
+    ).length;
+    const finalOnlineCount = Math.max(myMembership ? 1 : 0, onlineMembersCount);
+
     const formattedMembers = club.members.map((m) => {
       const totalXp = m.user.xpEvents.reduce((s, e) => s + e.amount, 0);
       const levelInfo = calculateLevel(totalXp);
+      const isOnline = Boolean((m.user as any).lastSeenAt && (m.user as any).lastSeenAt >= presenceCutoff);
       return {
         id: m.id,
         userId: m.userId,
@@ -101,6 +109,7 @@ export async function GET(req: NextRequest, context: RouteContext) {
           avatarUrl: m.user.avatarUrl,
           avatarFrame: m.user.avatarFrame,
           level: levelInfo.level,
+          isOnline,
         },
       };
     });
@@ -119,6 +128,7 @@ export async function GET(req: NextRequest, context: RouteContext) {
         createdAt: club.createdAt,
         owner: club.owner,
         memberCount: club._count.members,
+        onlineCount: finalOnlineCount,
         chatRoomId: club.chatRoom?.id || `club:${club.id}`,
         slowMode: club.chatRoom?.slowMode || 0,
         myRole: myMembership?.role || null,

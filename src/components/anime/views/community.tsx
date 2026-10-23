@@ -547,11 +547,18 @@ export function CommunityView() {
           </button>
         </div>
 
-        <div className="flex items-center gap-3 text-xs font-bold bg-secondary/50 p-2.5 rounded-2xl border">
-          {stats && <div className="flex flex-col"><span className="text-muted-foreground">{t("community.online")}</span><span>{stats.online}</span></div>}
-          {stats && <div className="w-px h-6 bg-border" />}
-          <div className="flex flex-col"><span className="text-muted-foreground">{t("community.postsToday")}</span><span>{stats?.postsToday ?? "—"}</span></div>
-        </div>
+        {communityMode === "feed" && stats && (
+          <div className="inline-flex items-center gap-2.5 px-4 py-2 rounded-2xl bg-secondary/40 border border-emerald-500/20 backdrop-blur-md shadow-xs transition-all hover:border-emerald-500/40">
+            <span className="relative flex h-2.5 w-2.5 shrink-0">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+              <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500"></span>
+            </span>
+            <div className="flex items-center gap-1.5 text-xs font-bold leading-none">
+              <span className="text-muted-foreground">{t("community.online")}</span>
+              <span className="text-emerald-500 font-extrabold">{stats.online}</span>
+            </div>
+          </div>
+        )}
       </div>
 
       {communityMode === "clubs" ? (

@@ -49,33 +49,42 @@ export async function GET(req: NextRequest) {
         chatRoom: {
           select: { id: true },
         },
-        ...(user
-          ? {
-              members: {
-                where: { userId: user.id },
-                select: { role: true },
+        members: {
+          select: {
+            userId: true,
+            role: true,
+            user: {
+              select: {
+                lastSeenAt: true,
               },
-            }
-          : {}),
+            },
+          },
+        },
       },
     });
 
-    const formatted = clubs.map((c) => ({
-      id: c.id,
-      name: c.name,
-      tag: c.tag,
-      description: c.description,
-      avatarUrl: c.avatarUrl,
-      bannerUrl: c.bannerUrl,
-      isPublic: c.isPublic,
-      level: c.level,
-      xp: c.xp,
-      createdAt: c.createdAt,
-      memberCount: c._count.members,
-      owner: c.owner,
-      chatRoomId: c.chatRoom?.id || `club:${c.id}`,
-      myRole: (c as any).members?.[0]?.role || null,
-    }));
+    const presenceCutoff = new Date(Date.now() - 5 * 60_000);
+    const formatted = clubs.map((c) => {
+      const myRole = user ? c.members.find((m) => m.userId === user.id)?.role || null : null;
+      const onlineCount = c.members.filter((m) => m.user?.lastSeenAt && m.user.lastSeenAt >= presenceCutoff).length;
+      return {
+        id: c.id,
+        name: c.name,
+        tag: c.tag,
+        description: c.description,
+        avatarUrl: c.avatarUrl,
+        bannerUrl: c.bannerUrl,
+        isPublic: c.isPublic,
+        level: c.level,
+        xp: c.xp,
+        createdAt: c.createdAt,
+        memberCount: c._count.members,
+        onlineCount: Math.max(myRole ? 1 : 0, onlineCount),
+        owner: c.owner,
+        chatRoomId: c.chatRoom?.id || `club:${c.id}`,
+        myRole,
+      };
+    });
 
     return NextResponse.json({ clubs: formatted });
   } catch (error) {
