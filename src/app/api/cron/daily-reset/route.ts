@@ -81,7 +81,7 @@ export async function POST(req: NextRequest) {
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
               chat_id: u.telegramId,
-              text: `🔥 <b>Kiluu Streak Eslatmasi!</b>\n\nSizning <b>${u.streakCount} kunlik</b> faol streak'ingiz uzilib qolishiga oz qoldi!\nBugungi kunlik mukofotingizni oling va streak'ni davom ettiring.\n\n${freezeText}\n\n👉 <a href="https://kiluu.uz">Kiluu platformasiga kirish</a>`,
+              text: `🔥 <b>Kiluu Streak Eslatmasi!</b>\n\nSizning <b>${u.streakCount} kunlik</b> faol streak'ingiz uzilib qolishiga oz qoldi!\nBugungi kunlik mukofotingizni oling va streak'ni davom ettiring.\n\n${freezeText}\n\n👉 <a href="https://kiluu.vercel.app">Kiluu platformasiga kirish</a>`,
               parse_mode: "HTML",
             }),
             signal: AbortSignal.timeout(3000),
