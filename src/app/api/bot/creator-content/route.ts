@@ -153,8 +153,8 @@ export async function POST(req: NextRequest) {
             price: input.is_free ? 0 : input.price,
             creatorId: user.id,
             source: "CREATOR",
-            moderationStatus: "PENDING",
-            hidden: true,
+            moderationStatus: "APPROVED",
+            hidden: false,
           },
           select: { id: true, slug: true, title: true },
         });
@@ -164,7 +164,7 @@ export async function POST(req: NextRequest) {
             kind: "creator",
             creatorId: user.id,
             price: input.is_free ? 0 : input.price,
-            status: "pending",
+            status: "published",
           },
         });
         return created;
@@ -209,13 +209,18 @@ export async function POST(req: NextRequest) {
     });
     if (existingEpisode) return NextResponse.json({ error: "This episode number already exists" }, { status: 409 });
     try {
+      const streamBase = process.env.NEXT_PUBLIC_STREAM_BASE_URL || process.env.STREAM_SERVER_URL || "https://kiluu-stream.onrender.com";
+      const initialVideoUrl = input.telegram_message_id
+        ? `${streamBase.replace(/\/+$/, "")}/stream/${input.telegram_message_id}`
+        : "telegram";
+
       const episode = await db.episode.create({
         data: {
           animeId: anime.id,
           versionId,
           number: input.number,
           title: input.title,
-          videoUrl: "telegram",
+          videoUrl: initialVideoUrl,
           duration: input.duration,
           telegramMessageId: String(input.telegram_message_id),
         },

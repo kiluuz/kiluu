@@ -428,6 +428,11 @@ export function VideoPlayer({
         onPause={() => setPlaying(false)}
         onWaiting={() => setWaiting(true)}
         onPlaying={() => setWaiting(false)}
+        onCanPlay={() => setWaiting(false)}
+        onError={() => {
+          setWaiting(false);
+          setSourceError("Video yuklanmadi. Telegram kanalida video mavjudligini yoki bot ruxsatlarini tekshiring.");
+        }}
         onEnded={() => {
           setPlaying(false);
           if (duration > 0) saveProgress(duration, duration, true);
