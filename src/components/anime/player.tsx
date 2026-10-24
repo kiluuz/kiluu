@@ -470,10 +470,17 @@ export function VideoPlayer({
         onPause={() => setPlaying(false)}
         onWaiting={() => setWaiting(true)}
         onPlaying={() => setWaiting(false)}
-        onCanPlay={() => setWaiting(false)}
-        onError={() => {
+        onCanPlay={() => {
           setWaiting(false);
-          setSourceError("Video yuklanmadi. Telegram kanalida video mavjudligini yoki bot ruxsatlarini tekshiring.");
+          setSourceError(null);
+        }}
+        onError={(e) => {
+          setWaiting(false);
+          const err = e.currentTarget.error;
+          if (err && err.code === 1) return; // MEDIA_ERR_ABORTED
+          if (playbackUrl) {
+            setSourceError("Video yuklanmadi. Telegram kanalida video mavjudligini yoki bot ruxsatlarini tekshiring.");
+          }
         }}
         onEnded={() => {
           setPlaying(false);
