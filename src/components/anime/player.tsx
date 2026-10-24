@@ -79,6 +79,17 @@ export function VideoPlayer({
   const hideTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const seekedRef = useRef(false);
 
+  const initialUrl = (() => {
+    if (episode.videoUrl && (episode.videoUrl.startsWith("http://") || episode.videoUrl.startsWith("https://"))) {
+      return episode.videoUrl;
+    }
+    const streamBase = process.env.NEXT_PUBLIC_STREAM_BASE_URL || "https://kiluu-stream.onrender.com";
+    if (episode.telegramMessageId && streamBase) {
+      return `${streamBase.replace(/\/+$/, "")}/stream/${episode.telegramMessageId}`;
+    }
+    return null;
+  })();
+
   const [playing, setPlaying] = useState(false);
   const [waiting, setWaiting] = useState(false);
   const [current, setCurrent] = useState(0);
@@ -91,7 +102,7 @@ export function VideoPlayer({
   const [speedOpen, setSpeedOpen] = useState(false);
   const [listOpen, setListOpen] = useState(false);
   const [resumeAt, setResumeAt] = useState<number | null>(episode.progress?.position || null);
-  const [playbackUrl, setPlaybackUrl] = useState<string | null>(null);
+  const [playbackUrl, setPlaybackUrl] = useState<string | null>(initialUrl);
   const [sourceError, setSourceError] = useState<string | null>(null);
   // Note: parent remounts this component via key={episode.id}, so all state resets naturally
 
@@ -269,6 +280,10 @@ export function VideoPlayer({
       toast.info("Only the party host controls playback", { id: "host-only" });
       return;
     }
+    if (!v.src && !playbackUrl) {
+      toast.info("Video oqimi ulanmoqda, kuting...", { id: "stream-loading" });
+      return;
+    }
     if (v.paused) {
       v.play()
         .then(() => {
@@ -277,6 +292,9 @@ export function VideoPlayer({
         })
         .catch((err) => {
           console.warn("Video play error:", err);
+          if (err && err.name === "AbortError") {
+            return;
+          }
           if (err && err.name === "NotAllowedError") {
             v.muted = true;
             v.play().then(() => {
@@ -286,6 +304,8 @@ export function VideoPlayer({
             }).catch(() => {
               toast.error("Brauzer videoni ijro etishni chekladi. Qaytadan urinib ko'ring.");
             });
+          } else if (err && err.name === "NotSupportedError") {
+            toast.info("Video manbasi yuklanmoqda, iltimos kuting...", { id: "stream-connecting" });
           } else {
             toast.error("Videoni o'ynatishda xatolik yuz berdi. Sahifani yangilab ko'ring.");
           }
@@ -358,10 +378,14 @@ export function VideoPlayer({
       play: (pos?: number) => {
         const v = videoRef.current;
         if (!v) return;
+        if (!v.src && !playbackUrl) return;
         if (typeof pos === "number" && isFinite(pos)) v.currentTime = pos;
-        v.play().then(() => setPlaying(true)).catch(() => {
-          toast.info("Tap the video once to allow playback audio in this browser.", { id: "party-autoplay" });
-          onAutoplayBlocked?.();
+        v.play().then(() => setPlaying(true)).catch((err) => {
+          if (err && err.name === "AbortError") return;
+          if (err && err.name === "NotAllowedError") {
+            toast.info("Tap the video once to allow playback audio in this browser.", { id: "party-autoplay" });
+            onAutoplayBlocked?.();
+          }
         });
       },
       pause: (pos?: number) => {
