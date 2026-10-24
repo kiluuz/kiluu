@@ -76,8 +76,9 @@ export async function GET(req: NextRequest) {
     const withAsciiApostrophe = cleanSearch.replace(/[\u02bb\u02bc\u2018\u2019`]/g, "'");
     const withUzbekTurnedComma = cleanSearch.replace(/['`\u2018\u2019\u02bc]/g, "ʻ");
     const withoutApostrophe = cleanSearch.replace(/['`\u2018\u2019\u02bb\u02bc]/g, "");
+    const words = cleanSearch.split(/\s+/).filter((w) => w.length >= 2);
 
-    const variations = Array.from(new Set([cleanSearch, withAsciiApostrophe, withUzbekTurnedComma, withoutApostrophe])).filter(Boolean);
+    const variations = Array.from(new Set([cleanSearch, withAsciiApostrophe, withUzbekTurnedComma, withoutApostrophe, ...words])).filter(Boolean);
 
     where.OR = variations.flatMap((term) => [
       { title: { contains: term, mode: "insensitive" } },
