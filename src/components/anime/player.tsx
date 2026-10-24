@@ -26,6 +26,7 @@ export interface PlayerEpisode {
   videoUrl: string;
   streamId?: string | null;
   hlsKey?: string | null;
+  telegramMessageId?: string | null;
   duration: number;
   progress: { position: number; duration: number; completed: boolean } | null;
 }
@@ -127,10 +128,16 @@ export function VideoPlayer({
       }
     });
     if (!episode.streamId && !episode.hlsKey) {
-      if (episode.videoUrl && episode.videoUrl !== "telegram" && episode.videoUrl !== "cloudflare") {
+      if (episode.videoUrl && episode.videoUrl !== "telegram" && episode.videoUrl !== "cloudflare" && episode.videoUrl !== "r2-hls") {
         queueMicrotask(() => { if (!cancelled) setPlaybackUrl(episode.videoUrl); });
       } else {
-        queueMicrotask(() => { if (!cancelled) setSourceError("This episode is not available in browser playback yet."); });
+        const streamBase = process.env.NEXT_PUBLIC_STREAM_BASE_URL;
+        if (episode.telegramMessageId && streamBase) {
+          const directUrl = `${streamBase.replace(/\/+$/, "")}/stream/${episode.telegramMessageId}`;
+          queueMicrotask(() => { if (!cancelled) setPlaybackUrl(directUrl); });
+        } else {
+          queueMicrotask(() => { if (!cancelled) setSourceError("This episode is not available in browser playback yet."); });
+        }
       }
       return () => { cancelled = true; };
     }
