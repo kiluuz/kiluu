@@ -181,7 +181,7 @@ export function WatchTogetherView() {
         })
         .then((d: { anime: AnimeDetail; episodes: EpisodeItem[] }) => {
           const watchable = (d.anime.owned || d.anime.isFree ? d.episodes : [])
-            .filter((episode) => Boolean(episode.streamId || episode.hlsKey));
+            .filter((episode) => Boolean(episode.streamId || episode.hlsKey || (episode.videoUrl && episode.videoUrl.startsWith("http"))));
           setEpisodes(watchable);
           setSelEpisode(watchable[0]?.id || "");
         })

@@ -153,7 +153,7 @@ export async function POST(request: NextRequest) {
       episodeNumber: result.episode.number,
       episodeTitle: result.episode.title,
       duration: result.episode.duration,
-      videoUrl: result.episode.hlsKey ? "r2-hls" : "cloudflare",
+      videoUrl: result.episode.hlsKey ? "r2-hls" : (result.episode.videoUrl?.startsWith("http") ? result.episode.videoUrl : "cloudflare"),
       streamId: result.episode.streamId,
       hlsKey: result.episode.hlsKey,
       coverImage: result.episode.anime.coverImage,

@@ -109,7 +109,7 @@ export async function POST(request: NextRequest) {
   if ("error" in result) {
     if (result.error === "PARTY_FULL") return NextResponse.json({ error: "Party is full" }, { status: 409 });
     if (result.error === "PURCHASE_REQUIRED") return NextResponse.json({ error: "You must own this anime to join" }, { status: 403 });
-    if (result.error === "NO_HLS_STREAM") return NextResponse.json({ error: "This episode has no HLS stream" }, { status: 409 });
+    if (result.error === "NO_HLS_STREAM") return NextResponse.json({ error: "This episode has no video stream" }, { status: 409 });
     if (result.error === "INSUFFICIENT_CREDITS") {
       return NextResponse.json(
         { error: `Joining Watch Together requires ${joinPrice} credits`, requiredCredits: joinPrice },
@@ -148,7 +148,7 @@ export async function POST(request: NextRequest) {
       episodeNumber: episode.number,
       episodeTitle: episode.title,
       duration: episode.duration,
-      videoUrl: episode.hlsKey ? "r2-hls" : "cloudflare",
+      videoUrl: episode.hlsKey ? "r2-hls" : (episode.videoUrl?.startsWith("http") ? episode.videoUrl : "cloudflare"),
       streamId: episode.streamId,
       hlsKey: episode.hlsKey,
       coverImage: joined.anime.coverImage,

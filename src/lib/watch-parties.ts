@@ -39,7 +39,8 @@ export async function getOwnedHlsEpisode(client: DbClient, userId: string, episo
     }
   }
   if (!ownsEpisode) return { error: "FORBIDDEN" as const };
-  if (!episode.streamId && !episode.hlsKey) return { error: "NO_HLS_STREAM" as const };
+  const hasDirectStream = Boolean(episode.videoUrl && (episode.videoUrl.startsWith("http://") || episode.videoUrl.startsWith("https://")));
+  if (!episode.streamId && !episode.hlsKey && !hasDirectStream) return { error: "NO_HLS_STREAM" as const };
   return { episode };
 }
 
