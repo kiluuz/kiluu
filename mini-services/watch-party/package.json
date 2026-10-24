@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "postinstall": "prisma generate --schema=../../prisma/schema.prisma",
+    "prestart": "cp -r ../../node_modules/.prisma ./node_modules/ 2>/dev/null || true",
     "dev": "tsx watch index.ts",
     "start": "tsx index.ts"
   },

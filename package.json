@@ -8,7 +8,7 @@
     "prebuild": "prisma generate && npm run brand:icons",
     "build": "next build --webpack && cp -r .next/static .next/standalone/.next/ && cp -r public .next/standalone/",
     "start": "NODE_ENV=production node .next/standalone/server.js",
-    "watch-party": "npm --prefix mini-services/watch-party run start",
+    "watch-party": "cp -r node_modules/.prisma mini-services/watch-party/node_modules/ 2>/dev/null || true; npm --prefix mini-services/watch-party run start",
     "lint": "eslint .",
     "db:push": "prisma db push",
     "db:generate": "prisma generate",

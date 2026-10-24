@@ -80,7 +80,13 @@ const allowedOrigins = (process.env.WATCH_PARTY_ALLOWED_ORIGINS || "http://local
   .split(",")
   .map((origin) => origin.trim())
   .filter(Boolean);
-const httpServer = createServer();
+const httpServer = createServer((req, res) => {
+  if (req.url === "/health" || req.url === "/healthz" || req.url === "/") {
+    res.writeHead(200, { "Content-Type": "application/json" });
+    res.end(JSON.stringify({ status: "ok", service: "watch-party" }));
+    return;
+  }
+});
 const io = new Server<ClientToServerEvents, ServerToClientEvents, Record<string, never>, SocketData>(httpServer, {
   path: "/",
   cors: { origin: allowedOrigins, methods: ["GET", "POST"], credentials: true },
@@ -465,7 +471,7 @@ setInterval(() => {
 
 async function start() {
   await configureRedisAdapter();
-  const port = Number(process.env.WATCH_PARTY_PORT || 3003);
+  const port = Number(process.env.PORT || process.env.WATCH_PARTY_PORT || 3003);
   httpServer.listen(port, () => console.log(`[watch-party] WebSocket server running on port ${port}`));
 }
 
