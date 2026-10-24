@@ -28,6 +28,7 @@ interface PartyRoom {
   episodeNumber: number;
   episodeTitle: string;
   videoUrl: string;
+  telegramMessageId?: string | null;
   streamId?: string | null;
   hlsKey?: string | null;
   duration?: number;
@@ -423,6 +424,7 @@ export function WatchTogetherView() {
       title: activeRoom.episodeTitle,
       description: null,
       videoUrl: activeRoom.videoUrl,
+      telegramMessageId: activeRoom.telegramMessageId,
       streamId: activeRoom.streamId,
       hlsKey: activeRoom.hlsKey,
       duration: activeRoom.duration || 0,

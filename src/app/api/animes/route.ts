@@ -72,15 +72,23 @@ export async function GET(req: NextRequest) {
     moderationStatus: "APPROVED",
   };
   if (search) {
-    where.OR = [
-      { title: { contains: search } },
-      { altTitle: { contains: search } },
-      { description: { contains: search } },
-      { studio: { contains: search } },
-    ];
+    const cleanSearch = search.trim();
+    const withAsciiApostrophe = cleanSearch.replace(/[\u02bb\u02bc\u2018\u2019`]/g, "'");
+    const withUzbekTurnedComma = cleanSearch.replace(/['`\u2018\u2019\u02bc]/g, "ʻ");
+    const withoutApostrophe = cleanSearch.replace(/['`\u2018\u2019\u02bb\u02bc]/g, "");
+
+    const variations = Array.from(new Set([cleanSearch, withAsciiApostrophe, withUzbekTurnedComma, withoutApostrophe])).filter(Boolean);
+
+    where.OR = variations.flatMap((term) => [
+      { title: { contains: term, mode: "insensitive" } },
+      { altTitle: { contains: term, mode: "insensitive" } },
+      { description: { contains: term, mode: "insensitive" } },
+      { studio: { contains: term, mode: "insensitive" } },
+      { slug: { contains: term, mode: "insensitive" } },
+    ]);
   }
   if (genre) {
-    where.genres = { contains: genre };
+    where.genres = { contains: genre, mode: "insensitive" };
   }
   if (type) {
     where.type = type;

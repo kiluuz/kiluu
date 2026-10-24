@@ -123,6 +123,13 @@ export async function POST(request: NextRequest) {
   await evaluateAchievements(user.id);
   const { party: joined, episode } = result;
   const serverTs = Number(joined.serverTs) || now.getTime();
+  const streamBase = (process.env.NEXT_PUBLIC_STREAM_BASE_URL || process.env.STREAM_SERVER_URL || "https://kiluu-stream.onrender.com").replace(/\/+$/, "");
+  const resolvedVideoUrl = episode.hlsKey
+    ? "r2-hls"
+    : (episode.videoUrl && episode.videoUrl.startsWith("http")
+      ? episode.videoUrl
+      : (episode.telegramMessageId ? `${streamBase}/stream/${episode.telegramMessageId}` : (episode.streamId ? "cloudflare" : "")));
+
   return NextResponse.json({
     ticket,
     entryCostCredits: result.charged ? joinPrice : 0,
@@ -148,7 +155,8 @@ export async function POST(request: NextRequest) {
       episodeNumber: episode.number,
       episodeTitle: episode.title,
       duration: episode.duration,
-      videoUrl: episode.hlsKey ? "r2-hls" : (episode.videoUrl?.startsWith("http") ? episode.videoUrl : "cloudflare"),
+      videoUrl: resolvedVideoUrl,
+      telegramMessageId: episode.telegramMessageId,
       streamId: episode.streamId,
       hlsKey: episode.hlsKey,
       coverImage: joined.anime.coverImage,

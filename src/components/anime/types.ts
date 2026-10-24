@@ -111,6 +111,7 @@ export interface EpisodeItem {
   title: string;
   description: string | null;
   videoUrl: string;
+  telegramMessageId?: string | null;
   streamId?: string | null;
   hlsKey?: string | null;
   duration: number;

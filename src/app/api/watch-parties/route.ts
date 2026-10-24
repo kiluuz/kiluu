@@ -110,6 +110,13 @@ export async function POST(request: NextRequest) {
   }
 
   const now = new Date();
+  const streamBase = (process.env.NEXT_PUBLIC_STREAM_BASE_URL || process.env.STREAM_SERVER_URL || "https://kiluu-stream.onrender.com").replace(/\/+$/, "");
+  const resolvedVideoUrl = result.episode.hlsKey
+    ? "r2-hls"
+    : (result.episode.videoUrl && result.episode.videoUrl.startsWith("http")
+      ? result.episode.videoUrl
+      : (result.episode.telegramMessageId ? `${streamBase}/stream/${result.episode.telegramMessageId}` : (result.episode.streamId ? "cloudflare" : "")));
+
   const resultParty = await db.$transaction(async (tx) => {
     const charge = await chargePartyEntry(tx, user.id, id, joinPrice);
     if ("error" in charge) return { error: "INSUFFICIENT_CREDITS" as const };
@@ -122,7 +129,7 @@ export async function POST(request: NextRequest) {
         createdById: user.id,
         animeId: result.episode.animeId,
         episodeId: result.episode.id,
-        videoUrl: result.episode.hlsKey ? "r2-hls" : "cloudflare",
+        videoUrl: resolvedVideoUrl,
         serverTs: BigInt(now.getTime()),
         capacity: 50,
         expiresAt: new Date(now.getTime() + 8 * 60 * 60 * 1000),
@@ -153,7 +160,8 @@ export async function POST(request: NextRequest) {
       episodeNumber: result.episode.number,
       episodeTitle: result.episode.title,
       duration: result.episode.duration,
-      videoUrl: result.episode.hlsKey ? "r2-hls" : (result.episode.videoUrl?.startsWith("http") ? result.episode.videoUrl : "cloudflare"),
+      videoUrl: resolvedVideoUrl,
+      telegramMessageId: result.episode.telegramMessageId,
       streamId: result.episode.streamId,
       hlsKey: result.episode.hlsKey,
       coverImage: result.episode.anime.coverImage,

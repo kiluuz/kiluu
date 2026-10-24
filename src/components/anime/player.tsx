@@ -127,31 +127,33 @@ export function VideoPlayer({
         setPlaybackUrl(null);
       }
     });
-    if (!episode.streamId && !episode.hlsKey) {
-      if (episode.videoUrl && episode.videoUrl !== "telegram" && episode.videoUrl !== "cloudflare" && episode.videoUrl !== "r2-hls") {
-        queueMicrotask(() => { if (!cancelled) setPlaybackUrl(episode.videoUrl); });
-      } else {
-        const streamBase = process.env.NEXT_PUBLIC_STREAM_BASE_URL;
-        if (episode.telegramMessageId && streamBase) {
-          const directUrl = `${streamBase.replace(/\/+$/, "")}/stream/${episode.telegramMessageId}`;
-          queueMicrotask(() => { if (!cancelled) setPlaybackUrl(directUrl); });
-        } else {
-          queueMicrotask(() => { if (!cancelled) setSourceError("This episode is not available in browser playback yet."); });
-        }
-      }
+
+    // 1. Direct HTTP streaming URL (e.g. from Render stream bot or CDN)
+    if (episode.videoUrl && (episode.videoUrl.startsWith("http://") || episode.videoUrl.startsWith("https://"))) {
+      queueMicrotask(() => { if (!cancelled) setPlaybackUrl(episode.videoUrl); });
       return () => { cancelled = true; };
     }
+
+    // 2. Direct Telegram Message ID with Stream Server base URL
+    const streamBase = process.env.NEXT_PUBLIC_STREAM_BASE_URL || "https://kiluu-stream.onrender.com";
+    if (episode.telegramMessageId && streamBase) {
+      const directUrl = `${streamBase.replace(/\/+$/, "")}/stream/${episode.telegramMessageId}`;
+      queueMicrotask(() => { if (!cancelled) setPlaybackUrl(directUrl); });
+      return () => { cancelled = true; };
+    }
+
+    // 3. Fallback to API route (handles HLS, Cloudflare Stream, R2 signed URLs)
     fetch(`/api/episodes/${encodeURIComponent(episode.id)}/stream`, { cache: "no-store" })
       .then(async (response) => {
         const data = await response.json();
         if (!response.ok) throw new Error(data.error || "Unable to authorize episode playback");
-        if (!cancelled) setPlaybackUrl(data.streamUrl);
+        if (!cancelled && data.streamUrl) setPlaybackUrl(data.streamUrl);
       })
       .catch((error: unknown) => {
         if (!cancelled) setSourceError(error instanceof Error ? error.message : "Unable to load episode stream");
       });
     return () => { cancelled = true; };
-  }, [episode.id, episode.streamId, episode.hlsKey, episode.videoUrl]);
+  }, [episode.id, episode.streamId, episode.hlsKey, episode.videoUrl, episode.telegramMessageId]);
 
   useEffect(() => {
     const video = videoRef.current;
@@ -268,10 +270,26 @@ export function VideoPlayer({
       return;
     }
     if (v.paused) {
-      v.play().then(() => {
-        setPlaying(true);
-        onLocalPlay?.(v.currentTime);
-      }).catch(() => {});
+      v.play()
+        .then(() => {
+          setPlaying(true);
+          onLocalPlay?.(v.currentTime);
+        })
+        .catch((err) => {
+          console.warn("Video play error:", err);
+          if (err && err.name === "NotAllowedError") {
+            v.muted = true;
+            v.play().then(() => {
+              setPlaying(true);
+              onLocalPlay?.(v.currentTime);
+              toast.info("Ovozni yoqish uchun pleyerdagi karnay belgisini bosing", { id: "unmute-hint" });
+            }).catch(() => {
+              toast.error("Brauzer videoni ijro etishni chekladi. Qaytadan urinib ko'ring.");
+            });
+          } else {
+            toast.error("Videoni o'ynatishda xatolik yuz berdi. Sahifani yangilab ko'ring.");
+          }
+        });
     } else {
       v.pause();
       setPlaying(false);
