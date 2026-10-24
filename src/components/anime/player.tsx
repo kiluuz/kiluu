@@ -132,16 +132,11 @@ export function VideoPlayer({
 
   useEffect(() => {
     let cancelled = false;
-    queueMicrotask(() => {
-      if (!cancelled) {
-        setSourceError(null);
-        setPlaybackUrl(null);
-      }
-    });
 
     // 1. Direct HTTP streaming URL (e.g. from Render stream bot or CDN)
     if (episode.videoUrl && (episode.videoUrl.startsWith("http://") || episode.videoUrl.startsWith("https://"))) {
-      queueMicrotask(() => { if (!cancelled) setPlaybackUrl(episode.videoUrl); });
+      setPlaybackUrl(episode.videoUrl);
+      setSourceError(null);
       return () => { cancelled = true; };
     }
 
@@ -149,7 +144,8 @@ export function VideoPlayer({
     const streamBase = process.env.NEXT_PUBLIC_STREAM_BASE_URL || "https://kiluu-stream.onrender.com";
     if (episode.telegramMessageId && streamBase) {
       const directUrl = `${streamBase.replace(/\/+$/, "")}/stream/${episode.telegramMessageId}`;
-      queueMicrotask(() => { if (!cancelled) setPlaybackUrl(directUrl); });
+      setPlaybackUrl(directUrl);
+      setSourceError(null);
       return () => { cancelled = true; };
     }
 
@@ -158,7 +154,10 @@ export function VideoPlayer({
       .then(async (response) => {
         const data = await response.json();
         if (!response.ok) throw new Error(data.error || "Unable to authorize episode playback");
-        if (!cancelled && data.streamUrl) setPlaybackUrl(data.streamUrl);
+        if (!cancelled && data.streamUrl) {
+          setPlaybackUrl(data.streamUrl);
+          setSourceError(null);
+        }
       })
       .catch((error: unknown) => {
         if (!cancelled) setSourceError(error instanceof Error ? error.message : "Unable to load episode stream");
