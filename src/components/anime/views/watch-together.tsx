@@ -557,6 +557,29 @@ export function WatchTogetherView() {
   return (
     <div className="max-w-[1100px] mx-auto px-4 sm:px-8 py-6 pb-10">
       <h1 className="sr-only">Watch Together</h1>
+
+      {/* Coming Soon Notice */}
+      <div className="mb-6 rounded-3xl border border-primary/20 bg-gradient-to-r from-primary/10 via-background to-secondary/30 p-5 shadow-sm">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div className="flex items-center gap-3.5">
+            <div className="w-11 h-11 rounded-2xl brand-gradient flex items-center justify-center shrink-0 shadow-md shadow-primary/20">
+              <Sparkles className="w-5 h-5 text-white" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <h2 className="font-bold text-base">Watch Together — Tez kunda!</h2>
+                <span className="text-[10px] font-black text-primary bg-primary/15 border border-primary/30 rounded-full px-2.5 py-0.5 uppercase tracking-wider">
+                  Soon
+                </span>
+              </div>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                Telegram direct stream serveri sozlanmoqda. Tez orada barcha animelarni do'stlaringiz bilan real vaqtda birgalikda tomosha qila olasiz!
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+
       {/* Actions */}
       <div className="grid sm:grid-cols-2 gap-4 mb-8">
         <button
