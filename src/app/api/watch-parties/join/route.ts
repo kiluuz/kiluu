@@ -34,8 +34,8 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ error: "Video stream files have not been uploaded yet" }, { status: 409 });
       }
     } catch (error) {
-      console.error("Watch party media availability check failed", error);
-      return NextResponse.json({ error: "Media storage is temporarily unavailable" }, { status: 503 });
+      // Non-fatal: if R2 check fails, let the user in — player will show the error
+      console.error("Watch party media availability check failed (non-fatal)", error);
     }
   }
   let joinPrice: number;
@@ -120,7 +120,8 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Party is no longer active" }, { status: 410 });
   }
 
-  await evaluateAchievements(user.id);
+  // Run achievement evaluation in background — don't block the join response
+  void evaluateAchievements(user.id).catch((e) => console.error("Achievement eval error", e));
   const { party: joined, episode } = result;
   const serverTs = Number(joined.serverTs) || now.getTime();
   const streamBase = (process.env.NEXT_PUBLIC_STREAM_BASE_URL || process.env.STREAM_SERVER_URL || "https://kiluu-stream.onrender.com").replace(/\/+$/, "");
