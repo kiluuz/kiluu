@@ -118,8 +118,12 @@ export function WatchTogetherView() {
   const pingIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const heartbeatIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const driftIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const chatEndRef = useRef<HTMLDivElement | null>(null);
 
-  // Inside a watch-party room the mobile dock hides (immersive mode)
+  // Auto-scroll chat to bottom when new messages arrive
+  useEffect(() => {
+    chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [chatMessages]);
   useEffect(() => {
     useAppStore.getState().setImmersive(Boolean(activeRoom));
     return () => useAppStore.getState().setImmersive(false);
@@ -302,7 +306,11 @@ export function WatchTogetherView() {
     socket.on("party:error", ({ error }: { error: string }) => toast.error(error));
     socket.on("playback:state", (state: PartyPlaybackState) => applyPlaybackState(state));
     socket.on("chat:message", (message: PartyChatMessage) => {
-      setChatMessages((current) => [...current.slice(-99), message]);
+      setChatMessages((current) => {
+        // Deduplicate: skip if we already added this message optimistically
+        if (current.some((m) => m.id === message.id)) return current;
+        return [...current.slice(-99), message];
+      });
     });
     socket.on("reaction", (reaction: { id: string; emoji: string; username: string }) => {
       const floating: FloatingReaction = {
@@ -410,8 +418,18 @@ export function WatchTogetherView() {
 
   function sendChat() {
     const body = chatText.trim();
-    if (!body) return;
-    socketRef.current?.emit("chat:send", { body });
+    if (!body || !socketRef.current) return;
+    // Optimistic update — show message immediately without waiting for server echo
+    const tempId = `local-${Date.now()}-${Math.random()}`;
+    const optimistic: PartyChatMessage = {
+      id: tempId,
+      body,
+      createdAt: new Date().toISOString(),
+      userId: user?.id ?? "",
+      username: user?.displayName || user?.username || "Sen",
+    };
+    setChatMessages((current) => [...current.slice(-99), optimistic]);
+    socketRef.current.emit("chat:send", { body });
     setChatText("");
   }
 
@@ -543,10 +561,11 @@ export function WatchTogetherView() {
                     <span className="font-bold">{message.username}: </span>{message.body}
                   </p>
                 ))}
+                <div ref={chatEndRef} />
               </div>
               <form className="mt-2 flex gap-2" onSubmit={(event) => { event.preventDefault(); sendChat(); }}>
-                <Input value={chatText} maxLength={500} onChange={(event) => setChatText(event.target.value)} placeholder="Message the party…" />
-                <Button type="submit" disabled={!chatText.trim()} className="shrink-0">Send</Button>
+                <Input value={chatText} maxLength={500} onChange={(event) => setChatText(event.target.value)} placeholder="Xabar yozing…" />
+                <Button type="submit" disabled={!chatText.trim()} className="shrink-0">Yuborish</Button>
               </form>
             </div>
           </div>
