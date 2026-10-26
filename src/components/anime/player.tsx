@@ -479,7 +479,7 @@ export function VideoPlayer({
         src={playbackUrl && !/\.m3u8(?:$|\?)/i.test(playbackUrl) ? playbackUrl : undefined}
         className="w-full aspect-video max-h-[82vh] object-contain bg-black"
         playsInline
-        preload={syncMode ? "auto" : "metadata"}
+        preload="metadata"
         onLoadedMetadata={(e) => {
           const v = e.currentTarget;
           setDuration(v.duration || episode.duration || 0);
