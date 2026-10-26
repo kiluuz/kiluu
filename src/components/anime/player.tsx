@@ -16,6 +16,8 @@ export interface PlayerControls {
   setRate: (rate: number) => void;
   setVolume: (v: number, muted?: boolean) => void;
   getCurrentTime: () => number;
+  /** Returns true when the video element is buffering (waiting for data). */
+  isBuffering: () => boolean;
   enableAudio: () => void;
 }
 
@@ -379,6 +381,22 @@ export function VideoPlayer({
         if (!v) return;
         if (!v.src && !playbackUrl) return;
         if (typeof pos === "number" && isFinite(pos)) v.currentTime = pos;
+        // If metadata not yet loaded, defer until it is
+        if (v.readyState < HTMLMediaElement.HAVE_METADATA) {
+          const onReady = () => {
+            v.removeEventListener("loadedmetadata", onReady);
+            if (typeof pos === "number" && isFinite(pos)) v.currentTime = pos;
+            v.play().then(() => setPlaying(true)).catch((err) => {
+              if (err && err.name === "AbortError") return;
+              if (err && err.name === "NotAllowedError") {
+                toast.info("Tap the video once to allow playback audio in this browser.", { id: "party-autoplay" });
+                onAutoplayBlocked?.();
+              }
+            });
+          };
+          v.addEventListener("loadedmetadata", onReady);
+          return;
+        }
         v.play().then(() => setPlaying(true)).catch((err) => {
           if (err && err.name === "AbortError") return;
           if (err && err.name === "NotAllowedError") {
@@ -415,6 +433,13 @@ export function VideoPlayer({
         setMuted(Boolean(mut));
       },
       getCurrentTime: () => videoRef.current?.currentTime || 0,
+      isBuffering: () => {
+        const v = videoRef.current;
+        if (!v) return false;
+        // HAVE_FUTURE_DATA = 3, HAVE_ENOUGH_DATA = 4
+        // readyState < 3 means not enough data to play from current position
+        return v.readyState < 3;
+      },
       enableAudio: () => {
         const v = videoRef.current;
         if (!v) return;

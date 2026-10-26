@@ -266,6 +266,10 @@ export function WatchTogetherView() {
         const state = playbackStateRef.current;
         const controls = controlsRef.current;
         if (!state || !controls || !state.is_playing) return;
+        // Skip drift correction while video is buffering — seeking during buffering
+        // interrupts the download and causes an infinite loading loop for guests
+        // who join mid-playback.
+        if (controls.isBuffering()) return;
         const expected = expectedPlaybackPosition({
           position: state.position,
           isPlaying: state.is_playing,
