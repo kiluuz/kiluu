@@ -80,6 +80,8 @@ export function VideoPlayer({
   const containerRef = useRef<HTMLDivElement>(null);
   const hideTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const seekedRef = useRef(false);
+  const retryTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const retryCountRef = useRef(0);
 
   const initialUrl = (() => {
     if (episode.videoUrl && (episode.videoUrl.startsWith("http://") || episode.videoUrl.startsWith("https://"))) {
@@ -497,14 +499,32 @@ export function VideoPlayer({
         onCanPlay={() => {
           setWaiting(false);
           setSourceError(null);
+          retryCountRef.current = 0; // reset retry counter on successful load
+          if (retryTimerRef.current) { clearTimeout(retryTimerRef.current); retryTimerRef.current = null; }
         }}
         onError={(e) => {
           setWaiting(false);
           const err = e.currentTarget.error;
-          if (err && err.code === 1) return; // MEDIA_ERR_ABORTED
-          if (playbackUrl) {
-            setSourceError("Video yuklanmadi. Telegram kanalida video mavjudligini yoki bot ruxsatlarini tekshiring.");
+          if (err && err.code === 1) return; // MEDIA_ERR_ABORTED — ignore
+          if (!playbackUrl) return;
+          // MEDIA_ERR_NETWORK (2) — server may be waking up, auto-retry up to 3 times
+          if (err && err.code === 2 && retryCountRef.current < 3) {
+            retryCountRef.current += 1;
+            const delay = retryCountRef.current * 5000; // 5s, 10s, 15s
+            setSourceError(`Video yuklanmoqda, qayta urinilmoqda… (${retryCountRef.current}/3)`);
+            if (retryTimerRef.current) clearTimeout(retryTimerRef.current);
+            retryTimerRef.current = setTimeout(() => {
+              const v = videoRef.current;
+              if (!v) return;
+              const currentTime = v.currentTime;
+              v.load(); // reload source
+              v.currentTime = currentTime;
+              setSourceError(null);
+            }, delay);
+            return;
           }
+          retryCountRef.current = 0;
+          setSourceError("Video yuklanmadi. Sahifani yangilab ko'ring yoki biroz kutib yana urinib ko'ring.");
         }}
         onEnded={() => {
           setPlaying(false);
