@@ -60,6 +60,26 @@ function signedAssetPath(uri, manifestKey, scope, expiry, signature) {
   return `/${encodedKey}?exp=${expiry}&sig=${signature}`;
 }
 
+function parseByteRange(header, size) {
+  const match = /^bytes=(\d*)-(\d*)$/.exec(header.trim());
+  if (!match) return null;
+  const [, startText, endText] = match;
+  if (!startText && !endText) return null;
+  if (!startText) {
+    // Suffix range ("bytes=-500"): the last N bytes. Safari uses this when it
+    // probes the end of a file for the moov atom.
+    const suffix = Number(endText);
+    if (!Number.isSafeInteger(suffix) || suffix <= 0) return null;
+    const length = Math.min(suffix, size);
+    return length > 0 ? { offset: size - length, length } : null;
+  }
+  const start = Number(startText);
+  if (!Number.isSafeInteger(start) || start >= size) return null;
+  const end = endText ? Math.min(Number(endText), size - 1) : size - 1;
+  if (!Number.isSafeInteger(end) || end < start) return null;
+  return { offset: start, length: end - start + 1 };
+}
+
 async function serveHls(request, env, key, url) {
   const segments = key.split("/");
   if (segments.length < 4 || segments[0] !== "hls") return jsonError("Not found", 404);
@@ -75,6 +95,34 @@ async function serveHls(request, env, key, url) {
     return jsonError("Invalid playback link", 403);
   }
 
+  const rangeHeader = request.headers.get("Range");
+  const isManifest = key.endsWith(".m3u8");
+
+  // Safari and other players use byte-range requests for seeking, including
+  // suffix ranges ("bytes=-N") to read the end of the file. Parse the range
+  // ourselves and pass explicit bounds to R2 so Content-Range is always
+  // accurate for every range form.
+  if (rangeHeader && !isManifest) {
+    const head = await env.MEDIA_BUCKET.head(key);
+    if (!head) return jsonError("Media object not found", 404);
+    const range = parseByteRange(rangeHeader, head.size);
+    if (!range) {
+      return new Response(null, {
+        status: 416,
+        headers: { ...corsHeaders, "Content-Range": `bytes */${head.size}`, "Accept-Ranges": "bytes" },
+      });
+    }
+    const object = await env.MEDIA_BUCKET.get(key, { range });
+    if (!object) return jsonError("Media object not found", 404);
+    const headers = new Headers(corsHeaders);
+    object.writeHttpMetadata(headers);
+    headers.set("Cache-Control", "private, no-store");
+    headers.set("Accept-Ranges", "bytes");
+    headers.set("Content-Range", `bytes ${range.offset}-${range.offset + range.length - 1}/${head.size}`);
+    headers.set("Content-Length", String(range.length));
+    return new Response(request.method === "HEAD" ? null : object.body, { status: 206, headers });
+  }
+
   const object = await env.MEDIA_BUCKET.get(key);
   if (!object) return jsonError("Media object not found", 404);
   const headers = new Headers(corsHeaders);
@@ -82,7 +130,7 @@ async function serveHls(request, env, key, url) {
   headers.set("Cache-Control", "private, no-store");
   headers.set("Accept-Ranges", "bytes");
 
-  if (key.endsWith(".m3u8")) {
+  if (isManifest) {
     const manifest = await object.text();
     const rewrite = (uri) => signedAssetPath(uri, key, scope, expiry, signature);
     const lines = manifest.split(/\r?\n/);
@@ -114,6 +162,7 @@ async function serveHls(request, env, key, url) {
     return new Response(request.method === "HEAD" ? null : protectedLines.join("\n"), { headers });
   }
 
+  if (object.size != null) headers.set("Content-Length", String(object.size));
   return new Response(request.method === "HEAD" ? null : object.body, { headers });
 }
 

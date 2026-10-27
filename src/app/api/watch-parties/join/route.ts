@@ -127,9 +127,11 @@ export async function POST(request: NextRequest) {
   const streamBase = (process.env.NEXT_PUBLIC_STREAM_BASE_URL || process.env.STREAM_SERVER_URL || "https://kiluu-stream.onrender.com").replace(/\/+$/, "");
   const resolvedVideoUrl = episode.hlsKey
     ? "r2-hls"
-    : (episode.videoUrl && episode.videoUrl.startsWith("http")
-      ? episode.videoUrl
-      : (episode.telegramMessageId ? `${streamBase}/stream/${episode.telegramMessageId}` : (episode.streamId ? "cloudflare" : "")));
+    : (episode.streamId
+      ? "cloudflare"
+      : (episode.videoUrl && episode.videoUrl.startsWith("http")
+        ? episode.videoUrl
+        : (episode.telegramMessageId ? `${streamBase}/stream/${episode.telegramMessageId}` : "")));
 
   return NextResponse.json({
     ticket,

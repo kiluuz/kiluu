@@ -85,11 +85,13 @@ export async function POST(request: NextRequest) {
   if (result.episode.hlsKey) {
     try {
       if (!(await r2ObjectExists(result.episode.hlsKey))) {
-        return NextResponse.json({ error: "Video stream files have not been uploaded yet" }, { status: 409 });
+        // Non-fatal: the player will try the other configured sources and show
+        // a clear error if none work. Blocking creation here stranded users
+        // whenever a single R2 object was missing.
+        console.warn("Watch party HLS object missing, continuing", result.episode.hlsKey);
       }
     } catch (error) {
-      console.error("Watch party media availability check failed", error);
-      return NextResponse.json({ error: "Media storage is temporarily unavailable" }, { status: 503 });
+      console.error("Watch party media availability check failed (non-fatal)", error);
     }
   }
   let joinPrice: number;
@@ -113,9 +115,11 @@ export async function POST(request: NextRequest) {
   const streamBase = (process.env.NEXT_PUBLIC_STREAM_BASE_URL || process.env.STREAM_SERVER_URL || "https://kiluu-stream.onrender.com").replace(/\/+$/, "");
   const resolvedVideoUrl = result.episode.hlsKey
     ? "r2-hls"
-    : (result.episode.videoUrl && result.episode.videoUrl.startsWith("http")
-      ? result.episode.videoUrl
-      : (result.episode.telegramMessageId ? `${streamBase}/stream/${result.episode.telegramMessageId}` : (result.episode.streamId ? "cloudflare" : "")));
+    : (result.episode.streamId
+      ? "cloudflare"
+      : (result.episode.videoUrl && result.episode.videoUrl.startsWith("http")
+        ? result.episode.videoUrl
+        : (result.episode.telegramMessageId ? `${streamBase}/stream/${result.episode.telegramMessageId}` : "")));
 
   const resultParty = await db.$transaction(async (tx) => {
     const charge = await chargePartyEntry(tx, user.id, id, joinPrice);

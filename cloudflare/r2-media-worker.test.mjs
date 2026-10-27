@@ -61,6 +61,59 @@ test("media worker signs HLS playlists and segments while allowing image reads",
   assert.equal(await segment.text(), "segment-bytes");
 });
 
+test("media worker returns correct Content-Range for byte ranges, including suffix ranges", async () => {
+  const body = "0123456789abcdefghij"; // 20 bytes
+  const segmentKey = "hls/my-anime/1/segment_00001.ts";
+  const env = {
+    R2_HLS_SIGNING_SECRET: secret,
+    MEDIA_BUCKET: {
+      head: async (key) => (key === segmentKey ? { size: body.length } : null),
+      get: async (key, options) => {
+        if (key !== segmentKey) return null;
+        const range = options?.range;
+        const slice = range ? body.slice(range.offset, range.offset + range.length) : body;
+        return {
+          body: new Blob([slice]).stream(),
+          text: async () => slice,
+          size: slice.length,
+          writeHttpMetadata(headers) {
+            headers.set("Content-Type", "video/mp2t");
+          },
+        };
+      },
+    },
+  };
+  const scope = "hls/my-anime/1";
+  const expiry = String(Math.floor(Date.now() / 1000) + 60);
+  const sig = await signature(scope, expiry);
+  const request = (range) => new Request(
+    `https://media.example.test/${scope}/segment_00001.ts?exp=${expiry}&sig=${sig}`,
+    { headers: { Range: range } },
+  );
+
+  const first = await worker.fetch(request("bytes=0-9"), env);
+  assert.equal(first.status, 206);
+  assert.equal(first.headers.get("Content-Range"), `bytes 0-9/${body.length}`);
+  assert.equal(first.headers.get("Content-Length"), "10");
+  assert.equal(await first.text(), body.slice(0, 10));
+
+  // Safari probes the tail of a file with a suffix range.
+  const suffix = await worker.fetch(request("bytes=-5"), env);
+  assert.equal(suffix.status, 206);
+  assert.equal(suffix.headers.get("Content-Range"), `bytes 15-19/${body.length}`);
+  assert.equal(suffix.headers.get("Content-Length"), "5");
+  assert.equal(await suffix.text(), body.slice(15));
+
+  const openEnded = await worker.fetch(request("bytes=10-"), env);
+  assert.equal(openEnded.status, 206);
+  assert.equal(openEnded.headers.get("Content-Range"), `bytes 10-19/${body.length}`);
+  assert.equal(await openEnded.text(), body.slice(10));
+
+  const unsatisfiable = await worker.fetch(request("bytes=100-"), env);
+  assert.equal(unsatisfiable.status, 416);
+  assert.equal(unsatisfiable.headers.get("Content-Range"), `bytes */${body.length}`);
+});
+
 test("media worker rejects expired or modified HLS signatures", async () => {
   const env = {
     R2_HLS_SIGNING_SECRET: secret,

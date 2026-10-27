@@ -118,7 +118,14 @@ export function WatchTogetherView() {
   const pingIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const heartbeatIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const driftIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const lastCorrectionAtRef = useRef(0);
+  const applyRetryCountRef = useRef(0);
+  const isHostRef = useRef(false);
   const chatEndRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    isHostRef.current = isHost;
+  }, [isHost]);
 
   // Auto-scroll chat to bottom when new messages arrive
   useEffect(() => {
@@ -201,21 +208,50 @@ export function WatchTogetherView() {
     playbackStateRef.current = state;
     const controls = controlsRef.current;
     if (!controls) {
+      // The player can mount a few renders after the party state arrives.
+      // Give it a bounded number of retries instead of retrying forever.
+      if (applyRetryCountRef.current >= 50) return;
+      applyRetryCountRef.current += 1;
       setTimeout(() => {
         if (playbackStateRef.current === state) applyPlaybackState(state);
       }, 100);
       return;
     }
-    const expected = expectedPlaybackPosition({
+    applyRetryCountRef.current = 0;
+    // Always compute the expected position fresh at the moment of applying,
+    // so that guests who join mid-playback seek to the correct live position
+    // rather than the stale snapshot captured at join/connect time.
+    const computeExpected = () => expectedPlaybackPosition({
       position: state.position,
       isPlaying: state.is_playing,
       serverTs: state.server_ts,
       playbackRate: state.playback_rate,
     }, Date.now() + clockOffsetRef.current);
+
     controls.setRate(state.playback_rate);
-    if (state.is_playing) controls.play(expected);
-    else controls.pause(expected);
+    if (state.is_playing) controls.play(computeExpected());
+    else controls.pause(computeExpected());
   }
+
+  // Mobile browsers freeze playback when the tab is hidden. When it becomes
+  // visible again, pull a fresh authoritative state instead of trusting the
+  // snapshot from before the freeze.
+  useEffect(() => {
+    function resync() {
+      if (document.visibilityState !== "visible") return;
+      const socket = socketRef.current;
+      if (!socket?.connected) return;
+      socket.emit("playback:sync", (state: PartyPlaybackState | null) => {
+        if (state) applyPlaybackState(state);
+      });
+    }
+    document.addEventListener("visibilitychange", resync);
+    window.addEventListener("pageshow", resync);
+    return () => {
+      document.removeEventListener("visibilitychange", resync);
+      window.removeEventListener("pageshow", resync);
+    };
+  }, [activeRoom]);
 
   function connectToParty(
     ticket: string,
@@ -262,14 +298,24 @@ export function WatchTogetherView() {
       pingIntervalRef.current = setInterval(ping, 4000);
       socket.emit("party:heartbeat");
       heartbeatIntervalRef.current = setInterval(() => socket.emit("party:heartbeat"), 20_000);
+      lastCorrectionAtRef.current = 0;
       driftIntervalRef.current = setInterval(() => {
         const state = playbackStateRef.current;
         const controls = controlsRef.current;
         if (!state || !controls || !state.is_playing) return;
-        // Skip drift correction while video is buffering — seeking during buffering
-        // interrupts the download and causes an infinite loading loop for guests
-        // who join mid-playback.
+        // The host's own video is the clock — never seek it.
+        if (isHostRef.current) return;
+        // Never chase the party clock while the local video is paused (mobile
+        // autoplay policies block play() until a user gesture). Seeking every
+        // second in that state keeps the element buffering forever and is the
+        // reason guests were stuck on "loading" until the host paused.
+        if (controls.isPaused()) return;
+        // Skip drift correction while video is buffering or seeking — seeking
+        // during buffering interrupts the download and causes an infinite
+        // loading loop for guests who join mid-playback.
         if (controls.isBuffering()) return;
+        // Give a seek time to settle before correcting again.
+        if (Date.now() - lastCorrectionAtRef.current < 3000) return;
         const expected = expectedPlaybackPosition({
           position: state.position,
           isPlaying: state.is_playing,
@@ -277,8 +323,12 @@ export function WatchTogetherView() {
           playbackRate: state.playback_rate,
         }, Date.now() + clockOffsetRef.current);
         const correction = playbackCorrection(controls.getCurrentTime(), expected);
-        if (correction.seekTo !== null) controls.seek(correction.seekTo);
-        else controls.setRate(state.playback_rate * correction.rate);
+        if (correction.seekTo !== null) {
+          lastCorrectionAtRef.current = Date.now();
+          controls.seek(correction.seekTo);
+        } else {
+          controls.setRate(state.playback_rate * correction.rate);
+        }
       }, 1000);
     });
     socket.on("connect_error", (error) => {
@@ -409,6 +459,8 @@ export function WatchTogetherView() {
     setReactions([]);
     setChatMessages([]);
     playbackStateRef.current = null;
+    applyRetryCountRef.current = 0;
+    lastCorrectionAtRef.current = 0;
     if (pingIntervalRef.current) clearInterval(pingIntervalRef.current);
     if (heartbeatIntervalRef.current) clearInterval(heartbeatIntervalRef.current);
     if (driftIntervalRef.current) clearInterval(driftIntervalRef.current);
@@ -468,16 +520,25 @@ export function WatchTogetherView() {
           onLocalSeek={(pos) => socketRef.current?.emit("playback:seek", { position: pos })}
           onLocalRate={(rate) => socketRef.current?.emit("playback:rate", { rate })}
           onAutoplayBlocked={() => setAutoplayBlocked(true)}
+          onSyncReady={() => {
+            // Video metadata has loaded — re-apply the current party state so
+            // the freshly-computed live position is used instead of the stale
+            // snapshot captured when this user joined or connected.
+            const state = playbackStateRef.current;
+            if (state) applyPlaybackState(state);
+          }}
         />
         {autoplayBlocked && (
           <div className="mx-4 mt-3 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm">
-            <span>Tap once to allow your browser to play synced video audio.</span>
+            <span>Video ovozsiz ijro etilmoqda. Ovozni yoqish uchun bir marta bosing.</span>
             <Button size="sm" onClick={() => {
-              controlsRef.current?.enableAudio();
+              // Must stay synchronous inside the tap handler so mobile
+              // browsers treat it as a user gesture and allow audio.
               setAutoplayBlocked(false);
+              controlsRef.current?.enableAudio();
               const state = playbackStateRef.current;
-              if (state) setTimeout(() => applyPlaybackState(state), 300);
-            }}>Enable synced playback</Button>
+              if (state) applyPlaybackState(state);
+            }}>Ovozni yoqish</Button>
           </div>
         )}
 

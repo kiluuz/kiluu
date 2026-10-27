@@ -21,6 +21,35 @@ export async function GET(
   }
 
   try {
+    // Prefer HLS whenever it is configured: iPhone Safari cannot play many
+    // MP4 files (HEVC/hev1, non-faststart), but it plays HLS natively.
+    if (result.episode.hlsKey) {
+      try {
+        if (await r2ObjectExists(result.episode.hlsKey)) {
+          const streamUrl = createSignedHlsUrl(result.episode.hlsKey);
+          return NextResponse.json(
+            { streamUrl, expiresInSeconds: 24 * 60 * 60 },
+            { headers: { "Cache-Control": "private, no-store" } },
+          );
+        }
+        console.warn("HLS object missing, trying other sources", result.episode.hlsKey);
+      } catch (error) {
+        // Non-fatal: storage may be temporarily unreachable; a direct source
+        // can still work.
+        console.error("R2 availability check failed", error);
+      }
+    }
+    if (result.episode.streamId) {
+      try {
+        const streamUrl = await createCloudflarePlaybackUrl(result.episode.streamId);
+        return NextResponse.json(
+          { streamUrl, expiresInSeconds: 3600 },
+          { headers: { "Cache-Control": "private, no-store" } },
+        );
+      } catch (error) {
+        console.error("Cloudflare playback token error", error);
+      }
+    }
     if (result.episode.videoUrl && (result.episode.videoUrl.startsWith("http://") || result.episode.videoUrl.startsWith("https://"))) {
       return NextResponse.json(
         { streamUrl: result.episode.videoUrl, expiresInSeconds: 24 * 60 * 60 },
@@ -35,27 +64,9 @@ export async function GET(
         { headers: { "Cache-Control": "private, no-store" } },
       );
     }
-    if (result.episode.hlsKey) {
-      if (!(await r2ObjectExists(result.episode.hlsKey))) {
-        return NextResponse.json({ error: "Video stream files have not been uploaded yet" }, { status: 404 });
-      }
-      const streamUrl = createSignedHlsUrl(result.episode.hlsKey);
-      return NextResponse.json(
-        { streamUrl, expiresInSeconds: 24 * 60 * 60 },
-        { headers: { "Cache-Control": "private, no-store" } },
-      );
-    }
-    const streamId = result.episode.streamId;
-    if (!streamId) {
-      return NextResponse.json({ error: "This episode has no browser HLS stream yet" }, { status: 409 });
-    }
-    const streamUrl = await createCloudflarePlaybackUrl(streamId);
-    return NextResponse.json(
-      { streamUrl, expiresInSeconds: 3600 },
-      { headers: { "Cache-Control": "private, no-store" } },
-    );
+    return NextResponse.json({ error: "This episode has no browser HLS stream yet" }, { status: 409 });
   } catch (error) {
-    console.error("Cloudflare playback token error", error);
+    console.error("Playback source resolution error", error);
     return NextResponse.json({ error: "Video streaming is temporarily unavailable" }, { status: 503 });
   }
 }

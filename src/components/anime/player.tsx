@@ -18,6 +18,8 @@ export interface PlayerControls {
   getCurrentTime: () => number;
   /** Returns true when the video element is buffering (waiting for data). */
   isBuffering: () => boolean;
+  /** Returns true when playback is paused — including when autoplay was blocked. */
+  isPaused: () => boolean;
   enableAudio: () => void;
 }
 
@@ -58,6 +60,7 @@ export function VideoPlayer({
   onLocalRate,
   onAutoplayBlocked,
   onEnded,
+  onSyncReady,
   controlsRef,
 }: {
   episode: PlayerEpisode;
@@ -74,16 +77,35 @@ export function VideoPlayer({
   onLocalRate?: (rate: number) => void;
   onAutoplayBlocked?: () => void;
   onEnded?: () => void;
+  /** Called in syncMode when video metadata has loaded and the player is ready
+   *  to receive a seek + play command. Use this to re-apply the current party
+   *  playback state so late-joiners land at the correct live position. */
+  onSyncReady?: () => void;
   controlsRef?: React.MutableRefObject<PlayerControls | null>;
 }) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const hlsRef = useRef<Hls | null>(null);
   const hideTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const seekedRef = useRef(false);
   const retryTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const retryCountRef = useRef(0);
+  // A play/pause requested before metadata is available. Only the latest one is
+  // kept — stacking loadedmetadata listeners made late-joining guests seek and
+  // play repeatedly, which looked like an endless loading state.
+  const pendingCommandRef = useRef<{ type: "play" | "pause" | "seek"; pos?: number } | null>(null);
+
+  // Stable refs for function props — avoids stale closures in the controlsRef effect
+  const onSyncReadyRef = useRef(onSyncReady);
+  const onAutoplayBlockedRef = useRef(onAutoplayBlocked);
+  useEffect(() => { onSyncReadyRef.current = onSyncReady; }, [onSyncReady]);
+  useEffect(() => { onAutoplayBlockedRef.current = onAutoplayBlocked; }, [onAutoplayBlocked]);
 
   const initialUrl = (() => {
+    // HLS sources must be authorized through the API route; never fall back to
+    // the Telegram MP4 for these, because those files can be HEVC and iPhone
+    // Safari cannot play them.
+    if (episode.hlsKey || episode.streamId) return null;
     if (episode.videoUrl && (episode.videoUrl.startsWith("http://") || episode.videoUrl.startsWith("https://"))) {
       return episode.videoUrl;
     }
@@ -108,6 +130,12 @@ export function VideoPlayer({
   const [resumeAt, setResumeAt] = useState<number | null>(episode.progress?.position || null);
   const [playbackUrl, setPlaybackUrl] = useState<string | null>(initialUrl);
   const [sourceError, setSourceError] = useState<string | null>(null);
+  const [metadataLoaded, setMetadataLoaded] = useState(false);
+  const [stalled, setStalled] = useState(false);
+  // The controls object lives for the lifetime of the player, but playbackUrl
+  // arrives later. A ref keeps play() from seeing a stale null URL.
+  const playbackUrlRef = useRef<string | null>(initialUrl);
+  useEffect(() => { playbackUrlRef.current = playbackUrl; }, [playbackUrl]);
   // Note: parent remounts this component via key={episode.id}, so all state resets naturally
 
   // Save progress (debounced)
@@ -137,23 +165,50 @@ export function VideoPlayer({
   useEffect(() => {
     let cancelled = false;
 
-    // 1. Direct HTTP streaming URL (e.g. from Render stream bot or CDN)
-    if (episode.videoUrl && (episode.videoUrl.startsWith("http://") || episode.videoUrl.startsWith("https://"))) {
-      setPlaybackUrl(episode.videoUrl);
-      setSourceError(null);
-      return () => { cancelled = true; };
-    }
-
-    // 2. Direct Telegram Message ID with Stream Server base URL
+    const directUrl = episode.videoUrl && (episode.videoUrl.startsWith("http://") || episode.videoUrl.startsWith("https://"))
+      ? episode.videoUrl
+      : null;
     const streamBase = process.env.NEXT_PUBLIC_STREAM_BASE_URL || "https://kiluu-stream.onrender.com";
-    if (episode.telegramMessageId && streamBase) {
-      const directUrl = `${streamBase.replace(/\/+$/, "")}/stream/${episode.telegramMessageId}`;
-      setPlaybackUrl(directUrl);
-      setSourceError(null);
+    const telegramUrl = episode.telegramMessageId && streamBase
+      ? `${streamBase.replace(/\/+$/, "")}/stream/${episode.telegramMessageId}`
+      : null;
+    // Last-resort source if the authorized HLS lookup fails (e.g. R2 object
+    // missing). Chrome can still play it; Safari may not if it is HEVC.
+    const fallbackUrl = telegramUrl || directUrl;
+
+    // 1. HLS (R2 private bucket or Cloudflare Stream) must be resolved through
+    // the API route to get a signed URL. Prefer it over any direct MP4 because
+    // iPhone Safari only supports HLS for many codecs.
+    if (episode.hlsKey || episode.streamId) {
+      fetch(`/api/episodes/${encodeURIComponent(episode.id)}/stream`, { cache: "no-store" })
+        .then(async (response) => {
+          const data = await response.json();
+          if (!response.ok || !data.streamUrl) throw new Error(data.error || "Unable to authorize episode playback");
+          if (!cancelled) {
+            setPlaybackUrl(data.streamUrl);
+            setSourceError(null);
+          }
+        })
+        .catch((error: unknown) => {
+          if (cancelled) return;
+          if (fallbackUrl) {
+            console.warn("HLS playback unavailable, falling back to direct stream", error);
+            setPlaybackUrl(fallbackUrl);
+            setSourceError(null);
+          } else {
+            setSourceError(error instanceof Error ? error.message : "Unable to load episode stream");
+          }
+        });
       return () => { cancelled = true; };
     }
 
-    // 3. Fallback to API route (handles HLS, Cloudflare Stream, R2 signed URLs)
+    // 2. Direct HTTP / Telegram URLs are already the initial playbackUrl
+    // (the parent remounts this component per episode via key={episode.id}).
+    if (directUrl || telegramUrl) {
+      return () => { cancelled = true; };
+    }
+
+    // 3. Last resort: let the API route decide (may return an error message)
     fetch(`/api/episodes/${encodeURIComponent(episode.id)}/stream`, { cache: "no-store" })
       .then(async (response) => {
         const data = await response.json();
@@ -173,7 +228,12 @@ export function VideoPlayer({
     const video = videoRef.current;
     if (!video || !playbackUrl || !/\.m3u8(?:$|\?)/i.test(playbackUrl)) return;
     if (video.canPlayType("application/vnd.apple.mpegurl")) {
-      video.src = playbackUrl;
+      // Safari handles HLS natively — set src directly and call load() so
+      // Safari picks up the new source even if the element already exists.
+      if (video.src !== playbackUrl) {
+        video.src = playbackUrl;
+        video.load();
+      }
       return;
     }
     if (!Hls.isSupported()) {
@@ -181,13 +241,98 @@ export function VideoPlayer({
       return;
     }
     const hls = new Hls({ maxBufferLength: 30, maxMaxBufferLength: 60 });
+    hlsRef.current = hls;
     hls.loadSource(playbackUrl);
     hls.attachMedia(video);
     hls.on(Hls.Events.ERROR, (_event, data) => {
       if (data.fatal) setSourceError("The HLS stream could not be played.");
     });
-    return () => hls.destroy();
+    return () => {
+      hlsRef.current = null;
+      hls.destroy();
+    };
   }, [playbackUrl]);
+
+  // If the stream server is slow to even return metadata (common when it is
+  // waking up or busy), offer a manual reload instead of an infinite spinner.
+  useEffect(() => {
+    if (!playbackUrl || (!waiting && metadataLoaded)) return;
+    const timer = setTimeout(() => setStalled(true), 20_000);
+    return () => clearTimeout(timer);
+  }, [playbackUrl, waiting, metadataLoaded]);
+
+  function attemptPlay() {
+    const v = videoRef.current;
+    if (!v) return;
+    v.play()
+      .then(() => {
+        setPlaying(true);
+        setWaiting(false);
+      })
+      .catch((err) => {
+        if (err instanceof DOMException && err.name === "AbortError") return;
+        if (err instanceof DOMException && err.name === "NotAllowedError") {
+          // iOS/Safari blocks unmuted autoplay without a user gesture, but
+          // muted playback is allowed. Start silently right away so the guest
+          // sees the synced video instead of an endless loading spinner; the
+          // party view offers a one-tap unmute.
+          try {
+            v.muted = true;
+            setMuted(true);
+            void v.play().then(() => {
+              setPlaying(true);
+              setWaiting(false);
+            }).catch(() => setWaiting(false));
+          } catch {
+            setWaiting(false);
+          }
+          onAutoplayBlockedRef.current?.();
+          return;
+        }
+        // Any other rejection (e.g. source not loaded yet) must not leave the
+        // spinner running forever.
+        setWaiting(false);
+      });
+  }
+
+  function applyPendingCommand() {
+    const v = videoRef.current;
+    const pending = pendingCommandRef.current;
+    if (!v || !pending) return;
+    pendingCommandRef.current = null;
+    if (typeof pending.pos === "number" && isFinite(pending.pos)) {
+      v.currentTime = Math.max(0, Math.min(pending.pos, v.duration || pending.pos));
+    }
+    if (pending.type === "play") attemptPlay();
+    else v.pause();
+  }
+
+  function retrySource() {
+    const v = videoRef.current;
+    if (!v) return;
+    retryCountRef.current = 0;
+    if (retryTimerRef.current) {
+      clearTimeout(retryTimerRef.current);
+      retryTimerRef.current = null;
+    }
+    pendingCommandRef.current = null;
+    setSourceError(null);
+    setStalled(false);
+    setWaiting(true);
+    setMetadataLoaded(false);
+    // Managed HLS: restart the loader instead of tearing down the MediaSource.
+    if (hlsRef.current) {
+      hlsRef.current.startLoad();
+      return;
+    }
+    const savedTime = v.currentTime;
+    const onMeta = () => {
+      v.removeEventListener("loadedmetadata", onMeta);
+      if (!syncMode && savedTime > 0) v.currentTime = savedTime;
+    };
+    v.addEventListener("loadedmetadata", onMeta);
+    v.load();
+  }
 
   useEffect(() => {
     let cancelled = false;
@@ -381,44 +526,51 @@ export function VideoPlayer({
       play: (pos?: number) => {
         const v = videoRef.current;
         if (!v) return;
-        if (!v.src && !playbackUrl) return;
-        if (typeof pos === "number" && isFinite(pos)) v.currentTime = pos;
-        // If metadata not yet loaded, defer until it is
-        if (v.readyState < HTMLMediaElement.HAVE_METADATA) {
-          const onReady = () => {
-            v.removeEventListener("loadedmetadata", onReady);
-            if (typeof pos === "number" && isFinite(pos)) v.currentTime = pos;
-            v.play().then(() => setPlaying(true)).catch((err) => {
-              if (err && err.name === "AbortError") return;
-              if (err && err.name === "NotAllowedError") {
-                toast.info("Tap the video once to allow playback audio in this browser.", { id: "party-autoplay" });
-                onAutoplayBlocked?.();
-              }
-            });
+        if (!v.src && !playbackUrlRef.current) return;
+        const hasMeta = v.readyState >= HTMLMediaElement.HAVE_METADATA;
+        if (hasMeta && typeof pos === "number" && isFinite(pos)) {
+          v.currentTime = Math.max(0, Math.min(pos, v.duration || pos));
+          setCurrent(v.currentTime);
+        }
+        if (!hasMeta) {
+          // The player may mount (and receive the party state) before the
+          // stream metadata is available. Keep one pending command and apply
+          // it on loadedmetadata instead of stacking listeners.
+          pendingCommandRef.current = {
+            type: "play",
+            pos: typeof pos === "number" && isFinite(pos) ? pos : undefined,
           };
-          v.addEventListener("loadedmetadata", onReady);
           return;
         }
-        v.play().then(() => setPlaying(true)).catch((err) => {
-          if (err && err.name === "AbortError") return;
-          if (err && err.name === "NotAllowedError") {
-            toast.info("Tap the video once to allow playback audio in this browser.", { id: "party-autoplay" });
-            onAutoplayBlocked?.();
-          }
-        });
+        attemptPlay();
       },
       pause: (pos?: number) => {
         const v = videoRef.current;
         if (!v) return;
-        if (typeof pos === "number" && isFinite(pos)) v.currentTime = pos;
+        const hasMeta = v.readyState >= HTMLMediaElement.HAVE_METADATA;
+        if (hasMeta && typeof pos === "number" && isFinite(pos)) {
+          v.currentTime = Math.max(0, Math.min(pos, v.duration || pos));
+          setCurrent(v.currentTime);
+        }
+        if (!hasMeta) {
+          pendingCommandRef.current = {
+            type: "pause",
+            pos: typeof pos === "number" && isFinite(pos) ? pos : undefined,
+          };
+        }
         v.pause();
         setPlaying(false);
+        setWaiting(false);
       },
       seek: (pos: number) => {
         const v = videoRef.current;
-        if (!v) return;
-        v.currentTime = pos;
-        setCurrent(pos);
+        if (!v || !isFinite(pos)) return;
+        if (v.readyState < HTMLMediaElement.HAVE_METADATA) {
+          pendingCommandRef.current = { type: "seek", pos };
+          return;
+        }
+        v.currentTime = Math.max(0, Math.min(pos, v.duration || pos));
+        setCurrent(v.currentTime);
       },
       setRate: (rate: number) => {
         const v = videoRef.current;
@@ -438,21 +590,22 @@ export function VideoPlayer({
       isBuffering: () => {
         const v = videoRef.current;
         if (!v) return false;
-        // HAVE_FUTURE_DATA = 3, HAVE_ENOUGH_DATA = 4
-        // readyState < 3 means not enough data to play from current position
-        return v.readyState < 3;
+        // A pending seek also counts as buffering: correcting drift while the
+        // element is seeking interrupts the download and can loop forever.
+        return v.seeking || v.readyState < HTMLMediaElement.HAVE_FUTURE_DATA;
       },
+      isPaused: () => videoRef.current?.paused ?? true,
       enableAudio: () => {
         const v = videoRef.current;
         if (!v) return;
-        const wasMuted = v.muted;
-        v.muted = true;
-        v.play().then(() => {
-          v.pause();
-          v.muted = wasMuted;
-          setPlaying(false);
+        // Called from a click/tap handler, so unmuting and playing here
+        // satisfies mobile autoplay policies.
+        v.muted = false;
+        setMuted(false);
+        void v.play().then(() => {
+          setPlaying(true);
+          setWaiting(false);
         }).catch(() => {
-          v.muted = wasMuted;
           toast.error("This browser did not allow playback. Use the video Play control once.");
         });
       },
@@ -482,28 +635,46 @@ export function VideoPlayer({
         preload="metadata"
         onLoadedMetadata={(e) => {
           const v = e.currentTarget;
+          setMetadataLoaded(true);
+          setStalled(false);
           setDuration(v.duration || episode.duration || 0);
           v.volume = volume;
           v.playbackRate = speed;
-          // Resume from saved position
-          if (!seekedRef.current && resumeAt && resumeAt > 5 && resumeAt < (v.duration || Infinity) - 10) {
+          applyPendingCommand();
+          if (syncMode) {
+            // Let the party state drive the seek position with a freshly
+            // computed live position instead of the stale snapshot captured
+            // at join-time.
+            onSyncReadyRef.current?.();
+          } else if (!seekedRef.current && resumeAt && resumeAt > 5 && resumeAt < (v.duration || Infinity) - 10) {
+            // Resume from saved position (normal watch mode only)
             v.currentTime = resumeAt;
           }
           seekedRef.current = true;
         }}
         onTimeUpdate={(e) => setCurrent(e.currentTarget.currentTime)}
         onPlay={() => setPlaying(true)}
-        onPause={() => setPlaying(false)}
+        onPause={() => {
+          setPlaying(false);
+          // A blocked autoplay leaves the element paused; never keep the
+          // loading spinner up in that state.
+          setWaiting(false);
+        }}
         onWaiting={() => setWaiting(true)}
-        onPlaying={() => setWaiting(false)}
+        onPlaying={() => {
+          setWaiting(false);
+          setStalled(false);
+        }}
         onCanPlay={() => {
           setWaiting(false);
+          setStalled(false);
           setSourceError(null);
           retryCountRef.current = 0; // reset retry counter on successful load
           if (retryTimerRef.current) { clearTimeout(retryTimerRef.current); retryTimerRef.current = null; }
         }}
         onError={(e) => {
           setWaiting(false);
+          setStalled(false);
           const err = e.currentTarget.error;
           if (err && err.code === 1) return; // MEDIA_ERR_ABORTED — ignore
           if (!playbackUrl) return;
@@ -516,15 +687,32 @@ export function VideoPlayer({
             retryTimerRef.current = setTimeout(() => {
               const v = videoRef.current;
               if (!v) return;
-              const currentTime = v.currentTime;
+              // Snapshot the time BEFORE load(); setting currentTime immediately
+              // after load() is unreliable on Safari — it must be done after
+              // the loadedmetadata event fires.
+              const savedTime = v.currentTime;
+              const onMeta = () => {
+                v.removeEventListener("loadedmetadata", onMeta);
+                if (!syncMode && savedTime > 0) v.currentTime = savedTime;
+              };
+              v.addEventListener("loadedmetadata", onMeta);
               v.load(); // reload source
-              v.currentTime = currentTime;
               setSourceError(null);
+              setWaiting(true);
             }, delay);
             return;
           }
           retryCountRef.current = 0;
-          setSourceError("Video yuklanmadi. Sahifani yangilab ko'ring yoki biroz kutib yana urinib ko'ring.");
+          if (err && err.code === 4) {
+            // MEDIA_ERR_SRC_NOT_SUPPORTED. On iPhone this almost always means
+            // the MP4 is HEVC (hev1) or not faststart — Safari needs H.264 or
+            // an HLS rendition.
+            setSourceError("Bu video formati brauzerda qo'llab-quvvatlanmaydi. iPhone uchun H.264 yoki HLS versiyasi kerak.");
+          } else if (err && err.code === 3) {
+            setSourceError("Videoni dekodlashda xatolik yuz berdi. Sahifani yangilab qayta urinib ko'ring.");
+          } else {
+            setSourceError("Video yuklanmadi. Sahifani yangilab ko'ring yoki biroz kutib yana urinib ko'ring.");
+          }
         }}
         onEnded={() => {
           setPlaying(false);
@@ -536,12 +724,33 @@ export function VideoPlayer({
 
       {sourceError && (
         <div className="absolute inset-x-4 top-16 z-10 rounded-xl bg-black/80 px-4 py-3 text-center text-sm text-white">
-          {sourceError}
+          <p>{sourceError}</p>
+          {playbackUrl && (
+            <button
+              onClick={retrySource}
+              className="mt-2 rounded-full bg-white/15 px-4 py-1.5 text-xs font-bold hover:bg-white/25 transition"
+            >
+              Qayta urinish
+            </button>
+          )}
+        </div>
+      )}
+
+      {/* Slow-stream fallback: the server may be waking up or busy */}
+      {stalled && !sourceError && (
+        <div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-3 bg-black/50">
+          <p className="px-6 text-center text-sm text-white/90">Video hali yuklanmoqda…</p>
+          <button
+            onClick={retrySource}
+            className="rounded-full bg-white/15 px-5 py-2 text-xs font-bold text-white hover:bg-white/25 transition"
+          >
+            Qayta urinish
+          </button>
         </div>
       )}
 
       {/* Loading spinner */}
-      {waiting && (
+      {waiting && !stalled && (
         <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
           <Loader2 className="w-10 h-10 animate-spin text-white/80" />
         </div>
