@@ -11,6 +11,18 @@ const sourceDir = path.join(root, "frames-src");
 const outputDir = path.join(root, "public", "frames");
 const prisma = new PrismaClient();
 const force = process.argv.includes("--force");
+const onlyArgument = process.argv.find((argument) => argument.startsWith("--only="));
+const onlySlugs = onlyArgument
+  ? onlyArgument.slice("--only=".length).split(",").map((slug) => slug.trim()).filter(Boolean)
+  : null;
+
+if (onlyArgument && (
+  !onlySlugs.length ||
+  onlySlugs.some((slug) => !FRAMES.some((frame) => frame.slug === slug))
+)) {
+  throw new Error("--only must contain one or more known frame slugs separated by commas");
+}
+const selectedSlugs = onlySlugs ? new Set(onlySlugs) : null;
 
 async function inferTextColor(imagePath, safe) {
   const { data, info } = await sharp(imagePath).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
@@ -139,6 +151,7 @@ try {
   await mkdir(outputDir, { recursive: true });
   const rows = [];
   for (const [sortOrder, frame] of FRAMES.entries()) {
+    if (selectedSlugs && !selectedSlugs.has(frame.slug)) continue;
     const typePath = frame.type === "avatar" ? "avatar" : "name";
     const version = frame.version ?? 2;
     const webpPath = path.join(outputDir, `${frame.slug}.v${version}.webp`);

@@ -176,7 +176,7 @@ export default {
     const key = decodeKey(url.pathname);
     if (!key) return jsonError("Invalid media path", 400);
     if (key.startsWith("hls/")) return serveHls(request, env, key, url);
-    if (!key.startsWith("images/")) return jsonError("Not found", 404);
+    if (!key.startsWith("images/") && !key.startsWith("frames/")) return jsonError("Not found", 404);
 
     const object = await env.MEDIA_BUCKET.get(key);
     if (!object) return jsonError("Not found", 404);

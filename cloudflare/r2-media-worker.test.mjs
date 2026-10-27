@@ -30,9 +30,10 @@ function object(body, contentType) {
   };
 }
 
-test("media worker signs HLS playlists and segments while allowing image reads", async () => {
+test("media worker signs HLS playlists and segments while allowing image and frame reads", async () => {
   const objects = new Map([
     ["images/avatar/1.webp", object("image-bytes", "image/webp")],
+    ["frames/name/vermilion-fan.v5.webp", object("name-frame-bytes", "image/webp")],
     ["hls/my-anime/1/index.m3u8", object("#EXTM3U\n#EXTINF:6,\nsegment_00001.ts\n", "application/vnd.apple.mpegurl")],
     ["hls/my-anime/1/segment_00001.ts", object("segment-bytes", "video/mp2t")],
   ]);
@@ -44,6 +45,13 @@ test("media worker signs HLS playlists and segments while allowing image reads",
   const image = await worker.fetch(new Request("https://media.example.test/images/avatar/1.webp"), env);
   assert.equal(image.status, 200);
   assert.equal(await image.text(), "image-bytes");
+
+  const frame = await worker.fetch(new Request(
+    "https://media.example.test/frames/name/vermilion-fan.v5.webp",
+  ), env);
+  assert.equal(frame.status, 200);
+  assert.equal(await frame.text(), "name-frame-bytes");
+  assert.equal(frame.headers.get("Cache-Control"), "public, max-age=31536000, immutable");
 
   const scope = "hls/my-anime/1";
   const expiry = String(Math.floor(Date.now() / 1000) + 60);
