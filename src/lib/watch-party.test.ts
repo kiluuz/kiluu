@@ -294,6 +294,28 @@ test("two clients receive host playback changes and reconnect restores server st
   assert.equal((await denied).ok, false);
 });
 
+test("a guest joining mid-playback receives the playing state immediately", async () => {
+  const host = await connectSocket(hostId, partyId);
+  const playAck = new Promise<{ ok: boolean }>((resolve) => {
+    host.socket.emit("playback:play", { position: 50 }, resolve);
+  });
+  assert.deepEqual(await playAck, { ok: true });
+
+  const lateJoinerId = loadUserIds[0];
+  await client.watchPartyMember.create({
+    data: { partyId, userId: lateJoinerId, lastSeenAt: new Date() },
+  });
+  const late = await connectSocket(lateJoinerId, partyId);
+  assert.equal(late.state.state.is_playing, true);
+  assert.ok(late.state.state.position >= 50 && late.state.state.position < 55);
+
+  const syncState = await new Promise<{ is_playing: boolean; position: number }>((resolve) => {
+    late.socket.emit("playback:sync", resolve);
+  });
+  assert.equal(syncState.is_playing, true);
+  assert.ok(syncState.position >= late.state.state.position);
+});
+
 test("50 connected participants receive the same measured playback update", async () => {
   const connectionStarted = performance.now();
   const connected = await Promise.all(loadUserIds.map((userId) => connectSocket(userId, loadPartyId)));

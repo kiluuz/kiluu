@@ -119,6 +119,7 @@ export function WatchTogetherView() {
   const heartbeatIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const driftIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const lastCorrectionAtRef = useRef(0);
+  const lastPlayAttemptAtRef = useRef(0);
   const applyRetryCountRef = useRef(0);
   const isHostRef = useRef(false);
   const chatEndRef = useRef<HTMLDivElement | null>(null);
@@ -271,6 +272,9 @@ export function WatchTogetherView() {
     setIsHost(participantsWithKeys.some((participant) => participant.userId === user?.id && participant.isHost));
     setChatMessages(initialMessages);
     setReactions([]);
+    applyRetryCountRef.current = 0;
+    lastCorrectionAtRef.current = 0;
+    lastPlayAttemptAtRef.current = 0;
     if (initialState) applyPlaybackState(initialState);
 
     const socket = io(process.env.NEXT_PUBLIC_WATCH_PARTY_URL || "/?XTransformPort=3003", {
@@ -298,18 +302,29 @@ export function WatchTogetherView() {
       pingIntervalRef.current = setInterval(ping, 4000);
       socket.emit("party:heartbeat");
       heartbeatIntervalRef.current = setInterval(() => socket.emit("party:heartbeat"), 20_000);
+      // Pull the authoritative state explicitly on every (re)connect instead
+      // of depending on the server push arriving after the player is ready.
+      socket.emit("playback:sync", (fresh: PartyPlaybackState | null) => {
+        if (fresh) applyPlaybackState(fresh);
+      });
       lastCorrectionAtRef.current = 0;
+      lastPlayAttemptAtRef.current = 0;
       driftIntervalRef.current = setInterval(() => {
         const state = playbackStateRef.current;
         const controls = controlsRef.current;
         if (!state || !controls || !state.is_playing) return;
         // The host's own video is the clock — never seek it.
         if (isHostRef.current) return;
-        // Never chase the party clock while the local video is paused (mobile
-        // autoplay policies block play() until a user gesture). Seeking every
-        // second in that state keeps the element buffering forever and is the
-        // reason guests were stuck on "loading" until the host paused.
-        if (controls.isPaused()) return;
+        // Guest is paused even though the party is playing: this is either a
+        // blocked autoplay or a dropped play() while the stream was loading.
+        // Keep nudging playback instead of waiting for another host action.
+        if (controls.isPaused()) {
+          if (Date.now() - lastPlayAttemptAtRef.current >= 3000) {
+            lastPlayAttemptAtRef.current = Date.now();
+            controls.ensurePlaying();
+          }
+          return;
+        }
         // Skip drift correction while video is buffering or seeking — seeking
         // during buffering interrupts the download and causes an infinite
         // loading loop for guests who join mid-playback.
@@ -461,6 +476,7 @@ export function WatchTogetherView() {
     playbackStateRef.current = null;
     applyRetryCountRef.current = 0;
     lastCorrectionAtRef.current = 0;
+    lastPlayAttemptAtRef.current = 0;
     if (pingIntervalRef.current) clearInterval(pingIntervalRef.current);
     if (heartbeatIntervalRef.current) clearInterval(heartbeatIntervalRef.current);
     if (driftIntervalRef.current) clearInterval(driftIntervalRef.current);

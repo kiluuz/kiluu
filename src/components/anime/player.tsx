@@ -20,6 +20,8 @@ export interface PlayerControls {
   isBuffering: () => boolean;
   /** Returns true when playback is paused — including when autoplay was blocked. */
   isPaused: () => boolean;
+  /** Guest-side safety net: start playback if the party expects it to be playing. */
+  ensurePlaying: () => void;
   enableAudio: () => void;
 }
 
@@ -90,6 +92,12 @@ export function VideoPlayer({
   const seekedRef = useRef(false);
   const retryTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const retryCountRef = useRef(0);
+  // The party said "playing" and the player has not reached that state yet.
+  // play() can be interrupted (AbortError) by a seek, so retries are driven by
+  // this flag instead of being dropped after the first attempt.
+  const wantPlayRef = useRef(false);
+  const playRetryTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const playRetryCountRef = useRef(0);
   // A play/pause requested before metadata is available. Only the latest one is
   // kept — stacking loadedmetadata listeners made late-joining guests seek and
   // play repeatedly, which looked like an endless loading state.
@@ -261,16 +269,45 @@ export function VideoPlayer({
     return () => clearTimeout(timer);
   }, [playbackUrl, waiting, metadataLoaded]);
 
+  function clearPlayRetry() {
+    if (playRetryTimerRef.current) {
+      clearTimeout(playRetryTimerRef.current);
+      playRetryTimerRef.current = null;
+    }
+    playRetryCountRef.current = 0;
+  }
+
+  function schedulePlayRetry() {
+    if (!syncMode || isHost || !wantPlayRef.current) return;
+    if (playRetryTimerRef.current) return;
+    if (playRetryCountRef.current >= 20) return;
+    playRetryCountRef.current += 1;
+    playRetryTimerRef.current = setTimeout(() => {
+      playRetryTimerRef.current = null;
+      const v = videoRef.current;
+      if (!v || !wantPlayRef.current || !v.paused) return;
+      attemptPlay();
+    }, 400 * Math.min(playRetryCountRef.current, 5));
+  }
+
   function attemptPlay() {
     const v = videoRef.current;
     if (!v) return;
+    wantPlayRef.current = true;
     v.play()
       .then(() => {
+        clearPlayRetry();
         setPlaying(true);
         setWaiting(false);
       })
       .catch((err) => {
-        if (err instanceof DOMException && err.name === "AbortError") return;
+        if (err instanceof DOMException && err.name === "AbortError") {
+          // A seek or source switch interrupted play(). This is normal while
+          // seeking to the host's live position right after joining — retry
+          // instead of leaving the guest paused forever.
+          schedulePlayRetry();
+          return;
+        }
         if (err instanceof DOMException && err.name === "NotAllowedError") {
           // iOS/Safari blocks unmuted autoplay without a user gesture, but
           // muted playback is allowed. Start silently right away so the guest
@@ -280,11 +317,16 @@ export function VideoPlayer({
             v.muted = true;
             setMuted(true);
             void v.play().then(() => {
+              clearPlayRetry();
               setPlaying(true);
               setWaiting(false);
-            }).catch(() => setWaiting(false));
+            }).catch(() => {
+              setWaiting(false);
+              schedulePlayRetry();
+            });
           } catch {
             setWaiting(false);
+            schedulePlayRetry();
           }
           onAutoplayBlockedRef.current?.();
           return;
@@ -295,6 +337,15 @@ export function VideoPlayer({
       });
   }
 
+  /** Guest safety net: the party says "playing" but the element is still paused. */
+  function ensurePlaying() {
+    const v = videoRef.current;
+    if (!v || !syncMode || isHost || !wantPlayRef.current) return;
+    if (!v.paused) return;
+    if (v.readyState < HTMLMediaElement.HAVE_CURRENT_DATA) return;
+    attemptPlay();
+  }
+
   function applyPendingCommand() {
     const v = videoRef.current;
     const pending = pendingCommandRef.current;
@@ -303,14 +354,20 @@ export function VideoPlayer({
     if (typeof pending.pos === "number" && isFinite(pending.pos)) {
       v.currentTime = Math.max(0, Math.min(pending.pos, v.duration || pending.pos));
     }
-    if (pending.type === "play") attemptPlay();
-    else v.pause();
+    if (pending.type === "play") {
+      wantPlayRef.current = true;
+      attemptPlay();
+    } else {
+      wantPlayRef.current = false;
+      v.pause();
+    }
   }
 
   function retrySource() {
     const v = videoRef.current;
     if (!v) return;
     retryCountRef.current = 0;
+    clearPlayRetry();
     if (retryTimerRef.current) {
       clearTimeout(retryTimerRef.current);
       retryTimerRef.current = null;
@@ -418,6 +475,10 @@ export function VideoPlayer({
   useEffect(() => {
     return () => {
       if (hideTimer.current) clearTimeout(hideTimer.current);
+      if (playRetryTimerRef.current) {
+        clearTimeout(playRetryTimerRef.current);
+        playRetryTimerRef.current = null;
+      }
     };
   }, []);
 
@@ -425,7 +486,9 @@ export function VideoPlayer({
     const v = videoRef.current;
     if (!v) return;
     if (syncMode && !isHost) {
-      toast.info("Only the party host controls playback", { id: "host-only" });
+      // Guests cannot control the party, but a tap is a valid user gesture:
+      // use it to resume synced playback when mobile autoplay was blocked.
+      ensurePlaying();
       return;
     }
     if (!v.src && !playbackUrl) {
@@ -526,11 +589,21 @@ export function VideoPlayer({
       play: (pos?: number) => {
         const v = videoRef.current;
         if (!v) return;
-        if (!v.src && !playbackUrlRef.current) return;
+        wantPlayRef.current = true;
         const hasMeta = v.readyState >= HTMLMediaElement.HAVE_METADATA;
         if (hasMeta && typeof pos === "number" && isFinite(pos)) {
           v.currentTime = Math.max(0, Math.min(pos, v.duration || pos));
           setCurrent(v.currentTime);
+        }
+        if (!v.src && !playbackUrlRef.current) {
+          // The signed stream URL may still be loading. Keep the party's play
+          // command instead of dropping it, so joining guests start as soon as
+          // the source is ready.
+          pendingCommandRef.current = {
+            type: "play",
+            pos: typeof pos === "number" && isFinite(pos) ? pos : undefined,
+          };
+          return;
         }
         if (!hasMeta) {
           // The player may mount (and receive the party state) before the
@@ -547,6 +620,8 @@ export function VideoPlayer({
       pause: (pos?: number) => {
         const v = videoRef.current;
         if (!v) return;
+        wantPlayRef.current = false;
+        clearPlayRetry();
         const hasMeta = v.readyState >= HTMLMediaElement.HAVE_METADATA;
         if (hasMeta && typeof pos === "number" && isFinite(pos)) {
           v.currentTime = Math.max(0, Math.min(pos, v.duration || pos));
@@ -595,14 +670,17 @@ export function VideoPlayer({
         return v.seeking || v.readyState < HTMLMediaElement.HAVE_FUTURE_DATA;
       },
       isPaused: () => videoRef.current?.paused ?? true,
+      ensurePlaying,
       enableAudio: () => {
         const v = videoRef.current;
         if (!v) return;
         // Called from a click/tap handler, so unmuting and playing here
         // satisfies mobile autoplay policies.
+        wantPlayRef.current = true;
         v.muted = false;
         setMuted(false);
         void v.play().then(() => {
+          clearPlayRetry();
           setPlaying(true);
           setWaiting(false);
         }).catch(() => {
@@ -613,7 +691,7 @@ export function VideoPlayer({
     return () => {
       controlsRef.current = null;
     };
-  }, [controlsRef]);
+  }, [controlsRef, isHost, syncMode]);
 
   return (
     <div
@@ -654,6 +732,12 @@ export function VideoPlayer({
         }}
         onTimeUpdate={(e) => setCurrent(e.currentTarget.currentTime)}
         onPlay={() => setPlaying(true)}
+        onPlaying={() => {
+          clearPlayRetry();
+          setWaiting(false);
+          setStalled(false);
+        }}
+        onSeeked={() => ensurePlaying()}
         onPause={() => {
           setPlaying(false);
           // A blocked autoplay leaves the element paused; never keep the
@@ -661,16 +745,15 @@ export function VideoPlayer({
           setWaiting(false);
         }}
         onWaiting={() => setWaiting(true)}
-        onPlaying={() => {
-          setWaiting(false);
-          setStalled(false);
-        }}
         onCanPlay={() => {
           setWaiting(false);
           setStalled(false);
           setSourceError(null);
           retryCountRef.current = 0; // reset retry counter on successful load
           if (retryTimerRef.current) { clearTimeout(retryTimerRef.current); retryTimerRef.current = null; }
+          // The source just became playable — resume if the party expects
+          // playback (this is the reliable moment right after joining).
+          ensurePlaying();
         }}
         onError={(e) => {
           setWaiting(false);
