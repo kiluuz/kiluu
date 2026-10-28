@@ -58,3 +58,7 @@ upload/
 scripts/checkdb.mjs
 qa-screenshots/
 qa-screenshots.zip
+
+# local/preview databases (contain user data and credentials)
+db/*.db
+db/*.db.bak*
