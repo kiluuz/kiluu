@@ -24,6 +24,8 @@ export interface PlayerControls {
   ensurePlaying: () => void;
   /** Guest-side recovery for a buffer that stopped progressing mid-playback. */
   recover: () => void;
+  /** Hard local restart: pause, seek to the party position and play again. */
+  restart: (pos: number) => void;
   enableAudio: () => void;
 }
 
@@ -334,8 +336,10 @@ export function VideoPlayer({
           return;
         }
         // Any other rejection (e.g. source not loaded yet) must not leave the
-        // spinner running forever.
+        // spinner running forever — retry instead of dropping the party's
+        // play command silently.
         setWaiting(false);
+        schedulePlayRetry();
       });
   }
 
@@ -344,7 +348,10 @@ export function VideoPlayer({
     const v = videoRef.current;
     if (!v || !syncMode || isHost || !wantPlayRef.current) return;
     if (!v.paused) return;
-    if (v.readyState < HTMLMediaElement.HAVE_CURRENT_DATA) return;
+    // HAVE_METADATA is enough: play() itself starts fetching the data needed
+    // at the party position. Requiring current data here left late joiners
+    // paused forever because a paused element may never buffer on its own.
+    if (v.readyState < HTMLMediaElement.HAVE_METADATA) return;
     attemptPlay();
   }
 
@@ -357,6 +364,14 @@ export function VideoPlayer({
     const v = videoRef.current;
     if (!v || !syncMode || isHost) return;
     wantPlayRef.current = true;
+    // A play() call that never settles leaves the element "unpaused" but with
+    // no frames. Pausing first clears that wedged state; this is the same
+    // pause → play cycle that manually unsticks a guest.
+    try {
+      v.pause();
+    } catch {
+      // ignore
+    }
     hlsRef.current?.startLoad();
     const target = v.currentTime > 0.5 ? v.currentTime - 0.25 : 0.01;
     try {
@@ -364,6 +379,27 @@ export function VideoPlayer({
     } catch {
       // Some browsers throw while the element is still initializing.
     }
+    attemptPlay();
+  }
+
+  function restart(pos: number) {
+    const v = videoRef.current;
+    if (!v || !syncMode || isHost) return;
+    wantPlayRef.current = true;
+    try {
+      v.pause();
+    } catch {
+      // ignore
+    }
+    if (typeof pos === "number" && isFinite(pos)) {
+      try {
+        v.currentTime = Math.max(0, Math.min(pos, v.duration || pos));
+        setCurrent(v.currentTime);
+      } catch {
+        // Some browsers throw while the element is still initializing.
+      }
+    }
+    hlsRef.current?.startLoad();
     attemptPlay();
   }
 
@@ -693,6 +729,7 @@ export function VideoPlayer({
       isPaused: () => videoRef.current?.paused ?? true,
       ensurePlaying,
       recover,
+      restart,
       enableAudio: () => {
         const v = videoRef.current;
         if (!v) return;
@@ -740,15 +777,20 @@ export function VideoPlayer({
           setDuration(v.duration || episode.duration || 0);
           v.volume = volume;
           v.playbackRate = speed;
-          applyPendingCommand();
           if (syncMode) {
             // Let the party state drive the seek position with a freshly
             // computed live position instead of the stale snapshot captured
-            // at join-time.
+            // at join-time. Applying the pending command here as well issued a
+            // second seek that aborted the first play() and left guests on a
+            // black frame until the host paused and resumed.
+            pendingCommandRef.current = null;
             onSyncReadyRef.current?.();
-          } else if (!seekedRef.current && resumeAt && resumeAt > 5 && resumeAt < (v.duration || Infinity) - 10) {
-            // Resume from saved position (normal watch mode only)
-            v.currentTime = resumeAt;
+          } else {
+            applyPendingCommand();
+            if (!seekedRef.current && resumeAt && resumeAt > 5 && resumeAt < (v.duration || Infinity) - 10) {
+              // Resume from saved position (normal watch mode only)
+              v.currentTime = resumeAt;
+            }
           }
           seekedRef.current = true;
         }}

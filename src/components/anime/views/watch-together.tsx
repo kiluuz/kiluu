@@ -124,6 +124,9 @@ export function WatchTogetherView() {
   const hostMismatchTicksRef = useRef(0);
   const bufferingSinceRef = useRef(0);
   const applyRetryCountRef = useRef(0);
+  const lastProgressAtRef = useRef(0);
+  const lastProgressValueRef = useRef(-1);
+  const lastHostBroadcastRef = useRef(0);
   const isHostRef = useRef(false);
   const chatEndRef = useRef<HTMLDivElement | null>(null);
 
@@ -243,8 +246,16 @@ export function WatchTogetherView() {
     }, Date.now() + clockOffsetRef.current);
 
     controls.setRate(state.playback_rate);
-    if (state.is_playing) controls.play(computeExpected());
-    else controls.pause(computeExpected());
+    if (state.is_playing) {
+      // Do not re-seek a guest that is already playing in sync. Party state
+      // arrives on every host heartbeat, and seeking on each one interrupts
+      // the stream and can wedge play() into a black frame.
+      const expected = computeExpected();
+      if (!controls.isPaused() && Math.abs(expected - controls.getCurrentTime()) < 2.5) return;
+      controls.play(expected);
+    } else {
+      controls.pause(computeExpected());
+    }
   }
 
   // Mobile browsers freeze playback when the tab is hidden. When it becomes
@@ -291,6 +302,9 @@ export function WatchTogetherView() {
     lastPlayAttemptAtRef.current = 0;
     hostMismatchTicksRef.current = 0;
     bufferingSinceRef.current = 0;
+    lastProgressAtRef.current = 0;
+    lastProgressValueRef.current = -1;
+    lastHostBroadcastRef.current = 0;
     if (initialState) applyPlaybackState(initialState);
 
     const socket = io(process.env.NEXT_PUBLIC_WATCH_PARTY_URL || "/?XTransformPort=3003", {
@@ -327,17 +341,32 @@ export function WatchTogetherView() {
       lastPlayAttemptAtRef.current = 0;
       hostMismatchTicksRef.current = 0;
       bufferingSinceRef.current = 0;
+      lastProgressAtRef.current = 0;
+      lastProgressValueRef.current = -1;
+      lastHostBroadcastRef.current = 0;
       driftIntervalRef.current = setInterval(() => {
         const state = playbackStateRef.current;
         const controls = controlsRef.current;
         if (!state || !controls) return;
+        const now = Date.now();
         if (isHostRef.current) {
+          const localPaused = controls.isPaused();
+          // Periodic authoritative broadcast. A guest that joined while the
+          // host was already watching needs a fresh play command once its own
+          // player can start; without it guests waited for the host to pause
+          // and resume manually.
+          if (now - lastHostBroadcastRef.current >= 5000) {
+            lastHostBroadcastRef.current = now;
+            socket.emit(
+              localPaused ? "playback:pause" : "playback:play",
+              { position: controls.getCurrentTime() },
+            );
+          }
           // The host's own player is the source of truth. If a control event
           // was lost (emitted before the socket joined the party, or during a
           // reconnect), the server keeps guests paused while the host watches.
           // Re-broadcast the host's actual playback state when it disagrees
           // with the party for a few consecutive ticks.
-          const localPaused = controls.isPaused();
           if (state.is_playing === !localPaused) {
             hostMismatchTicksRef.current = 0;
             return;
@@ -351,15 +380,27 @@ export function WatchTogetherView() {
           );
           return;
         }
-        if (!state.is_playing) return;
-        const now = Date.now();
+        if (!state.is_playing) {
+          lastProgressAtRef.current = 0;
+          return;
+        }
+        // Track real timeline progress instead of trusting `paused`: calling
+        // play() clears `paused` immediately even when no frame ever starts.
+        const current = controls.getCurrentTime();
+        if (Math.abs(current - lastProgressValueRef.current) > 0.05) {
+          lastProgressValueRef.current = current;
+          lastProgressAtRef.current = now;
+        }
         // A buffer that stopped progressing never recovers on its own. Restart
         // loading and retry instead of leaving the guest on an endless spinner
-        // until the host happens to pause and play again.
+        // until the host happens to pause and play again. A stream that never
+        // produced a single frame since joining gets restarted sooner than one
+        // that stalled mid-playback.
         if (controls.isBuffering()) {
+          const limit = lastProgressValueRef.current < 0 ? 6000 : 12_000;
           if (!bufferingSinceRef.current) {
             bufferingSinceRef.current = now;
-          } else if (now - bufferingSinceRef.current >= 12_000) {
+          } else if (now - bufferingSinceRef.current >= limit) {
             bufferingSinceRef.current = now;
             controls.recover();
           }
@@ -375,6 +416,23 @@ export function WatchTogetherView() {
             controls.ensurePlaying();
           }
           return;
+        }
+        // The element claims to be playing but the timeline is frozen — the
+        // black screen guests land on after joining mid-playback. Perform the
+        // same local pause → seek → play cycle the host does manually.
+        if (document.visibilityState === "visible") {
+          if (!lastProgressAtRef.current) lastProgressAtRef.current = now;
+          if (now - lastProgressAtRef.current >= 4000) {
+            lastProgressAtRef.current = now;
+            lastProgressValueRef.current = -1;
+            controls.restart(expectedPlaybackPosition({
+              position: state.position,
+              isPlaying: state.is_playing,
+              serverTs: state.server_ts,
+              playbackRate: state.playback_rate,
+            }, now + clockOffsetRef.current));
+            return;
+          }
         }
         // Give a seek time to settle before correcting again.
         if (now - lastCorrectionAtRef.current < 3000) return;
@@ -526,6 +584,9 @@ export function WatchTogetherView() {
     lastPlayAttemptAtRef.current = 0;
     hostMismatchTicksRef.current = 0;
     bufferingSinceRef.current = 0;
+    lastProgressAtRef.current = 0;
+    lastProgressValueRef.current = -1;
+    lastHostBroadcastRef.current = 0;
     if (pingIntervalRef.current) clearInterval(pingIntervalRef.current);
     if (heartbeatIntervalRef.current) clearInterval(heartbeatIntervalRef.current);
     if (driftIntervalRef.current) clearInterval(driftIntervalRef.current);
