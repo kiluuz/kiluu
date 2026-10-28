@@ -355,7 +355,7 @@ export function PostCard({
           <div className="min-w-0" style={{ marginLeft: avatarNameGap(post.user, 44) }}>
             <div className="flex items-center gap-1.5 flex-wrap">
               <button className="min-w-0 max-w-full overflow-visible font-bold hover:text-primary transition text-sm" onClick={() => openProfile(post.user.username)}>
-                <NameWithFrame user={post.user} className="text-sm" height={36} avatarSize={0} />
+                <NameWithFrame user={post.user} className="text-sm" height={36} maxHeight={44} avatarSize={0} />
               </button>
               {post.user.isVerified && <CheckCircle2 className="w-3.5 h-3.5 text-primary shrink-0" />}
               {post.user.level && <span className="text-[10px] font-bold bg-secondary/80 px-1.5 py-0.5 rounded text-muted-foreground shrink-0">Lv.{post.user.level}</span>}

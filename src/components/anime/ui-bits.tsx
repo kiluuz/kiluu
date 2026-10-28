@@ -224,12 +224,14 @@ export function NameWithFrame({
   className,
   height = 40,
   avatarSize = 40,
+  maxHeight,
 }: {
   user: FramedUser;
   compact?: boolean;
   className?: string;
   height?: number;
   avatarSize?: number;
+  maxHeight?: number;
 }) {
   const name = user.displayName?.trim() || user.username || "";
   const config = frameById(user.equippedNameFrameId);
@@ -245,6 +247,7 @@ export function NameWithFrame({
       config={config}
       className={className}
       height={height}
+      maxHeight={maxHeight}
     />
   );
 }
@@ -255,12 +258,14 @@ function NameFramePlate({
   config,
   className,
   height,
+  maxHeight,
 }: {
   name: string;
   color?: string;
   config: NonNullable<ReturnType<typeof frameById>>;
   className?: string;
   height: number;
+  maxHeight?: number;
 }) {
   const [debug, setDebug] = useState(false);
   const [fontSize, setFontSize] = useState(config.maxFontPx ?? 16);
@@ -317,7 +322,9 @@ function NameFramePlate({
     ((config.minFontPx ?? 12) + 2) / safeHeightRatio,
     65 / safeWidthRatio
   );
-  const plateHeight = Math.max(height || 36, minLegibleHeight);
+  const plateHeight = maxHeight
+    ? Math.min(Math.max(height || 36, minLegibleHeight), maxHeight)
+    : Math.max(height || 36, minLegibleHeight);
   const plateWidth = plateHeight * aspectRatio;
   return (
     <span
