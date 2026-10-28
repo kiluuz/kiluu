@@ -2,7 +2,9 @@ import { Prisma } from "@prisma/client";
 import { db } from "@/lib/db";
 
 export const XP_CONFIG = {
-  curve: { base: 250, exponent: 1.18, maxLevel: 100 },
+  // Early levels stay cheap (level 10 is about a week of average activity),
+  // while the power term keeps level 100 a long-term goal (~56k XP).
+  curve: { linear: 120, power: 0.45, exponent: 2.5, maxLevel: 100 },
   amounts: {
     purchase: 250,
     gift_sent: 80,
@@ -10,8 +12,8 @@ export const XP_CONFIG = {
     post: 25,
     comment: 8,
     like_received: 3,
-    watch_time: 1,
-    watch_complete: 15,
+    watch_time: 2,
+    watch_complete: 60,
     award_given: 12,
     achievement: 20,
     party_hosted: 50,
@@ -61,7 +63,10 @@ const LEVEL_COSMETICS: Record<number, string> = {
 /** XP required to reach a level; level 1 starts at zero XP. */
 export function xpForLevel(level: number): number {
   if (level <= 1) return 0;
-  return Math.floor(XP_CONFIG.curve.base * Math.pow(level - 1, XP_CONFIG.curve.exponent));
+  const steps = level - 1;
+  return Math.floor(
+    XP_CONFIG.curve.linear * steps + XP_CONFIG.curve.power * Math.pow(steps, XP_CONFIG.curve.exponent),
+  );
 }
 
 export function levelFromXp(totalXp: number): {

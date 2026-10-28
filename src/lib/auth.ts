@@ -3,8 +3,18 @@ import { clientRole } from "@/lib/rbac";
 import { randomBytes, scryptSync, timingSafeEqual } from "crypto";
 import { cookies } from "next/headers";
 
-const SESSION_COOKIE = "aniverse_session";
+export const SESSION_COOKIE = "aniverse_session";
 const SESSION_DAYS = 30;
+
+export function sessionCookieOptions(expiresAt: Date) {
+  return {
+    httpOnly: true,
+    sameSite: "lax" as const,
+    secure: process.env.NODE_ENV === "production",
+    expires: expiresAt,
+    path: "/",
+  };
+}
 
 export function hashPassword(password: string): string {
   const salt = randomBytes(16).toString("hex");
@@ -20,20 +30,19 @@ export function verifyPassword(password: string, stored: string): boolean {
   return hashBuf.length === testBuf.length && timingSafeEqual(hashBuf, testBuf);
 }
 
-export async function createSession(userId: string) {
+export async function createSessionRecord(userId: string) {
   const token = randomBytes(32).toString("hex");
   const expiresAt = new Date(Date.now() + SESSION_DAYS * 24 * 60 * 60 * 1000);
   await db.session.create({
     data: { token, userId, expiresAt },
   });
+  return { token, expiresAt };
+}
+
+export async function createSession(userId: string) {
+  const { token, expiresAt } = await createSessionRecord(userId);
   const cookieStore = await cookies();
-  cookieStore.set(SESSION_COOKIE, token, {
-    httpOnly: true,
-    sameSite: "lax",
-    secure: process.env.NODE_ENV === "production",
-    expires: expiresAt,
-    path: "/",
-  });
+  cookieStore.set(SESSION_COOKIE, token, sessionCookieOptions(expiresAt));
   return token;
 }
 
@@ -55,7 +64,7 @@ export async function getCurrentUser() {
     include: { user: true },
   });
   if (!session) return null;
-  if (session.expiresAt < new Date()) {
+  if (session.expiresAt < new Date() || session.user.deletedAt) {
     await db.session.delete({ where: { id: session.id } });
     return null;
   }

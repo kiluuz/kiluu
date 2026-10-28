@@ -75,7 +75,7 @@ export async function POST(req: NextRequest) {
         const previousMinute = Math.floor((beforeWatch._sum.seconds || 0) / 60);
         const newMinute = Math.floor(((beforeWatch._sum.seconds || 0) + watchedSeconds) / 60);
         for (let minute = previousMinute + 1; minute <= newMinute; minute += 1) {
-          await awardXpInTransaction(tx, user.id, "watch_time", `minute-${minute}`, 1);
+          await awardXpInTransaction(tx, user.id, "watch_time", `minute-${minute}`);
         }
       }
       if (isCompleted && !previous?.completed) {

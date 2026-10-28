@@ -20,8 +20,14 @@ test("Level 1-100 XP curve reaches 100 in 6-12 months with 150-250 XP/day", () =
   );
 
   assert.equal(xpForLevel(1), 0);
-  assert.equal(xpForLevel(2), 250);
+  assert.ok(xpForLevel(2) > 0);
   assert.equal(levelFromXp(xpForLevel(100)).level, 100);
+});
+
+test("an average user reaches level 10 within one week", () => {
+  // Moderate activity: about 200 XP/day (two episodes, streak, some social).
+  const week = simulateLevelProgression(200, 7).history.at(-1);
+  assert.ok(week && week.level >= 10, `Expected level 10 after 7 days, got ${week?.level}`);
 });
 
 test("Daily activity XP caps are enforced", () => {

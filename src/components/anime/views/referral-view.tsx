@@ -88,10 +88,7 @@ export function ReferralView() {
   };
 
   useEffect(() => {
-    if (!user) {
-      setLoading(false);
-      return;
-    }
+    if (!user) return;
 
     Promise.all([
       fetch("/api/referrals").then((r) => r.json()),
@@ -270,7 +267,7 @@ export function ReferralView() {
           <ShieldCheck className="w-4 h-4 text-primary" /> Do'st qachon "malakali" hisoblanadi?
         </h4>
         <p className="text-muted-foreground leading-relaxed">
-          Firibgarlikning oldini olish maqsadida taklif qilingan do'stingiz <strong>Telegram akkauntini bog'lagan</strong> hamda saytda birinchi ma'noli faollikni bajargan (<strong>birinchi anime xarid qilgan</strong> yoki <strong>kamida 3 ta epizod tomosha qilgan</strong>) bo'lishi kerak. Shundan so'ng mukofot avtomatik ravishda ikkala hisobga qo'shiladi.
+          Taklif qilingan do'stingiz ro'yxatdan o'tishi bilan hisobga olinadi. Mukofot esa u <strong>birinchi epizodni tomosha qilganda</strong> yoki <strong>birinchi xaridni amalga oshirganda</strong> avtomatik ravishda ikkala hisobga qo'shiladi. Telegram bog'lash shart emas.
         </p>
       </div>
 
@@ -321,10 +318,18 @@ export function ReferralView() {
                     "text-[10px]",
                     r.status === "rewarded"
                       ? "bg-emerald-500/15 text-emerald-500 border-emerald-500/30"
+                      : r.status === "declined"
+                      ? "bg-rose-500/15 text-rose-500 border-rose-500/30"
                       : "bg-amber-500/15 text-amber-500 border-amber-500/30"
                   )}
                 >
-                  {r.status === "rewarded" ? "✓ Mukofotlandi" : "Kutilmoqda..."}
+                  {r.status === "rewarded"
+                    ? "✓ Mukofotlandi"
+                    : r.status === "declined"
+                    ? "Rad etildi"
+                    : r.status === "qualified"
+                    ? "Oylik limitda"
+                    : "Faollik kutilmoqda..."}
                 </Badge>
               </div>
             ))}

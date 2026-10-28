@@ -1,11 +1,18 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { createSession, toPublicUser } from "@/lib/auth";
+import {
+  SESSION_COOKIE,
+  createSessionRecord,
+  sessionCookieOptions,
+  toPublicUser,
+} from "@/lib/auth";
 import { rateLimit } from "@/lib/rate-limit";
 import { rateKey } from "@/lib/client-ip";
 import { log } from "@/lib/logger";
 import { sendVerificationEmail } from "@/lib/email";
 import { z } from "zod";
+
+const VERIFY_WINDOW_MS = 10 * 60 * 1000;
 
 const VerifyBody = z.object({
   email: z.string().email().max(200),
@@ -27,19 +34,25 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Email and 6-digit code required" }, { status: 400 });
     }
     const { email, code } = parsed.data;
+    const normalizedEmail = email.toLowerCase();
+
+    if (!rateLimit(`verify-email:email:${normalizedEmail}`, 10, VERIFY_WINDOW_MS)) {
+      return NextResponse.json({ error: "Too many attempts for this email" }, { status: 429 });
+    }
 
     const user = await db.user.findUnique({
-      where: { email: email.toLowerCase() },
+      where: { email: normalizedEmail },
     });
 
     if (!user) {
       return NextResponse.json({ error: "Account not found" }, { status: 404 });
     }
     if (user.emailVerified) {
-      // Allaqachon tasdiqlangan — session yaratib kiritamiz
-      await createSession(user.id);
-      const ownedCount = await db.purchase.count({ where: { userId: user.id } });
-      return NextResponse.json({ user: { ...toPublicUser(user), ownedCount } });
+      // Verifikatsiya sessiya ochish yo'li emas — parol bilan kiring.
+      return NextResponse.json(
+        { error: "Email already verified. Please sign in." },
+        { status: 409 },
+      );
     }
     if (!user.verifyCode || !user.verifyCodeExp) {
       return NextResponse.json({ error: "No verification code found. Please register again." }, { status: 400 });
@@ -51,19 +64,30 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Invalid code" }, { status: 400 });
     }
 
-    // Tasdiqlash
-    const verified = await db.user.update({
-      where: { id: user.id },
+    // Bir martalik kod: shartli update faqat kod hali amal qilganda bajariladi.
+    const consumed = await db.user.updateMany({
+      where: {
+        id: user.id,
+        emailVerified: false,
+        verifyCode: code,
+        verifyCodeExp: { gt: new Date() },
+      },
       data: {
         emailVerified: true,
         verifyCode: null,
         verifyCodeExp: null,
       },
     });
+    if (consumed.count !== 1) {
+      return NextResponse.json({ error: "Invalid or expired code" }, { status: 400 });
+    }
 
-    await createSession(verified.id);
+    const verified = await db.user.findUniqueOrThrow({ where: { id: user.id } });
+    const { token, expiresAt } = await createSessionRecord(verified.id);
     const ownedCount = await db.purchase.count({ where: { userId: verified.id } });
-    return NextResponse.json({ user: { ...toPublicUser(verified), ownedCount } });
+    const res = NextResponse.json({ user: { ...toPublicUser(verified), ownedCount } });
+    res.cookies.set(SESSION_COOKIE, token, sessionCookieOptions(expiresAt));
+    return res;
   } catch (e) {
     log.error("verify-email failed", { err: String(e) });
     return NextResponse.json({ error: "Verification failed" }, { status: 500 });
@@ -81,8 +105,13 @@ export async function PATCH(req: NextRequest) {
       return NextResponse.json({ error: "Email required" }, { status: 400 });
     }
     const { email } = parsed.data;
+    const normalizedEmail = email.toLowerCase();
 
-    const user = await db.user.findUnique({ where: { email: email.toLowerCase() } });
+    if (!rateLimit(`resend-otp:email:${normalizedEmail}`, 3, VERIFY_WINDOW_MS)) {
+      return NextResponse.json({ error: "Too many resend attempts for this email" }, { status: 429 });
+    }
+
+    const user = await db.user.findUnique({ where: { email: normalizedEmail } });
     if (!user) {
       return NextResponse.json({ error: "Account not found" }, { status: 404 });
     }

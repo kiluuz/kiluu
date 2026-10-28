@@ -6,7 +6,7 @@ import { getDateStringInTimezone, recordUserActivityForStreak } from "./streaks"
 import { processQuestsForEvent } from "./quests";
 import { checkAndQualifyReferral } from "./referrals";
 import { calculateLevel } from "./level-utils";
-import { DAILY_ACTIVITY_CAPS } from "./xp";
+import { DAILY_ACTIVITY_CAPS, isUniqueConstraintError } from "./xp";
 
 export interface EventResult {
   xpAwarded: number;
@@ -95,7 +95,14 @@ export async function emitEvent(
     baseAmount = 5;
     capSource = "chat";
   } else if (type === "episode_watched") {
-    baseAmount = 15; // Cheklovsiz
+    // Bir epizod uchun faqat bir marta — har pauzada qayta yozilmasin.
+    const alreadyAwarded = payload.episodeId
+      ? await db.xpEvent.findUnique({
+          where: { userId_reason_refId: { userId, reason: type, refId: payload.episodeId } },
+          select: { id: true },
+        })
+      : null;
+    baseAmount = alreadyAwarded ? 0 : 25; // Cheklovsiz
   } else if (type === "purchase") {
     baseAmount = 250; // Cheklovsiz
   } else if (type === "gift_sent") {
@@ -151,23 +158,33 @@ export async function emitEvent(
       });
       const oldLevelInfo = calculateLevel(oldTotal._sum.amount || 0);
 
-      // XP event yozish
-      await db.xpEvent.create({
-        data: {
-          userId,
-          reason: type,
-          amount: allowedXp,
-          refType: payload.refType || null,
-          refId: payload.refId || null,
-        },
-      });
-      xpAwarded = allowedXp;
+      // XP event yozish. Parallel so'rovlar bir xil event yozsa, unique
+      // constraint ikkinchisini rad etadi — bu xato emas, shunchaki takror.
+      let created = true;
+      try {
+        await db.xpEvent.create({
+          data: {
+            userId,
+            reason: type,
+            amount: allowedXp,
+            refType: payload.refType || null,
+            refId: payload.refId || (type === "episode_watched" ? payload.episodeId : null) || null,
+          },
+        });
+      } catch (error) {
+        if (!isUniqueConstraintError(error)) throw error;
+        created = false;
+      }
 
-      // Yangi darajani tekshirish
-      const newLevelInfo = calculateLevel((oldTotal._sum.amount || 0) + allowedXp);
-      if (newLevelInfo.level > oldLevelInfo.level) {
-        // Level ko'tarildi!
-        await onUserLevelUp(userId, oldLevelInfo.level, newLevelInfo.level, newLevelInfo.titleJa);
+      if (created) {
+        xpAwarded = allowedXp;
+
+        // Yangi darajani tekshirish
+        const newLevelInfo = calculateLevel((oldTotal._sum.amount || 0) + allowedXp);
+        if (newLevelInfo.level > oldLevelInfo.level) {
+          // Level ko'tarildi!
+          await onUserLevelUp(userId, oldLevelInfo.level, newLevelInfo.level, newLevelInfo.titleJa);
+        }
       }
     }
   }

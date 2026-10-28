@@ -113,9 +113,8 @@ export async function checkAndQualifyReferral(userId: string): Promise<{
       referred: {
         select: {
           id: true,
-          telegramId: true,
           purchases: { select: { id: true }, take: 1 },
-          watchEvents: { select: { id: true }, take: 3 },
+          watchEvents: { select: { id: true }, take: 1 },
         },
       },
       referrer: {
@@ -124,19 +123,24 @@ export async function checkAndQualifyReferral(userId: string): Promise<{
     },
   });
 
-  if (!referral || referral.status === "rewarded") {
+  if (!referral || referral.status === "rewarded" || referral.status === "declined") {
     return { qualified: false, rewarded: false };
   }
 
-  // Mezonlar:
-  // 1. Telegram bog'langan bo'lishi shart
-  const hasTelegram = !!referral.referred.telegramId;
-  // 2. Birinchi xarid qilgan YOKI kamida 3 ta epizod tomosha qilgan bo'lishi kerak
+  // Birinchi ma'noli faollik kifoya: bitta epizodni tomosha qilish yoki xarid.
+  // Telegram bog'lash shart emas, chunki sayt email bilan ro'yxatdan o'tadi.
   const hasPurchase = referral.referred.purchases.length >= 1;
-  const hasWatched3 = referral.referred.watchEvents.length >= 3;
-
-  const isQualified = hasTelegram && (hasPurchase || hasWatched3);
+  const hasWatched = referral.referred.watchEvents.length >= 1;
+  const isQualified = hasPurchase || hasWatched;
   if (!isQualified) {
+    return { qualified: false, rewarded: false };
+  }
+
+  if (referral.isSuspicious) {
+    await db.referral.update({
+      where: { id: referral.id },
+      data: { status: "declined", qualifiedAt: new Date() },
+    });
     return { qualified: false, rewarded: false };
   }
 
@@ -165,7 +169,7 @@ export async function checkAndQualifyReferral(userId: string): Promise<{
       },
     });
 
-    if (withinMonthlyLimit && !referral.isSuspicious) {
+    if (withinMonthlyLimit) {
       // 1. Referrerga mukofot (+100 XP, +10 kredit)
       await tx.user.update({
         where: { id: referral.referrerId },
@@ -214,11 +218,22 @@ export async function checkAndQualifyReferral(userId: string): Promise<{
     }
   });
 
-  return { qualified: true, rewarded: withinMonthlyLimit && !referral.isSuspicious };
+  return { qualified: true, rewarded: withinMonthlyLimit };
 }
 
 export async function getReferralStats(userId: string) {
   const code = await getOrCreateReferralCode(userId);
+
+  // Hodisa o'tkazib yuborilgan bo'lsa ham, sahifa ochilganda kutilayotgan
+  // referallarni qayta tekshiramiz — aks holda "Kutilmoqda..." abadiy qoladi.
+  const pendingReferrals = await db.referral.findMany({
+    where: { referrerId: userId, status: { in: ["pending", "qualified"] } },
+    select: { referredId: true },
+    take: 25,
+  });
+  for (const pending of pendingReferrals) {
+    await checkAndQualifyReferral(pending.referredId);
+  }
 
   const [totalInvited, qualifiedCount, rewards] = await Promise.all([
     db.referral.count({ where: { referrerId: userId } }),

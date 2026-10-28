@@ -48,13 +48,12 @@ after(async () => {
 
 test("XP threshold curve has consistent boundaries", () => {
   assert.equal(xpForLevel(1), 0);
-  assert.equal(levelFromXp(xpForLevel(2) - 1).level, 1);
-  assert.equal(levelFromXp(xpForLevel(2)).level, 2);
-  assert.equal(xpForLevel(2), 250);
-  assert.equal(levelFromXp(25).level, 1);
-  assert.equal(levelFromXp(275).level, 2);
-  assert.equal(levelFromXp(500).level, 2);
+  assert.ok(xpForLevel(2) > 0);
   assert.equal(levelFromXp(-10).level, 1);
+  for (const level of [2, 5, 10, 25, 50, 100]) {
+    assert.equal(levelFromXp(xpForLevel(level)).level, level);
+    assert.equal(levelFromXp(xpForLevel(level) - 1).level, level - 1);
+  }
 });
 
 test("XP events are idempotent and level-up notification is emitted once", async () => {

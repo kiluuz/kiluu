@@ -30,6 +30,7 @@ model User {
   emailVerified  Boolean  @default(false)
   verifyCode     String?
   verifyCodeExp  DateTime?
+  deletedAt      DateTime? // set when the account is anonymized by the mobile bridge
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 
@@ -1175,7 +1176,7 @@ model Referral {
   referrerId   String
   referredId   String    @unique
   code         String
-  status       String    @default("pending") // pending | qualified | rewarded
+  status       String    @default("pending") // pending | qualified | rewarded | declined
   isSuspicious Boolean   @default(false)
   qualifiedAt  DateTime?
   rewardedAt   DateTime?
