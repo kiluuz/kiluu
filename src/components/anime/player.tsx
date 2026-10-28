@@ -60,6 +60,7 @@ export function VideoPlayer({
   title,
   syncMode = false,
   isHost = false,
+  syncPaused = false,
   onLocalPlay,
   onLocalPause,
   onLocalSeek,
@@ -77,6 +78,8 @@ export function VideoPlayer({
   title: string;
   syncMode?: boolean;
   isHost?: boolean;
+  /** The party itself is paused (host-side state). Guests cannot resume it. */
+  syncPaused?: boolean;
   onLocalPlay?: (pos: number) => void;
   onLocalPause?: (pos: number) => void;
   onLocalSeek?: (pos: number) => void;
@@ -924,7 +927,7 @@ export function VideoPlayer({
       )}
 
       {/* Center play button */}
-      {!playing && !waiting && (
+      {!playing && !waiting && (!syncMode || isHost || !syncPaused) && (
         <button
           onClick={togglePlay}
           className="absolute inset-0 flex items-center justify-center"
@@ -934,6 +937,16 @@ export function VideoPlayer({
             <Play className="w-7 h-7 sm:w-9 sm:h-9 fill-white text-white ml-1" />
           </span>
         </button>
+      )}
+
+      {/* Guest view of a paused party: the host paused on purpose, so a play
+          button here would only look broken. */}
+      {syncMode && !isHost && syncPaused && !playing && !waiting && (
+        <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+          <div className="rounded-full bg-black/65 backdrop-blur px-4 py-2 text-xs font-semibold text-white/85 border border-white/15">
+            Host paused the video
+          </div>
+        </div>
       )}
 
       {/* Controls */}

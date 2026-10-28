@@ -113,6 +113,7 @@ export function WatchTogetherView() {
   const [chatText, setChatText] = useState("");
   const [latencyMs, setLatencyMs] = useState<number | null>(null);
   const [autoplayBlocked, setAutoplayBlocked] = useState(false);
+  const [partyPaused, setPartyPaused] = useState(false);
   const controlsRef = useRef<PlayerControls | null>(null);
   const clockOffsetRef = useRef(0);
   const playbackStateRef = useRef<PartyPlaybackState | null>(null);
@@ -223,6 +224,7 @@ export function WatchTogetherView() {
       state.version < previous.version
     ) return;
     playbackStateRef.current = state;
+    setPartyPaused(!state.is_playing);
     const controls = controlsRef.current;
     if (!controls) {
       // The player can mount a few renders after the party state arrives.
@@ -293,6 +295,7 @@ export function WatchTogetherView() {
     }));
     setParticipants(participantsWithKeys);
     setAutoplayBlocked(false);
+    setPartyPaused(false);
     setIsHost(participantsWithKeys.some((participant) => participant.userId === user?.id && participant.isHost));
     setChatMessages(initialMessages);
     setReactions([]);
@@ -316,6 +319,19 @@ export function WatchTogetherView() {
       timeout: 10000,
     });
     socketRef.current = socket;
+    // Push the host's real playback state right away. Guests joining a
+    // running party used to wait for the periodic heartbeat (up to 5s) or the
+    // host's next pause/play before they received a play command.
+    function broadcastHostState() {
+      if (!socket.connected) return;
+      const controls = controlsRef.current;
+      if (!controls) return;
+      lastHostBroadcastRef.current = Date.now();
+      socket.emit(
+        controls.isPaused() ? "playback:pause" : "playback:play",
+        { position: controls.getCurrentTime() },
+      );
+    }
     socket.on("connect", () => {
       if (pingIntervalRef.current) clearInterval(pingIntervalRef.current);
       if (heartbeatIntervalRef.current) clearInterval(heartbeatIntervalRef.current);
@@ -355,13 +371,7 @@ export function WatchTogetherView() {
           // host was already watching needs a fresh play command once its own
           // player can start; without it guests waited for the host to pause
           // and resume manually.
-          if (now - lastHostBroadcastRef.current >= 5000) {
-            lastHostBroadcastRef.current = now;
-            socket.emit(
-              localPaused ? "playback:pause" : "playback:play",
-              { position: controls.getCurrentTime() },
-            );
-          }
+          if (now - lastHostBroadcastRef.current >= 5000) broadcastHostState();
           // The host's own player is the source of truth. If a control event
           // was lost (emitted before the socket joined the party, or during a
           // reconnect), the server keeps guests paused while the host watches.
@@ -374,10 +384,7 @@ export function WatchTogetherView() {
           hostMismatchTicksRef.current += 1;
           if (hostMismatchTicksRef.current < 3) return;
           hostMismatchTicksRef.current = 0;
-          socket.emit(
-            localPaused ? "playback:pause" : "playback:play",
-            { position: controls.getCurrentTime() },
-          );
+          broadcastHostState();
           return;
         }
         if (!state.is_playing) {
@@ -462,8 +469,12 @@ export function WatchTogetherView() {
       applyPlaybackState(payload.state);
     });
     socket.on("party:participants", (nextParticipants: Participant[]) => {
+      const hostNow = nextParticipants.some((participant) => participant.userId === user?.id && participant.isHost);
       setParticipants(nextParticipants);
-      setIsHost(nextParticipants.some((participant) => participant.userId === user?.id && participant.isHost));
+      setIsHost(hostNow);
+      // Someone just joined (or the host role changed): give them the current
+      // playback state immediately instead of waiting for the next heartbeat.
+      if (hostNow) broadcastHostState();
     });
     socket.on("party:host-changed", ({ userId: hostId, hostName }: { userId: string; hostName: string }) => {
       setParticipants((current) => current.map((participant) => ({ ...participant, isHost: participant.userId === hostId })));
@@ -579,6 +590,7 @@ export function WatchTogetherView() {
     setReactions([]);
     setChatMessages([]);
     playbackStateRef.current = null;
+    setPartyPaused(false);
     applyRetryCountRef.current = 0;
     lastCorrectionAtRef.current = 0;
     lastPlayAttemptAtRef.current = 0;
@@ -640,6 +652,7 @@ export function WatchTogetherView() {
           onNext={() => {}}
           syncMode
           isHost={isHost}
+          syncPaused={partyPaused}
           controlsRef={controlsRef}
           onLocalPlay={(pos) => socketRef.current?.emit("playback:play", { position: pos })}
           onLocalPause={(pos) => socketRef.current?.emit("playback:pause", { position: pos })}

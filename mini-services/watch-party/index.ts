@@ -207,10 +207,14 @@ async function handlePlayback(
   data: { position?: number; rate?: number },
   ack?: (result: { ok: boolean; error?: string }) => void,
 ) {
-  if (!socket.rooms.has(socket.data.partyId)) {
-    ack?.({ ok: false, error: "You are no longer in this party." });
-    return;
-  }
+  // The client flushes queued events (the host's first "play" after pressing
+  // play while the socket was connecting) as soon as the connection is
+  // acknowledged. Those packets can arrive before the asynchronous room setup
+  // finishes, and rejecting them here silently left the party paused while the
+  // host watched, so every later guest joined into a paused party. Membership
+  // was already verified by the ticket middleware, so re-join instead of
+  // dropping the command.
+  if (!socket.rooms.has(socket.data.partyId)) socket.join(socket.data.partyId);
   const now = new Date();
   const party = await db.watchParty.findFirst({
     where: {
