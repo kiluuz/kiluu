@@ -65,6 +65,7 @@ interface PartyPlaybackState {
   is_playing: boolean;
   playback_rate: number;
   server_ts: number;
+  version?: number;
 }
 
 interface PartyChatMessage {
@@ -120,6 +121,8 @@ export function WatchTogetherView() {
   const driftIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const lastCorrectionAtRef = useRef(0);
   const lastPlayAttemptAtRef = useRef(0);
+  const hostMismatchTicksRef = useRef(0);
+  const bufferingSinceRef = useRef(0);
   const applyRetryCountRef = useRef(0);
   const isHostRef = useRef(false);
   const chatEndRef = useRef<HTMLDivElement | null>(null);
@@ -206,6 +209,16 @@ export function WatchTogetherView() {
   }, [selAnime]);
 
   function applyPlaybackState(state: PartyPlaybackState) {
+    const previous = playbackStateRef.current;
+    // A party:state snapshot can be read just before a host update yet reach
+    // the client after the newer playback:state broadcast. Never let such a
+    // stale snapshot overwrite fresher playback state.
+    if (
+      previous &&
+      typeof state.version === "number" &&
+      typeof previous.version === "number" &&
+      state.version < previous.version
+    ) return;
     playbackStateRef.current = state;
     const controls = controlsRef.current;
     if (!controls) {
@@ -272,9 +285,12 @@ export function WatchTogetherView() {
     setIsHost(participantsWithKeys.some((participant) => participant.userId === user?.id && participant.isHost));
     setChatMessages(initialMessages);
     setReactions([]);
+    playbackStateRef.current = null;
     applyRetryCountRef.current = 0;
     lastCorrectionAtRef.current = 0;
     lastPlayAttemptAtRef.current = 0;
+    hostMismatchTicksRef.current = 0;
+    bufferingSinceRef.current = 0;
     if (initialState) applyPlaybackState(initialState);
 
     const socket = io(process.env.NEXT_PUBLIC_WATCH_PARTY_URL || "/?XTransformPort=3003", {
@@ -309,28 +325,59 @@ export function WatchTogetherView() {
       });
       lastCorrectionAtRef.current = 0;
       lastPlayAttemptAtRef.current = 0;
+      hostMismatchTicksRef.current = 0;
+      bufferingSinceRef.current = 0;
       driftIntervalRef.current = setInterval(() => {
         const state = playbackStateRef.current;
         const controls = controlsRef.current;
-        if (!state || !controls || !state.is_playing) return;
-        // The host's own video is the clock — never seek it.
-        if (isHostRef.current) return;
+        if (!state || !controls) return;
+        if (isHostRef.current) {
+          // The host's own player is the source of truth. If a control event
+          // was lost (emitted before the socket joined the party, or during a
+          // reconnect), the server keeps guests paused while the host watches.
+          // Re-broadcast the host's actual playback state when it disagrees
+          // with the party for a few consecutive ticks.
+          const localPaused = controls.isPaused();
+          if (state.is_playing === !localPaused) {
+            hostMismatchTicksRef.current = 0;
+            return;
+          }
+          hostMismatchTicksRef.current += 1;
+          if (hostMismatchTicksRef.current < 3) return;
+          hostMismatchTicksRef.current = 0;
+          socket.emit(
+            localPaused ? "playback:pause" : "playback:play",
+            { position: controls.getCurrentTime() },
+          );
+          return;
+        }
+        if (!state.is_playing) return;
+        const now = Date.now();
+        // A buffer that stopped progressing never recovers on its own. Restart
+        // loading and retry instead of leaving the guest on an endless spinner
+        // until the host happens to pause and play again.
+        if (controls.isBuffering()) {
+          if (!bufferingSinceRef.current) {
+            bufferingSinceRef.current = now;
+          } else if (now - bufferingSinceRef.current >= 12_000) {
+            bufferingSinceRef.current = now;
+            controls.recover();
+          }
+          return;
+        }
+        bufferingSinceRef.current = 0;
         // Guest is paused even though the party is playing: this is either a
         // blocked autoplay or a dropped play() while the stream was loading.
         // Keep nudging playback instead of waiting for another host action.
         if (controls.isPaused()) {
-          if (Date.now() - lastPlayAttemptAtRef.current >= 3000) {
-            lastPlayAttemptAtRef.current = Date.now();
+          if (now - lastPlayAttemptAtRef.current >= 3000) {
+            lastPlayAttemptAtRef.current = now;
             controls.ensurePlaying();
           }
           return;
         }
-        // Skip drift correction while video is buffering or seeking — seeking
-        // during buffering interrupts the download and causes an infinite
-        // loading loop for guests who join mid-playback.
-        if (controls.isBuffering()) return;
         // Give a seek time to settle before correcting again.
-        if (Date.now() - lastCorrectionAtRef.current < 3000) return;
+        if (now - lastCorrectionAtRef.current < 3000) return;
         const expected = expectedPlaybackPosition({
           position: state.position,
           isPlaying: state.is_playing,
@@ -477,6 +524,8 @@ export function WatchTogetherView() {
     applyRetryCountRef.current = 0;
     lastCorrectionAtRef.current = 0;
     lastPlayAttemptAtRef.current = 0;
+    hostMismatchTicksRef.current = 0;
+    bufferingSinceRef.current = 0;
     if (pingIntervalRef.current) clearInterval(pingIntervalRef.current);
     if (heartbeatIntervalRef.current) clearInterval(heartbeatIntervalRef.current);
     if (driftIntervalRef.current) clearInterval(driftIntervalRef.current);

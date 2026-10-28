@@ -147,6 +147,7 @@ export async function POST(request: NextRequest) {
       is_playing: joined.isPlaying,
       playback_rate: joined.playbackRate,
       server_ts: now.getTime(),
+      version: serverTs,
     },
     party: {
       id: joined.id,

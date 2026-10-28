@@ -22,6 +22,8 @@ export interface PlayerControls {
   isPaused: () => boolean;
   /** Guest-side safety net: start playback if the party expects it to be playing. */
   ensurePlaying: () => void;
+  /** Guest-side recovery for a buffer that stopped progressing mid-playback. */
+  recover: () => void;
   enableAudio: () => void;
 }
 
@@ -343,6 +345,25 @@ export function VideoPlayer({
     if (!v || !syncMode || isHost || !wantPlayRef.current) return;
     if (!v.paused) return;
     if (v.readyState < HTMLMediaElement.HAVE_CURRENT_DATA) return;
+    attemptPlay();
+  }
+
+  /**
+   * Guest safety net: the element reports "playing" but stopped progressing
+   * (stalled fetch / wedged seek). Restart HLS loading and nudge the timeline
+   * so the media element issues a fresh request, then retry play().
+   */
+  function recover() {
+    const v = videoRef.current;
+    if (!v || !syncMode || isHost) return;
+    wantPlayRef.current = true;
+    hlsRef.current?.startLoad();
+    const target = v.currentTime > 0.5 ? v.currentTime - 0.25 : 0.01;
+    try {
+      v.currentTime = target;
+    } catch {
+      // Some browsers throw while the element is still initializing.
+    }
     attemptPlay();
   }
 
@@ -671,6 +692,7 @@ export function VideoPlayer({
       },
       isPaused: () => videoRef.current?.paused ?? true,
       ensurePlaying,
+      recover,
       enableAudio: () => {
         const v = videoRef.current;
         if (!v) return;
@@ -737,7 +759,18 @@ export function VideoPlayer({
           setWaiting(false);
           setStalled(false);
         }}
-        onSeeked={() => ensurePlaying()}
+        onSeeked={() => {
+          // The seek target is now buffered. Clear the spinner so a guest that
+          // is paused at the host's position sees the frame instead of an
+          // endless loading state.
+          setWaiting(false);
+          ensurePlaying();
+        }}
+        onLoadedData={(e) => {
+          // HAVE_CURRENT_DATA reached: enough data exists at the current
+          // position even if the element never gets as far as canplay while paused.
+          if (e.currentTarget.paused) setWaiting(false);
+        }}
         onPause={() => {
           setPlaying(false);
           // A blocked autoplay leaves the element paused; never keep the

@@ -41,7 +41,7 @@ function openSocket(userId: string, id: string) {
   });
   sockets.push(socket);
   const initialState = new Promise<{
-    state: { video_id: string; position: number; is_playing: boolean; server_ts: number };
+    state: { video_id: string; position: number; is_playing: boolean; server_ts: number; version?: number };
   }>((resolve) => socket.once("party:state", resolve));
   return { socket, initialState };
 }
@@ -314,6 +314,31 @@ test("a guest joining mid-playback receives the playing state immediately", asyn
   });
   assert.equal(syncState.is_playing, true);
   assert.ok(syncState.position >= late.state.state.position);
+});
+
+test("host playback commands buffered before connecting are not dropped", async () => {
+  // Socket.IO buffers events emitted while disconnected and flushes them right
+  // after the connection handshake — at the exact moment the service used to
+  // wait for a database write before joining the socket to the party room.
+  // The room guard then rejected the host's command and the party stayed in
+  // the old state, so every guest that joined while the host was watching got
+  // the paused snapshot and never started playing.
+  const pending = openSocket(hostId, partyId);
+  const ack = new Promise<{ ok: boolean; error?: string }>((resolve) => {
+    pending.socket.emit("playback:pause", { position: 7 }, resolve);
+  });
+  pending.socket.connect();
+  assert.deepEqual(await ack, { ok: true });
+
+  const lateJoinerId = loadUserIds[1];
+  await client.watchPartyMember.create({
+    data: { partyId, userId: lateJoinerId, lastSeenAt: new Date() },
+  });
+  const late = await connectSocket(lateJoinerId, partyId);
+  assert.equal(late.state.state.is_playing, false);
+  assert.equal(late.state.state.position, 7);
+  const stored = await client.watchParty.findUniqueOrThrow({ where: { id: partyId } });
+  assert.equal(late.state.state.version, Number(stored.serverTs));
 });
 
 test("50 connected participants receive the same measured playback update", async () => {

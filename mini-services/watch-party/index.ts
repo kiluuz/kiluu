@@ -31,6 +31,8 @@ interface PartyState {
   is_playing: boolean;
   playback_rate: number;
   server_ts: number;
+  /** Last persisted playback update (ms). Clients ignore older snapshots. */
+  version: number;
 }
 
 interface ClientToServerEvents {
@@ -118,18 +120,19 @@ function currentState(party: {
   serverTs: bigint;
 }): PartyState {
   const now = Date.now();
-  const serverTs = Number(party.serverTs) || now;
+  const version = Number(party.serverTs) || now;
   return {
     video_id: party.episodeId,
     position: expectedPlaybackPosition({
       position: party.position,
       isPlaying: party.isPlaying,
       playbackRate: party.playbackRate,
-      serverTs,
+      serverTs: version,
     }, now),
     is_playing: party.isPlaying,
     playback_rate: party.playbackRate,
     server_ts: now,
+    version,
   };
 }
 
@@ -260,6 +263,7 @@ async function handlePlayback(
     is_playing: isPlaying,
     playback_rate: playbackRate,
     server_ts: now.getTime(),
+    version: now.getTime(),
   };
   io.to(party.id).emit("playback:state", state);
   ack?.({ ok: true });
@@ -347,12 +351,18 @@ io.on("connection", (untypedSocket) => {
   const pendingCleanup = disconnectCleanupTimers.get(timerKey);
   if (pendingCleanup) clearTimeout(pendingCleanup);
   disconnectCleanupTimers.delete(timerKey);
+  // Join synchronously, before the first await. Clients flush buffered events
+  // (e.g. the host's play command after pressing play while the socket was
+  // still connecting) as soon as the connection is acknowledged, and the
+  // playback handlers reject sockets that are not in the room yet. Joining
+  // after the membership write dropped those commands and left every later
+  // guest stuck on the paused state.
+  socket.join(partyId);
   void (async () => {
     await db.watchPartyMember.updateMany({
       where: { partyId, userId },
       data: { lastSeenAt: new Date() },
     });
-    socket.join(partyId);
     await sendCurrentState(socket);
     await emitParticipants(partyId);
   })().catch((error: unknown) => {
