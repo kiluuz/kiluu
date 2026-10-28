@@ -360,31 +360,15 @@ export function VideoPlayer({
 
   /**
    * Guest safety net: the element reports "playing" but stopped progressing
-   * (stalled fetch / wedged seek). Restart HLS loading and nudge the timeline
-   * so the media element issues a fresh request, then retry play().
+   * (stalled fetch / wedged seek). Restart HLS loading and retry play().
+   * Deliberately does not seek: during a slow start the target is already
+   * ahead of the buffered data, and moving it again drops the fragment that is
+   * being fetched, so the guest could never finish starting.
    */
   function recover() {
     const v = videoRef.current;
     if (!v || !syncMode || isHost) return;
     wantPlayRef.current = true;
-    // A play() call that never settles leaves the element "unpaused" but with
-    // no frames. Pausing first clears that wedged state; this is the same
-    // pause → play cycle that manually unsticks a guest. A seek that is still
-    // in flight is left alone: restarting it aborts the fragment fetches of a
-    // slow start, which is how guests ended up needing a manual pause.
-    if (!v.seeking) {
-      try {
-        v.pause();
-      } catch {
-        // ignore
-      }
-      const target = v.currentTime > 0.5 ? v.currentTime - 0.25 : 0.01;
-      try {
-        v.currentTime = target;
-      } catch {
-        // Some browsers throw while the element is still initializing.
-      }
-    }
     hlsRef.current?.startLoad();
     attemptPlay();
   }

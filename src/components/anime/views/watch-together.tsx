@@ -129,6 +129,8 @@ export function WatchTogetherView() {
   const lastProgressValueRef = useRef(-1);
   /** The guest has rendered at least one advancing frame since joining. */
   const timelineAdvancedRef = useRef(false);
+  /** A seek + play for the current watch start has already been issued. */
+  const startRequestedRef = useRef(false);
   const lastHostBroadcastRef = useRef(0);
   const isHostRef = useRef(false);
   const chatEndRef = useRef<HTMLDivElement | null>(null);
@@ -251,20 +253,31 @@ export function WatchTogetherView() {
 
     controls.setRate(state.playback_rate);
     if (state.is_playing) {
-      // Party state arrives on every host heartbeat. Re-seeking a guest that is
-      // already playing in sync interrupts the stream. Re-seeking one that has
-      // not shown a single frame since joining is worse: every heartbeat moves
-      // the target further ahead, the in-flight fragment fetches are dropped,
-      // and a slow start never finishes — the guest then sits on a black frame
-      // until the host pauses and resumes. Until the timeline advances once,
-      // let the pending play run and leave recovery to the watchdog below.
+      // Party state arrives on every host heartbeat. Until the guest has
+      // rendered its first frame, the only thing that matters is letting the
+      // seek issued at join finish: re-seeking on every heartbeat discards the
+      // HLS fragment fetch that is already in flight, so a slow start never
+      // completes and the guest sits on a black frame until the host pauses.
       const expected = computeExpected();
+      if (!timelineAdvancedRef.current) {
+        if (!startRequestedRef.current) {
+          startRequestedRef.current = true;
+          controls.play(expected);
+        } else if (controls.isPaused()) {
+          controls.ensurePlaying();
+        }
+        return;
+      }
       if (
         !controls.isPaused()
-        && (!timelineAdvancedRef.current || controls.isBuffering() || Math.abs(expected - controls.getCurrentTime()) < 2.5)
+        && (controls.isBuffering() || Math.abs(expected - controls.getCurrentTime()) < 2.5)
       ) return;
       controls.play(expected);
     } else {
+      // A fresh play after a pause is a new start: seek once to the paused
+      // position, then leave the stream alone until it renders.
+      timelineAdvancedRef.current = false;
+      startRequestedRef.current = false;
       controls.pause(computeExpected());
     }
   }
@@ -317,6 +330,7 @@ export function WatchTogetherView() {
     lastProgressAtRef.current = 0;
     lastProgressValueRef.current = -1;
     timelineAdvancedRef.current = false;
+    startRequestedRef.current = false;
     lastHostBroadcastRef.current = 0;
     if (initialState) applyPlaybackState(initialState);
 
@@ -370,6 +384,7 @@ export function WatchTogetherView() {
       lastProgressAtRef.current = 0;
       lastProgressValueRef.current = -1;
       timelineAdvancedRef.current = false;
+      startRequestedRef.current = false;
       lastHostBroadcastRef.current = 0;
       driftIntervalRef.current = setInterval(() => {
         const state = playbackStateRef.current;
@@ -406,7 +421,10 @@ export function WatchTogetherView() {
         // play() clears `paused` immediately even when no frame ever starts.
         const current = controls.getCurrentTime();
         if (Math.abs(current - lastProgressValueRef.current) > 0.05) {
-          if (lastProgressValueRef.current >= 0) timelineAdvancedRef.current = true;
+          if (lastProgressValueRef.current >= 0) {
+            timelineAdvancedRef.current = true;
+            startRequestedRef.current = true;
+          }
           lastProgressValueRef.current = current;
           lastProgressAtRef.current = now;
         }
@@ -416,7 +434,10 @@ export function WatchTogetherView() {
         // produced a single frame since joining gets restarted sooner than one
         // that stalled mid-playback.
         if (controls.isBuffering()) {
-          const limit = timelineAdvancedRef.current ? 12_000 : 6000;
+          // A start that has not rendered a frame yet gets a longer grace
+          // period: the initial seek may still be fetching a large fragment,
+          // and restarting the loader too early aborts it.
+          const limit = timelineAdvancedRef.current ? 12_000 : 20_000;
           if (!bufferingSinceRef.current) {
             bufferingSinceRef.current = now;
           } else if (now - bufferingSinceRef.current >= limit) {
@@ -438,11 +459,18 @@ export function WatchTogetherView() {
         }
         // The element claims to be playing but the timeline is frozen — the
         // black screen guests land on after joining mid-playback. Perform the
-        // same local pause → seek → play cycle the host does manually.
+        // same local pause → seek → play cycle the host does manually. Until
+        // the guest has rendered its first frame, keep the retry
+        // non-destructive: restarting the seek on a timer is exactly what
+        // keeps late joiners stuck on a black frame.
         if (document.visibilityState === "visible") {
           if (!lastProgressAtRef.current) lastProgressAtRef.current = now;
           if (now - lastProgressAtRef.current >= 4000) {
             lastProgressAtRef.current = now;
+            if (!timelineAdvancedRef.current) {
+              controls.recover();
+              return;
+            }
             lastProgressValueRef.current = -1;
             controls.restart(expectedPlaybackPosition({
               position: state.position,
@@ -611,6 +639,7 @@ export function WatchTogetherView() {
     lastProgressAtRef.current = 0;
     lastProgressValueRef.current = -1;
     timelineAdvancedRef.current = false;
+    startRequestedRef.current = false;
     lastHostBroadcastRef.current = 0;
     if (pingIntervalRef.current) clearInterval(pingIntervalRef.current);
     if (heartbeatIntervalRef.current) clearInterval(heartbeatIntervalRef.current);
@@ -675,7 +704,10 @@ export function WatchTogetherView() {
           onSyncReady={() => {
             // Video metadata has loaded — re-apply the current party state so
             // the freshly-computed live position is used instead of the stale
-            // snapshot captured when this user joined or connected.
+            // snapshot captured when this user joined or connected. The player
+            // dropped its pending command on metadata, so let the party state
+            // issue the seek + play once more.
+            startRequestedRef.current = false;
             const state = playbackStateRef.current;
             if (state) applyPlaybackState(state);
           }}
