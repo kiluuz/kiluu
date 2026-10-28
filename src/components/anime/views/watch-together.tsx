@@ -127,6 +127,8 @@ export function WatchTogetherView() {
   const applyRetryCountRef = useRef(0);
   const lastProgressAtRef = useRef(0);
   const lastProgressValueRef = useRef(-1);
+  /** The guest has rendered at least one advancing frame since joining. */
+  const timelineAdvancedRef = useRef(false);
   const lastHostBroadcastRef = useRef(0);
   const isHostRef = useRef(false);
   const chatEndRef = useRef<HTMLDivElement | null>(null);
@@ -249,11 +251,18 @@ export function WatchTogetherView() {
 
     controls.setRate(state.playback_rate);
     if (state.is_playing) {
-      // Do not re-seek a guest that is already playing in sync. Party state
-      // arrives on every host heartbeat, and seeking on each one interrupts
-      // the stream and can wedge play() into a black frame.
+      // Party state arrives on every host heartbeat. Re-seeking a guest that is
+      // already playing in sync interrupts the stream. Re-seeking one that has
+      // not shown a single frame since joining is worse: every heartbeat moves
+      // the target further ahead, the in-flight fragment fetches are dropped,
+      // and a slow start never finishes — the guest then sits on a black frame
+      // until the host pauses and resumes. Until the timeline advances once,
+      // let the pending play run and leave recovery to the watchdog below.
       const expected = computeExpected();
-      if (!controls.isPaused() && Math.abs(expected - controls.getCurrentTime()) < 2.5) return;
+      if (
+        !controls.isPaused()
+        && (!timelineAdvancedRef.current || controls.isBuffering() || Math.abs(expected - controls.getCurrentTime()) < 2.5)
+      ) return;
       controls.play(expected);
     } else {
       controls.pause(computeExpected());
@@ -307,6 +316,7 @@ export function WatchTogetherView() {
     bufferingSinceRef.current = 0;
     lastProgressAtRef.current = 0;
     lastProgressValueRef.current = -1;
+    timelineAdvancedRef.current = false;
     lastHostBroadcastRef.current = 0;
     if (initialState) applyPlaybackState(initialState);
 
@@ -359,6 +369,7 @@ export function WatchTogetherView() {
       bufferingSinceRef.current = 0;
       lastProgressAtRef.current = 0;
       lastProgressValueRef.current = -1;
+      timelineAdvancedRef.current = false;
       lastHostBroadcastRef.current = 0;
       driftIntervalRef.current = setInterval(() => {
         const state = playbackStateRef.current;
@@ -395,6 +406,7 @@ export function WatchTogetherView() {
         // play() clears `paused` immediately even when no frame ever starts.
         const current = controls.getCurrentTime();
         if (Math.abs(current - lastProgressValueRef.current) > 0.05) {
+          if (lastProgressValueRef.current >= 0) timelineAdvancedRef.current = true;
           lastProgressValueRef.current = current;
           lastProgressAtRef.current = now;
         }
@@ -404,7 +416,7 @@ export function WatchTogetherView() {
         // produced a single frame since joining gets restarted sooner than one
         // that stalled mid-playback.
         if (controls.isBuffering()) {
-          const limit = lastProgressValueRef.current < 0 ? 6000 : 12_000;
+          const limit = timelineAdvancedRef.current ? 12_000 : 6000;
           if (!bufferingSinceRef.current) {
             bufferingSinceRef.current = now;
           } else if (now - bufferingSinceRef.current >= limit) {
@@ -598,6 +610,7 @@ export function WatchTogetherView() {
     bufferingSinceRef.current = 0;
     lastProgressAtRef.current = 0;
     lastProgressValueRef.current = -1;
+    timelineAdvancedRef.current = false;
     lastHostBroadcastRef.current = 0;
     if (pingIntervalRef.current) clearInterval(pingIntervalRef.current);
     if (heartbeatIntervalRef.current) clearInterval(heartbeatIntervalRef.current);
