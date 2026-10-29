@@ -1,14 +1,14 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
-import { ChevronLeft, ChevronRight, Check, Clock3, Sparkles } from "lucide-react";
+import { useEffect, useState } from "react";
+import { ChevronLeft, Loader2, Send, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useAppStore } from "../store";
 import type { AnimeDetail, EpisodeItem } from "../types";
-import { VideoPlayer } from "../player";
-import { SmartImage, timeAgo } from "../ui-bits";
+import { SmartImage } from "../ui-bits";
+import { useBotStatus } from "../bot-hooks";
+import { LinkTelegramModal } from "../bot-ui";
 import { toast } from "sonner";
-import { cn } from "@/lib/utils";
 import { useI18n } from "@/components/i18n-provider";
 
 interface DetailResponse {
@@ -17,11 +17,13 @@ interface DetailResponse {
 }
 
 export function WatchView() {
-  const { view, user, navigate, goBack } = useAppStore();
+  const { view, user, navigate, goBack, setAuthOpen } = useAppStore();
   const { t } = useI18n();
   const [data, setData] = useState<DetailResponse | null>(null);
   const [dataForAnime, setDataForAnime] = useState<string | null>(null);
-  const [localEpisodes, setLocalEpisodes] = useState<EpisodeItem[]>([]);
+  const [showLinkModal, setShowLinkModal] = useState(false);
+  const [opening, setOpening] = useState(false);
+  const bot = useBotStatus(Boolean(user));
 
   const animeId = view.animeId!;
   const episodeId = view.episodeId;
@@ -36,28 +38,21 @@ export function WatchView() {
         if (d.anime) {
           setData(d);
           setDataForAnime(animeId);
-          setLocalEpisodes(d.episodes);
-          if (!episodeId && d.episodes[0]) {
-            navigate("watch", { animeId, episodeId: d.episodes[0].id });
-          }
         }
       })
       .catch(() => toast.error(t("watch.loadError")));
     return () => {
       alive = false;
     };
-     
   }, [animeId, user?.id]);
 
-  const currentEpisode = useMemo(
-    () => localEpisodes.find((e) => e.id === episodeId) || localEpisodes[0],
-    [localEpisodes, episodeId]
-  );
+  const currentEpisode =
+    data?.episodes.find((e) => e.id === episodeId) || data?.episodes[0];
 
   if (loading) {
     return (
-      <div className="max-w-[1200px] mx-auto px-0 sm:px-8 py-0 sm:py-6">
-        <div className="aspect-video max-h-[82vh] skeleton" />
+      <div className="max-w-[720px] mx-auto px-4 py-10">
+        <div className="aspect-video rounded-3xl skeleton" />
       </div>
     );
   }
@@ -66,15 +61,15 @@ export function WatchView() {
     return (
       <div className="text-center py-32">
         <p className="font-bold text-lg">{t("watch.episodeNotFound")}</p>
-        <Button variant="outline" className="mt-4 rounded-full" onClick={() => navigate("home")}>{t("watch.backHome")}</Button>
+        <Button variant="outline" className="mt-4 rounded-full" onClick={() => navigate("home")}>
+          {t("watch.backHome")}
+        </Button>
       </div>
     );
   }
 
   const { anime } = data;
-  const idx = localEpisodes.findIndex((e) => e.id === currentEpisode.id);
-  const next = localEpisodes[idx + 1];
-  const prev = localEpisodes[idx - 1];
+  const episodeNumber = currentEpisode.number;
 
   if (!anime.owned && !anime.isFree) {
     return (
@@ -94,121 +89,110 @@ export function WatchView() {
     );
   }
 
-  return (
-    <div className="max-w-[1200px] mx-auto px-0 sm:px-8 py-0 sm:py-6 pb-10">
-      {/* Player */}
-      <VideoPlayer
-        key={currentEpisode.id}
-        episode={currentEpisode}
-        episodes={localEpisodes}
-        title={anime.title}
-        hasNext={Boolean(next)}
-        onNext={() => next && navigate("watch", { animeId, episodeId: next.id })}
-        onEpisodeSelect={(epId) => navigate("watch", { animeId, episodeId: epId })}
-        onEnded={() => {
-          if (next) {
-            toast.success(t("watch.nextStarting"), {
-              action: { label: t("watch.playNow"), onClick: () => navigate("watch", { animeId, episodeId: next.id }) },
-            });
-          } else {
-            toast.success(t("watch.finished"));
-          }
-        }}
-      />
+  async function openInTelegram() {
+    if (!user) {
+      setAuthOpen(true);
+      return;
+    }
+    if (!bot.linked) {
+      setShowLinkModal(true);
+      return;
+    }
+    setOpening(true);
+    try {
+      const res = await fetch("/api/bot/deliver-purchases", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ slug: anime.slug, episode_number: episodeNumber }),
+      });
+      if (!res.ok) throw new Error("deliver failed");
+      toast.success(`✅ Episode ${episodeNumber} was sent to your Telegram bot!`);
+      bot.refresh();
 
-      {/* Below player */}
-      <div className="px-4 sm:px-0 mt-4 grid lg:grid-cols-[1fr_340px] gap-6">
-        <div>
-          <div className="flex items-center gap-2 mb-1.5 flex-wrap">
-            <span className="text-xs font-black text-primary bg-primary/10 border border-primary/25 rounded-full px-2.5 py-1">
+      const botUsername = process.env.NEXT_PUBLIC_BOT_USERNAME || "DubAniXbot";
+      window.location.href = `tg://resolve?domain=${botUsername}`;
+      setTimeout(() => {
+        if (!document.hidden) {
+          window.open(`https://t.me/${botUsername}`, "_blank");
+        }
+      }, 1500);
+    } catch {
+      toast.error("Could not send the episode. Please try again.");
+    } finally {
+      setOpening(false);
+    }
+  }
+
+  return (
+    <div className="max-w-[720px] mx-auto px-4 py-6 sm:py-12">
+      <button
+        onClick={goBack}
+        className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-primary transition mb-4 font-medium"
+      >
+        <ChevronLeft className="w-4 h-4" /> {t("common.back")}
+      </button>
+
+      <div className="glass-strong rounded-3xl overflow-hidden shadow-2xl">
+        <div className="relative aspect-video">
+          <SmartImage src={anime.coverImage} alt={anime.title} className="w-full h-full object-cover" />
+          <div className="absolute inset-0 bg-gradient-to-t from-black via-black/55 to-black/10" />
+          <div className="absolute bottom-0 inset-x-0 p-5 sm:p-6">
+            <span className="text-[11px] font-black text-white bg-primary rounded-full px-2.5 py-1">
               EP {String(currentEpisode.number).padStart(2, "0")}
             </span>
-            <h1 className="text-lg sm:text-xl font-bold">{currentEpisode.title}</h1>
+            <h1 className="text-xl sm:text-2xl font-black text-white mt-2 leading-tight">{anime.title}</h1>
+            <p className="text-sm text-white/70 mt-0.5 truncate">{currentEpisode.title}</p>
           </div>
-          <button
-            onClick={() => navigate("detail", { animeId: anime.slug })}
-            className="text-sm text-muted-foreground hover:text-primary transition font-medium"
-          >
-            {anime.title} →
-          </button>
-          {currentEpisode.description && (
-            <p className="text-sm text-muted-foreground mt-3 leading-relaxed">{currentEpisode.description}</p>
-          )}
+        </div>
 
-          {/* Prev / Next */}
-          <div className="flex items-center gap-3 mt-5">
+        <div className="p-5 sm:p-7 space-y-4">
+          <div className="flex items-start gap-3 rounded-2xl border border-primary/25 bg-primary/5 p-4">
+            <Send className="w-5 h-5 text-primary shrink-0 mt-0.5" />
+            <div>
+              <p className="font-bold text-sm">Watching happens in the Telegram bot</p>
+              <p className="text-xs text-muted-foreground mt-1 leading-relaxed">
+                Episodes are delivered by the Kiluu bot. Open the bot, send <strong>/my_library</strong>,
+                and pick this anime. On the website, only <strong>Watch Together</strong> plays video.
+              </p>
+            </div>
+          </div>
+
+          <div className="flex flex-col sm:flex-row gap-2.5">
             <Button
-              variant="secondary"
-              size="sm"
-              disabled={!prev}
-              onClick={() => prev && navigate("watch", { animeId, episodeId: prev.id })}
-              className="rounded-full"
+              onClick={openInTelegram}
+              disabled={opening}
+              className="flex-1 h-12 rounded-full brand-gradient text-white font-bold gap-2 shadow-lg shadow-primary/25"
             >
-              <ChevronLeft className="w-4 h-4" /> {t("watch.previous")}
+              {opening ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+              {opening ? "Sending..." : bot.linked ? "Send episode & open Telegram" : "Connect Telegram"}
             </Button>
             <Button
-              size="sm"
-              disabled={!next}
-              onClick={() => next && navigate("watch", { animeId, episodeId: next.id })}
-              className="rounded-full brand-gradient text-white font-bold"
-            >
-              {t("watch.nextEpisode")} <ChevronRight className="w-4 h-4" />
-            </Button>
-            <Button
-              variant="ghost"
-              size="sm"
+              variant="outline"
               onClick={() => navigate("watch-together")}
-              className="rounded-full ml-auto"
+              className="h-12 rounded-full font-bold gap-2 px-5"
             >
               <Sparkles className="w-4 h-4" /> {t("nav.watch-together")}
             </Button>
           </div>
-        </div>
 
-        {/* Episode sidebar */}
-        <aside className="glass rounded-2xl p-4 self-start">
-          <div className="flex items-center justify-between mb-3">
-            <h3 className="text-sm font-bold flex items-center gap-2">
-              <Clock3 className="w-4 h-4 text-primary" /> {t("watch.upNext")}
-            </h3>
-            <span className="text-[10px] text-muted-foreground">{t("watch.episodeCount", { count: localEpisodes.length })}</span>
+          <div className="flex items-center justify-between text-xs text-muted-foreground pt-1">
+            <button
+              onClick={() => navigate("detail", { animeId: anime.slug })}
+              className="hover:text-primary transition font-semibold"
+            >
+              {anime.title} · all episodes →
+            </button>
+            <span>{data.episodes.length} episodes</span>
           </div>
-          <div className="space-y-1.5 max-h-[420px] overflow-y-auto fancy-scroll pr-1">
-            {localEpisodes.map((ep) => {
-              const active = ep.id === currentEpisode.id;
-              const pct = ep.progress && ep.progress.duration > 0
-                ? Math.min(100, (ep.progress.position / ep.progress.duration) * 100)
-                : 0;
-              return (
-                <button
-                  key={ep.id}
-                  onClick={() => navigate("watch", { animeId, episodeId: ep.id })}
-                  className={cn(
-                    "w-full flex items-center gap-2.5 p-2 rounded-xl transition text-left",
-                    active ? "bg-primary/15 border border-primary/30" : "hover:bg-accent border border-transparent"
-                  )}
-                >
-                  <div className="relative w-16 aspect-video rounded-lg overflow-hidden shrink-0">
-                    <SmartImage src={anime.coverImage} alt="" className="w-full h-full object-cover" />
-                    {pct > 0 && (
-                      <div className="absolute bottom-0 inset-x-0 h-[3px] bg-black/50">
-                        <div className="h-full brand-gradient" style={{ width: `${pct}%` }} />
-                      </div>
-                    )}
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <p className={cn("text-xs font-bold truncate", active && "text-primary")}>
-                      EP {String(ep.number).padStart(2, "0")}
-                    </p>
-                    <p className="text-[11px] text-muted-foreground truncate">{ep.title}</p>
-                  </div>
-                  {ep.progress?.completed && <Check className="w-3.5 h-3.5 text-emerald-500 shrink-0" />}
-                </button>
-              );
-            })}
-          </div>
-        </aside>
+        </div>
       </div>
+
+      <LinkTelegramModal
+        open={showLinkModal}
+        onClose={() => setShowLinkModal(false)}
+        onLinked={() => bot.refresh()}
+        animeTitle={anime.title}
+      />
     </div>
   );
 }

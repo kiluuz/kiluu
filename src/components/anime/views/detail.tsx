@@ -264,7 +264,6 @@ export function DetailView() {
   // They can watch if they bought it via old system OR it's free.
   // But if it's a paid bot anime, they use the bot flow.
   const canWatchLocally = anime.owned || anime.isFree;
-  const firstUnwatched = displayEpisodes.find((e) => !e.progress?.completed) || displayEpisodes[0];
 
   function buy() {
     if (!user) {
@@ -308,20 +307,6 @@ export function DetailView() {
     }
   }
 
-  function startWatching(episodeId?: string) {
-    if (!user) {
-      setAuthOpen(true);
-      return;
-    }
-    if (!canWatchLocally) {
-      toast.error("Purchase required", {
-        action: { label: "Buy", onClick: buy },
-      });
-      return;
-    }
-    navigate("watch", { animeId: anime.slug, episodeId: episodeId || firstUnwatched?.id });
-  }
-
   async function handleWatchTelegram(episodeNumber?: number) {
     if (!user) {
       setAuthOpen(true);
@@ -342,7 +327,11 @@ export function DetailView() {
           episode_number: episodeNumber,
         }),
       });
-      const data = await res.json();
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        toast.error(data.error || "Could not send the anime");
+        return;
+      }
       toast.success(
         episodeNumber
           ? `✅ Episode ${episodeNumber} was sent to your Telegram bot!`
@@ -795,11 +784,9 @@ export function DetailView() {
                             });
                             return;
                           }
-                          if (isTelegramOnly) {
-                            handleWatchTelegram(ep.number);
-                          } else {
-                            startWatching(ep.id);
-                          }
+                          // Playback is Telegram-only on the site; Watch Together is
+                          // the sole in-browser player.
+                          handleWatchTelegram(ep.number);
                         }}
                         className="w-full flex items-center gap-3.5 p-2.5 rounded-2xl border bg-card hover:border-primary/50 hover:bg-accent/50 transition group text-left"
                         aria-label={`Play episode ${ep.number}: ${ep.title}`}

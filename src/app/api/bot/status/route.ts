@@ -17,6 +17,10 @@ export async function GET(req: NextRequest) {
       // If user not found on bot side yet or bot offline, fallback to defaults
     }
 
+    // `consume-link` stores telegramId on the site user, so the site DB is
+    // authoritative even when the bot API is unreachable or misses the user.
+    const linked = Boolean(botData.linked || user.telegramId);
+
     // Merge with site-side database purchases so purchases are never lost
     try {
       const sitePurchases = await db.purchase.findMany({
@@ -42,12 +46,12 @@ export async function GET(req: NextRequest) {
       }
 
       return NextResponse.json({
-        linked: botData.linked ?? false,
+        linked,
         purchases: Array.from(fullPurchases),
         episode_purchases: episodePurchases,
       });
     } catch {
-      return NextResponse.json(botData);
+      return NextResponse.json({ ...botData, linked });
     }
   } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 500 });

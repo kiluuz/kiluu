@@ -207,11 +207,6 @@ export default function AnimeApp() {
     return () => { alive = false; };
   }, []);
 
-  // The video player view is immersive — the mobile dock hides completely
-  useEffect(() => {
-    useAppStore.getState().setImmersive(view.name === "watch");
-  }, [view.name]);
-
   // Full-page login — no chrome
   if (view.name === "login") {
     return (
