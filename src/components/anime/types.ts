@@ -335,6 +335,7 @@ export interface PublicProfile {
   favoriteUsers: UserMini[];
   followersList: UserMini[];
   ownedAnimes: AnimeSummary[];
+  receivedGifts?: ReceivedGift[];
   posts: {
     id: string;
     content: string;
@@ -359,6 +360,16 @@ export interface UserMini {
   accentColor: string;
   accentTo?: string | null;
   role?: string;
+}
+
+export interface ReceivedGift {
+  id: string;
+  pricePaid: number;
+  message: string | null;
+  createdAt: string;
+  claimedAt: string | null;
+  anime: { id: string; slug: string; title: string; coverImage: string | null };
+  sender: { username: string; displayName: string | null; avatarUrl: string | null } | null;
 }
 
 export interface ExchangeOfferItem {

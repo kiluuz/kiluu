@@ -1046,3 +1046,147 @@ input[type="range"].player-range::-moz-range-thumb {
     transition: none !important;
   }
 }
+
+/* ============================================================
+   COLLECTIBLE GIFT CARDS
+   ============================================================ */
+
+.gift-frame {
+  transition: transform 0.3s cubic-bezier(0.22, 1, 0.36, 1), box-shadow 0.35s ease;
+  transform-style: preserve-3d;
+  will-change: transform;
+}
+
+/* Manga speed lines — rotate slowly behind the art */
+.gift-speedlines {
+  background: repeating-conic-gradient(rgba(255, 255, 255, 0.24) 0deg 1.5deg, transparent 1.5deg 6deg);
+  -webkit-mask-image: radial-gradient(circle at 50% 58%, transparent 0 28%, #000 72%);
+  mask-image: radial-gradient(circle at 50% 58%, transparent 0 28%, #000 72%);
+  animation: gift-speedlines-spin 50s linear infinite;
+}
+@keyframes gift-speedlines-spin {
+  to { transform: rotate(360deg); }
+}
+
+/* Halftone dots over the lower half of the art */
+.gift-halftone {
+  background-image: radial-gradient(rgba(255, 255, 255, 0.38) 0.8px, transparent 1.1px);
+  background-size: 7px 7px;
+}
+
+/* Diagonal rarity ribbon */
+.gift-ribbon {
+  position: absolute;
+  top: 15px;
+  left: -36px;
+  width: 132px;
+  transform: rotate(-45deg);
+  text-align: center;
+  font-size: 9px;
+  font-weight: 900;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: #15110e;
+  padding: 4px 0;
+  z-index: 25;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.45);
+}
+
+/* Hover shine sweep for poster buttons */
+.gift-shine {
+  position: relative;
+  overflow: hidden;
+}
+.gift-shine::after {
+  content: "";
+  position: absolute;
+  top: -60%;
+  bottom: -60%;
+  left: -80%;
+  width: 55%;
+  transform: rotate(18deg) translateX(-180%);
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.45), transparent);
+  transition: transform 0.7s ease;
+  pointer-events: none;
+  z-index: 12;
+}
+.gift-shine:hover::after,
+.gift-shine:focus-visible::after {
+  transform: rotate(18deg) translateX(420%);
+}
+
+/* Holo foil following the cursor */
+.gift-foil {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.25s ease;
+  mix-blend-mode: overlay;
+  background:
+    radial-gradient(240px circle at var(--foil-x, 50%) var(--foil-y, 50%), rgba(255, 255, 255, 0.55), transparent 62%),
+    linear-gradient(115deg, transparent 30%, rgba(255, 255, 255, 0.22) 48%, transparent 66%);
+}
+.gift-card-tilt:hover .gift-foil {
+  opacity: 1;
+}
+
+/* Gift box + send celebration */
+@keyframes gift-box-shake {
+  0%, 100% { transform: rotate(0) scale(1); }
+  15% { transform: rotate(-8deg) scale(1.03); }
+  30% { transform: rotate(7deg) scale(1.04); }
+  45% { transform: rotate(-6deg) scale(1.05); }
+  60% { transform: rotate(5deg) scale(1.06); }
+  75% { transform: rotate(-3deg) scale(1.07); }
+  90% { transform: rotate(2deg) scale(1.08); }
+}
+.gift-box-shake {
+  animation: gift-box-shake 0.9s ease-in-out;
+}
+@keyframes gift-pop-in {
+  0% { opacity: 0; transform: scale(0.82) translateY(16px); }
+  60% { opacity: 1; transform: scale(1.03) translateY(-4px); }
+  100% { opacity: 1; transform: scale(1) translateY(0); }
+}
+.gift-pop-in {
+  animation: gift-pop-in 0.55s cubic-bezier(0.2, 0.9, 0.3, 1.2) both;
+}
+@keyframes gift-fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+.gift-fade-in {
+  animation: gift-fade-in 0.3s ease both;
+}
+@keyframes gift-petal-fall {
+  0% { transform: translate3d(0, -12vh, 0) rotate(0deg); opacity: 0; }
+  12% { opacity: 1; }
+  100% { transform: translate3d(var(--petal-drift, 40px), 112vh, 0) rotate(540deg); opacity: 0; }
+}
+.gift-petal {
+  position: absolute;
+  top: 0;
+  border-radius: 80% 0 55% 50% / 55% 0 80% 45%;
+  background: linear-gradient(140deg, #ffd7e3, #f7a8c4 60%, #e86e9a);
+  animation: gift-petal-fall var(--petal-duration, 3s) ease-in var(--petal-delay, 0s) forwards;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .gift-speedlines,
+  .gift-petal {
+    animation: none !important;
+    display: none;
+  }
+  .gift-frame,
+  .gift-shine::after {
+    transition: none !important;
+  }
+  .gift-frame {
+    transform: none !important;
+  }
+  .gift-box-shake,
+  .gift-pop-in {
+    animation: none !important;
+  }
+}

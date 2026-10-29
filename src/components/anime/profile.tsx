@@ -5,12 +5,12 @@ import {
   BadgeCheck, Crown, CalendarDays, Heart, Film, Star, Timer, Package, Users,
   Pencil, Loader2, Smile, Sparkles, Lock, Check,
   Play, MessageSquare, ThumbsUp, Trophy, Clapperboard,
-  Instagram, Youtube, Twitter, MapPin, Clock, Layers,
+  Instagram, Youtube, Twitter, MapPin, Clock, Layers, Gift,
 } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { useAppStore, useOpenProfile } from "./store";
-import type { PublicProfile, AnimeSummary, ShowcaseConfig } from "./types";
+import type { PublicProfile, AnimeSummary, ShowcaseConfig, ReceivedGift } from "./types";
 import { avatarNameGap, FramedAvatar, NameWithFrame, nameFrameContentInset, SmartImage, formatDuration, timeAgo, formatCredits } from "./ui-bits";
 import { RARITY_LABEL, type AchievementDef, type Rarity } from "./profile-assets";
 import { frameById } from "../../../frames.config";
@@ -18,6 +18,8 @@ import { ProfileEditor } from "./profile-editor";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { useI18n } from "@/components/i18n-provider";
+import { GIFT_RARITIES, giftRarity, type GiftRarityId } from "@/lib/gift-rarity";
+import { GiftCard, GiftDetailDialog, formatGiftDate } from "./gift-card";
 
 /* ================================================================
    ACCENT HELPERS — Discord-style profile colors w/ WCAG AA contrast
@@ -920,6 +922,128 @@ function FavoritesTab({ profile }: { profile: PublicProfile }) {
   );
 }
 
+function GiftsTab({ profile }: { profile: PublicProfile }) {
+  const navigate = useAppStore((s) => s.navigate);
+  const gifts = profile.receivedGifts ?? [];
+  const [filter, setFilter] = useState<"all" | GiftRarityId>("all");
+  const [selected, setSelected] = useState<ReceivedGift | null>(null);
+
+  if (gifts.length === 0) {
+    return (
+      <RichEmptyState
+        icon={<Gift className="w-5 h-5" />}
+        title={profile.isMe ? "No gifts collected yet" : "No gifts yet"}
+        hint={
+          profile.isMe
+            ? "Gifts you unwrap will live here as collectible cards, rarest first."
+            : `${profile.displayName || profile.username} hasn't unwrapped any gifts yet.`
+        }
+        actionLabel={profile.isMe ? "Send a gift" : undefined}
+        onAction={profile.isMe ? () => navigate("gifts") : undefined}
+      />
+    );
+  }
+
+  const filtered = filter === "all" ? gifts : gifts.filter((gift) => giftRarity(gift.pricePaid).id === filter);
+  const dialogGift = selected
+    ? {
+        id: selected.id,
+        pricePaid: selected.pricePaid,
+        message: selected.message,
+        createdAt: selected.createdAt,
+        claimedAt: selected.claimedAt,
+        status: "CLAIMED",
+        incoming: true,
+        recipientUsername: profile.username,
+        anime: selected.anime,
+        sender: selected.sender,
+      }
+    : null;
+
+  return (
+    <div className="space-y-4">
+      <div className="flex flex-wrap items-center gap-2">
+        <span className="text-sm font-bold">
+          {gifts.length} gift{gifts.length === 1 ? "" : "s"} collected
+        </span>
+        <button
+          type="button"
+          aria-pressed={filter === "all"}
+          onClick={() => setFilter("all")}
+          className={cn(
+            "rounded-full border px-2.5 py-1 text-[10px] font-black uppercase tracking-wider transition-colors focus-ring-accent",
+            filter === "all" ? "border-foreground/40 bg-foreground/10 text-foreground" : "text-muted-foreground hover:text-foreground"
+          )}
+        >
+          All
+        </button>
+        {GIFT_RARITIES.map((rarity) => (
+          <button
+            key={rarity.id}
+            type="button"
+            aria-pressed={filter === rarity.id}
+            onClick={() => setFilter(rarity.id)}
+            className="rounded-full border px-2.5 py-1 text-[10px] font-black uppercase tracking-wider transition-colors focus-ring-accent"
+            style={
+              filter === rarity.id
+                ? { color: rarity.color, borderColor: `${rarity.color}88`, background: `${rarity.color}1f` }
+                : { color: "var(--muted-foreground)" }
+            }
+          >
+            {rarity.label}
+          </button>
+        ))}
+      </div>
+
+      {filtered.length === 0 ? (
+        <p className="rounded-xl border border-dashed p-6 text-center text-xs text-muted-foreground">
+          No {filter} gifts in this collection yet.
+        </p>
+      ) : (
+        <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 xl:grid-cols-4">
+          {filtered.map((gift) => {
+            const rarity = giftRarity(gift.pricePaid);
+            return (
+              <button
+                key={gift.id}
+                type="button"
+                onClick={() => setSelected(gift)}
+                aria-label={`Open ${rarity.label} gift card — ${gift.anime.title} from @${gift.sender?.username ?? "unknown"}`}
+                className="group rounded-[18px] text-left focus-ring-accent"
+              >
+                <GiftCard size="mini" anime={gift.anime} price={gift.pricePaid} />
+                <div className="mt-2 px-0.5">
+                  <p className="truncate text-xs font-bold">From @{gift.sender?.username ?? "unknown"}</p>
+                  <p className="text-[10px] text-muted-foreground">
+                    {rarity.label} · {formatGiftDate(gift.createdAt)}
+                  </p>
+                </div>
+              </button>
+            );
+          })}
+        </div>
+      )}
+
+      <GiftDetailDialog
+        gift={dialogGift}
+        open={Boolean(selected)}
+        onOpenChange={(open) => {
+          if (!open) setSelected(null);
+        }}
+        mode="received"
+        onWatch={
+          selected
+            ? () => {
+                setSelected(null);
+                navigate("detail", { animeId: selected.anime.slug });
+              }
+            : undefined
+        }
+      />
+    </div>
+  );
+}
+
 function PostCard({ post, profile }: { post: PublicProfile["posts"][number]; profile: PublicProfile }) {
   const navigate = useAppStore((s) => s.navigate);
   const [liked, setLiked] = useState(post.liked);
@@ -1074,6 +1198,7 @@ export function ProfilePageBody({
     { id: "overview", label: t("profile.overview") },
     { id: "collection", label: t("profile.collection"), count: profile.ownedAnimes.length },
     { id: "favorites", label: t("profile.favorites"), count: profile.favoriteAnimes.length },
+    { id: "gifts", label: "Gifts", count: profile.receivedGifts?.length ?? 0 },
     { id: "activity", label: t("profile.activity"), count: profile.posts.length },
     { id: "achievements", label: t("profile.achievements"), count: getAchievementStates(profile).filter((a) => a.earned).length },
   ];
@@ -1139,6 +1264,7 @@ export function ProfilePageBody({
               {tab === "overview" && <OverviewTab profile={profile} onEdit={onEdit} />}
               {tab === "collection" && <CollectionTab profile={profile} />}
               {tab === "favorites" && <FavoritesTab profile={profile} />}
+              {tab === "gifts" && <GiftsTab profile={profile} />}
               {tab === "activity" && <ActivityTab profile={profile} />}
               {tab === "achievements" && <AchievementsTab profile={profile} />}
             </>

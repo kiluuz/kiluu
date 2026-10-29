@@ -7,6 +7,7 @@ import { getXpTotal, levelFromXp } from "@/lib/xp";
 import { Prisma } from "@prisma/client";
 import { sqlTable } from "@/lib/sql-table";
 import { isVerifiedByFollowerCount } from "@/lib/verification";
+import { giftRarityRank } from "@/lib/gift-rarity";
 
 const ANIME_CARD = {
   id: true, slug: true, title: true, coverImage: true, bannerImage: true,
@@ -135,6 +136,7 @@ export async function GET(
         favoriteUsers: [],
         followersList: [],
         ownedAnimes: [],
+        receivedGifts: [],
         posts: [],
         isFollowing,
         isMe,
@@ -268,6 +270,37 @@ export async function GET(
 
   const isOnline = Boolean(user.lastSeenAt && Date.now() - new Date(user.lastSeenAt).getTime() < 3 * 60_000);
 
+  const receivedGiftRows = privacy.showCollection || isMe
+    ? await db.gift.findMany({
+        where: {
+          status: "CLAIMED",
+          OR: [
+            { recipientId: user.id },
+            { recipientUsername: user.username.toLowerCase() },
+          ],
+        },
+        include: {
+          anime: { select: { id: true, slug: true, title: true, coverImage: true } },
+          sender: { select: { username: true, displayName: true, avatarUrl: true } },
+        },
+        orderBy: { createdAt: "desc" },
+        take: 60,
+      })
+    : [];
+  const receivedGifts = receivedGiftRows
+    .slice()
+    .sort((a, b) => giftRarityRank(a.pricePaid) - giftRarityRank(b.pricePaid) || b.createdAt.getTime() - a.createdAt.getTime())
+    .slice(0, 30)
+    .map((gift) => ({
+      id: gift.id,
+      pricePaid: gift.pricePaid,
+      message: gift.message,
+      createdAt: gift.createdAt.toISOString(),
+      claimedAt: gift.claimedAt?.toISOString() ?? null,
+      anime: gift.anime,
+      sender: gift.sender,
+    }));
+
   return NextResponse.json({
     profile: {
       id: user.id,
@@ -316,6 +349,7 @@ export async function GET(
       favoriteUsers: privacy.showFollowers || isMe ? favoriteUsersRows.map((f) => f.followed) : [],
       followersList: privacy.showFollowers || isMe ? followersRows.map((f) => f.follower) : [],
       ownedAnimes: privacy.showCollection || isMe ? ownedAnimes : [],
+      receivedGifts,
       posts: privacy.showActivity || isMe ? postsRows.map((p) => ({
         id: p.id,
         content: p.content,
