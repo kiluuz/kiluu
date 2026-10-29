@@ -328,11 +328,12 @@ export function DetailView() {
         }),
       });
       const data = await res.json().catch(() => ({}));
-      if (res.ok) {
+      const delivered = typeof data.delivered === "number" ? data.delivered : res.ok ? 1 : 0;
+      if (res.ok && delivered > 0) {
         toast.success(
           episodeNumber
-            ? `✅ Episode ${episodeNumber} was sent to your Telegram bot!`
-            : "✅ The anime was sent to your Telegram bot!"
+            ? `✅ Episode ${episodeNumber} added to your bot library — open /my_library in the bot.`
+            : "✅ Added to your bot library — open /my_library in the bot."
         );
       } else {
         toast.error(data.error || "Could not deliver the anime. Opening the bot — try /my_library.");

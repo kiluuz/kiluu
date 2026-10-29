@@ -105,10 +105,12 @@ export function WatchView() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ slug: anime.slug, episode_number: episodeNumber }),
       });
-      if (res.ok) {
-        toast.success(`✅ Episode ${episodeNumber} was sent to your Telegram bot!`);
+      const data = await res.json().catch(() => ({}));
+      const delivered = typeof data.delivered === "number" ? data.delivered : res.ok ? 1 : 0;
+      if (res.ok && delivered > 0) {
+        toast.success(`✅ Episode ${episodeNumber} added to your bot library — open /my_library in the bot.`);
       } else {
-        toast.error("Could not deliver the episode. Opening the bot — try /my_library.");
+        toast.error(data.error || "Could not deliver the episode. Opening the bot — try /my_library.");
       }
     } catch {
       toast.error("Could not deliver the episode. Opening the bot — try /my_library.");

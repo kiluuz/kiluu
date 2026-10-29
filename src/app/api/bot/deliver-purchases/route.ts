@@ -50,18 +50,32 @@ export async function POST(req: NextRequest) {
     for (const slug of slugsToDeliver) {
       try {
         const grantRes = await grantPurchase(user.id, slug, specificSlug ? episodeNumber : 0, true);
-        results.push({ slug, success: true });
+        if (grantRes && grantRes.linked === false) {
+          // Bot has no chat_id for this site user — nothing can be sent until they re-link.
+          results.push({ slug, success: false, error: "not_linked_on_bot" });
+        } else {
+          results.push({ slug, success: true });
+        }
       } catch (e: any) {
         results.push({ slug, success: false, error: e.message });
       }
     }
 
     const delivered = results.filter((r) => r.success).length;
+    const firstError = results.find((r) => !r.success)?.error;
 
     return NextResponse.json({
       delivered,
       total: slugsToDeliver.size,
       results,
+      ...(delivered === 0 && firstError
+        ? {
+            error:
+              firstError === "not_linked_on_bot"
+                ? "Telegram account is not linked on the bot side. Reconnect Telegram and try again."
+                : firstError,
+          }
+        : {}),
     });
   } catch (error: any) {
     console.error("deliver-purchases error", error);

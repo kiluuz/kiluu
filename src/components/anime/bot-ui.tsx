@@ -97,7 +97,9 @@ export function TelegramLinkWidget({ onLinked }: { onLinked: () => void }) {
             const deliverRes = await fetch("/api/bot/deliver-purchases", { method: "POST" });
             const deliverData = await deliverRes.json();
             if (deliverData.delivered > 0) {
-              toast.success(`✅ ${deliverData.delivered} anime sent to your Telegram bot!`);
+              toast.success(`✅ ${deliverData.delivered} anime added to your bot library!`);
+            } else if (deliverData.total > 0) {
+              toast.error(deliverData.error || "Could not sync purchases to the bot. Please try again.");
             }
           } catch {
             // Delivery failure is non-fatal — user can still use the app
