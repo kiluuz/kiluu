@@ -105,22 +105,25 @@ export function WatchView() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ slug: anime.slug, episode_number: episodeNumber }),
       });
-      if (!res.ok) throw new Error("deliver failed");
-      toast.success(`✅ Episode ${episodeNumber} was sent to your Telegram bot!`);
-      bot.refresh();
-
-      const botUsername = process.env.NEXT_PUBLIC_BOT_USERNAME || "DubAniXbot";
-      window.location.href = `tg://resolve?domain=${botUsername}`;
-      setTimeout(() => {
-        if (!document.hidden) {
-          window.open(`https://t.me/${botUsername}`, "_blank");
-        }
-      }, 1500);
+      if (res.ok) {
+        toast.success(`✅ Episode ${episodeNumber} was sent to your Telegram bot!`);
+      } else {
+        toast.error("Could not deliver the episode. Opening the bot — try /my_library.");
+      }
     } catch {
-      toast.error("Could not send the episode. Please try again.");
+      toast.error("Could not deliver the episode. Opening the bot — try /my_library.");
     } finally {
       setOpening(false);
     }
+    bot.refresh();
+
+    const botUsername = process.env.NEXT_PUBLIC_BOT_USERNAME || "DubAniXbot";
+    window.location.href = `tg://resolve?domain=${botUsername}`;
+    setTimeout(() => {
+      if (!document.hidden) {
+        window.open(`https://t.me/${botUsername}`, "_blank");
+      }
+    }, 1500);
   }
 
   return (

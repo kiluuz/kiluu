@@ -328,15 +328,15 @@ export function DetailView() {
         }),
       });
       const data = await res.json().catch(() => ({}));
-      if (!res.ok) {
-        toast.error(data.error || "Could not send the anime");
-        return;
+      if (res.ok) {
+        toast.success(
+          episodeNumber
+            ? `✅ Episode ${episodeNumber} was sent to your Telegram bot!`
+            : "✅ The anime was sent to your Telegram bot!"
+        );
+      } else {
+        toast.error(data.error || "Could not deliver the anime. Opening the bot — try /my_library.");
       }
-      toast.success(
-        episodeNumber
-          ? `✅ Episode ${episodeNumber} was sent to your Telegram bot!`
-          : "✅ The anime was sent to your Telegram bot!"
-      );
       botStatus.refresh();
 
       // Open Telegram (native first, then web fallback)
