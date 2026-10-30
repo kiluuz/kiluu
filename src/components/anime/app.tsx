@@ -27,6 +27,7 @@ import { LoginView } from "./views/login";
 import { ScheduleView } from "./views/schedule";
 import { DubbingView } from "./views/dubbing";
 import { BotAdminView } from "./views/bot-admin";
+import { AdminUsersView } from "./views/admin-users";
 import type { AuthUser } from "./types";
 
 const VIEW_LOADING_COPY: Record<string, { title: string; caption: string }> = {
@@ -43,6 +44,7 @@ const VIEW_LOADING_COPY: Record<string, { title: string; caption: string }> = {
   watch: { title: "Watch", caption: "Preparing your episode" },
   studio: { title: "Creator Studio", caption: "Opening your studio" },
   settings: { title: "Settings", caption: "Loading your preferences" },
+  "admin-users": { title: "Users", caption: "Loading the user directory" },
 };
 
 export default function AnimeApp() {
@@ -258,6 +260,7 @@ export default function AnimeApp() {
           {view.name === "studio" && <StudioView />}
           {view.name === "settings" && <SettingsView />}
           {view.name === "bot-admin" && <BotAdminView />}
+          {view.name === "admin-users" && <AdminUsersView />}
         </Suspense>
         {navigationLoading && (
           <div className="kiluu-content-loader">

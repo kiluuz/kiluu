@@ -42,6 +42,8 @@ export function viewToPath(view: View): string {
       return "/login";
     case "bot-admin":
       return "/bot-admin";
+    case "admin-users":
+      return "/admin/users";
     case "detail":
       return view.animeId ? `/anime/${encodeURIComponent(view.animeId)}` : "/";
     case "watch":
@@ -102,6 +104,9 @@ export function pathToView(pathname: string, search: string = ""): View {
   }
   if (cleanPath === "/bot-admin") {
     return { name: "bot-admin" };
+  }
+  if (cleanPath === "/admin/users") {
+    return { name: "admin-users" };
   }
 
   const animeMatch = cleanPath.match(/^\/anime\/([^/]+)$/);

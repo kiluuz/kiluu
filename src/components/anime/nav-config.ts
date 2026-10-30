@@ -2,7 +2,7 @@
 
 import {
   Home, Compass, Users, Clock, Gift, Wallet, Video, AudioLines,
-  CalendarDays, Clapperboard, Settings2, type LucideIcon,
+  CalendarDays, Clapperboard, Settings2, UsersRound, type LucideIcon,
 } from "lucide-react";
 import { useAppStore } from "./store";
 import type { ViewName } from "./types";
@@ -53,6 +53,8 @@ export const NAV_ITEMS: readonly NavItemDef[] = [
     lockHint: "You picked the Viewer path at sign-up — Creator Studio is for Creator accounts." },
   { id: "bot-admin",      label: "Bot Admin",      shortLabel: "Admin",    icon: Settings2,    group: "creator", adminOnly: true,
     lockHint: "Admin panel is for admin accounts only." },
+  { id: "admin-users",    label: "Users",          shortLabel: "Users",    icon: UsersRound,   group: "creator", adminOnly: true,
+    lockHint: "User directory is for admin accounts only." },
 ] as const;
 
 export const NAV_GROUP_LABELS: Record<NavGroup, string> = {

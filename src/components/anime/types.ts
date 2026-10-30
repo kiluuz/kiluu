@@ -499,7 +499,8 @@ export type ViewName =
   | "login"
   | "schedule"
   | "dubbing"
-  | "bot-admin";
+  | "bot-admin"
+  | "admin-users";
 
 export interface View {
   name: ViewName;
