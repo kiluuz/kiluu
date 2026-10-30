@@ -33,6 +33,12 @@ test("all selectable languages have translations for the main app views", () => 
     "community.composerPlaceholder",
     "gifts.description",
     "gifts.status.claimed",
+    "gifts.creatorBlocked",
+    "profile.created",
+    "profile.memberOf",
+    "profile.members",
+    "profile.topRated",
+    "profile.teamLeader",
     "library.guestTitle",
     "library.telegramDelivered",
   ];

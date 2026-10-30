@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Loader2, Clapperboard, Swords, Check, Eye, Sparkles } from "lucide-react";
+import { Loader2, Clapperboard, Swords, Check, Eye, Sparkles, AtSign } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -16,6 +16,7 @@ export function Onboarding() {
   const { user, updateUser } = useAppStore();
   const [choice, setChoice] = useState<"CREATOR" | "VIEWER" | null>(null);
   const [favoriteGenres, setFavoriteGenres] = useState<string[]>(user?.favoriteGenres ?? []);
+  const [handle, setHandle] = useState(user?.username ?? "");
   const [displayName, setDisplayName] = useState(user?.displayName || user?.username || "");
   const [saving, setSaving] = useState(false);
   const [step, setStep] = useState<"genres" | "role" | "name">("genres");
@@ -54,24 +55,39 @@ export function Onboarding() {
 
   async function finish(role: "CREATOR" | "VIEWER") {
     const normalizedName = normalizeDisplayName(displayName);
+    const cleanHandle = handle.trim().toLowerCase();
+    if (!/^[a-z0-9_]{3,20}$/.test(cleanHandle)) {
+      toast.error("Username must be 3-20 characters: lowercase letters, numbers or underscore");
+      return;
+    }
     if (!normalizedName) {
       toast.error("Display name must be 2-20 characters");
       return;
     }
     setSaving(true);
     try {
+      const payload = role === "CREATOR"
+        ? { role, teamUsername: cleanHandle, teamDisplayName: normalizedName }
+        : { role, username: cleanHandle, displayName: normalizedName };
       const res = await fetch("/api/profile", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ role, displayName: normalizedName }),
+        body: JSON.stringify(payload),
       });
-      const data = await res.json();
+      const data = await res.json().catch(() => ({}));
       if (!res.ok) {
-        toast.error(data.error || "Failed to save");
+        const messages: Record<string, string> = {
+          INVALID_HANDLE: "Username must be 3-20 characters: lowercase letters, numbers or underscore",
+          HANDLE_RESERVED: "That username is reserved — pick another one",
+          HANDLE_TAKEN: "That username is already taken",
+          TEAM_HANDLE_TAKEN: "That team username is already taken",
+          INVALID_TEAM_NAME: "Team display name must be 2-20 characters",
+        };
+        toast.error(messages[data.code] || data.error || "Failed to save");
         return;
       }
       updateUser({ ...user!, ...data.user });
-      toast.success(role === "CREATOR" ? "Creator mode unlocked! Publish your animes in the Studio." : "You're all set. Enjoy the show!");
+      toast.success(role === "CREATOR" ? "Team account created! Your Creator Studio is ready." : "You're all set. Enjoy the show!");
     } catch {
       toast.error("Network error");
     } finally {
@@ -103,7 +119,11 @@ export function Onboarding() {
               <span className="text-xs opacity-70">(You choose this only once)</span>
             </p>
           ) : (
-            <p className="text-muted-foreground mt-2 text-sm">Pick your display name — others will see this on your profile</p>
+            <p className="text-muted-foreground mt-2 text-sm">
+              {choice === "CREATOR"
+                ? "Pick your team username and display name — this becomes your public creator account"
+                : "Pick your username and display name — others will see them on your profile"}
+            </p>
           )}
         </div>
 
@@ -164,7 +184,7 @@ export function Onboarding() {
                 <ul className={`mt-3 space-y-1 text-[11px] ${choice === "CREATOR" ? "text-white/80" : "text-muted-foreground"}`}>
                   <li className="flex items-center gap-1.5"><Check className="w-3 h-3" /> Publish unlimited animes</li>
                   <li className="flex items-center gap-1.5"><Check className="w-3 h-3" /> Creator Studio dashboard</li>
-                  <li className="flex items-center gap-1.5"><Check className="w-3 h-3" /> Creator badge on profile</li>
+                  <li className="flex items-center gap-1.5"><Check className="w-3 h-3" /> One team account for your studio</li>
                 </ul>
                 {choice === "CREATOR" && (
                   <div className="absolute top-3 right-3 w-6 h-6 rounded-full bg-white flex items-center justify-center">
@@ -209,8 +229,30 @@ export function Onboarding() {
           </>
         ) : (
           <div className="rounded-2xl border bg-card p-6">
+            <div className="space-y-1.5 mb-4">
+              <Label htmlFor="ob-handle" className="text-xs font-semibold">
+                {choice === "CREATOR" ? "Team username" : "Username"}
+              </Label>
+              <div className="relative">
+                <AtSign className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+                <Input
+                  id="ob-handle"
+                  value={handle}
+                  onChange={(e) => setHandle(e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, "").slice(0, 20))}
+                  maxLength={20}
+                  autoComplete="off"
+                  placeholder={choice === "CREATOR" ? "your_team" : "your_name"}
+                  className="pl-9 h-12 rounded-xl text-base"
+                />
+              </div>
+              <p className="text-[11px] text-muted-foreground">
+                3–20 characters · lowercase letters, numbers and underscore
+              </p>
+            </div>
             <div className="space-y-1.5 mb-5">
-              <Label htmlFor="ob-name" className="text-xs font-semibold">Display name</Label>
+              <Label htmlFor="ob-name" className="text-xs font-semibold">
+                {choice === "CREATOR" ? "Team display name" : "Display name"}
+              </Label>
               <div className="relative">
                 <Eye className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
                 <Input
@@ -218,7 +260,7 @@ export function Onboarding() {
                   value={displayName}
                   onChange={(e) => setDisplayName(e.target.value.replace(/[\u0000-\u001f\u007f-\u009f]/gu, ""))}
                   maxLength={20}
-                  placeholder="How others see you"
+                  placeholder={choice === "CREATOR" ? "Your team name" : "How others see you"}
                   className="pl-9 h-12 rounded-xl text-base"
                 />
               </div>
@@ -229,11 +271,17 @@ export function Onboarding() {
                 Back
               </Button>
               <Button
-                disabled={saving || !displayName.trim()}
+                disabled={saving || !displayName.trim() || handle.length < 3}
                 onClick={() => finish(choice!)}
                 className="flex-1 h-11 rounded-xl font-bold brand-gradient hover:opacity-90 text-white"
               >
-                {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : `Enter Kiluu as ${choice === "CREATOR" ? "Creator" : "Viewer"}`}
+                {saving ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : choice === "CREATOR" ? (
+                  "Create team account"
+                ) : (
+                  "Enter Kiluu"
+                )}
               </Button>
             </div>
           </div>

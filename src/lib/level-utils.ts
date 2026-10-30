@@ -48,11 +48,14 @@ export function calculateBadges(params: {
   purchasedAnimes: number;
   levelInfo: LevelInfo;
 }): BadgeInfo[] {
-  const badges: BadgeInfo[] = [{
-    id: "level_title",
-    label: params.levelInfo.titleJa,
-    color: "bg-primary/90 text-primary-foreground",
-  }];
+  const badges: BadgeInfo[] = [];
+  if (!params.isCreator) {
+    badges.push({
+      id: "level_title",
+      label: params.levelInfo.titleJa,
+      color: "bg-primary/90 text-primary-foreground",
+    });
+  }
   if (params.isCreator && params.createdAnimes > 0) {
     badges.push({ id: "creator", label: "CREATOR", color: "bg-blue-600/90 text-white", glow: true });
   }

@@ -46,7 +46,7 @@ export async function getOwnedHlsEpisode(client: DbClient, userId: string, episo
 
 export function watchPartyJoinPrice(): number {
   const raw = process.env.WATCH_PARTY_JOIN_PRICE_CREDITS;
-  const price = Number(raw ?? "5");
+  const price = Number(raw ?? "20");
   if (!Number.isSafeInteger(price) || price < 1) {
     throw new Error("WATCH_PARTY_JOIN_PRICE_CREDITS must be a positive integer");
   }

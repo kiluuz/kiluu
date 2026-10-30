@@ -7,8 +7,13 @@ import { parseProfilePrivacy } from "@/lib/profile-privacy";
 import { ANIME_GENRES, parseFavoriteGenres } from "@/lib/anime-preferences";
 import { presetBannerUrl } from "@/components/anime/profile-assets";
 import { normalizeDisplayName } from "@/lib/display-name";
+import { ensureTeamClub } from "@/lib/dub-teams";
 
 const HEX = /^#[0-9a-fA-F]{6}$/;
+const HANDLE_RE = /^[a-z0-9_]{3,20}$/;
+const RESERVED_HANDLES = new Set([
+  "admin", "administrator", "kiluu", "support", "moderator", "mod", "staff", "official", "creator", "viewer",
+]);
 
 // PATCH /api/profile — update profile customization fields
 export async function PATCH(req: NextRequest) {
@@ -32,8 +37,60 @@ export async function PATCH(req: NextRequest) {
       data.onboardingDone = true;
     }
 
+    // ---- Onboarding handle / creator team account ----
+    let teamSetup: { slug: string; name: string } | null = null;
+    if (!user.onboardingDone && data.role !== undefined) {
+      const creatorFlow = data.role === "creator" || typeof body.teamUsername === "string";
+      if (creatorFlow) {
+        const teamSlug = typeof body.teamUsername === "string" ? body.teamUsername.trim().toLowerCase() : "";
+        if (!HANDLE_RE.test(teamSlug)) {
+          return NextResponse.json({ error: "Team handle must be 3-20 lowercase letters, numbers or underscores", code: "INVALID_HANDLE" }, { status: 400 });
+        }
+        if (RESERVED_HANDLES.has(teamSlug)) {
+          return NextResponse.json({ error: "This handle is reserved", code: "HANDLE_RESERVED" }, { status: 400 });
+        }
+        const teamName = normalizeDisplayName(typeof body.teamDisplayName === "string" ? body.teamDisplayName : "");
+        if (!teamName) {
+          return NextResponse.json({ error: "Team display name must be 2-20 characters", code: "INVALID_TEAM_NAME" }, { status: 400 });
+        }
+        const handleConflict = await db.user.findFirst({
+          where: { username: teamSlug, NOT: { id: user.id } },
+          select: { id: true },
+        });
+        if (handleConflict) {
+          return NextResponse.json({ error: "This handle is already taken", code: "HANDLE_TAKEN" }, { status: 409 });
+        }
+        const slugConflict = await db.dubTeam.findUnique({
+          where: { slug: teamSlug },
+          select: { id: true, ownerId: true },
+        });
+        if (slugConflict && slugConflict.ownerId !== user.id) {
+          return NextResponse.json({ error: "This team handle is already taken", code: "TEAM_HANDLE_TAKEN" }, { status: 409 });
+        }
+        data.username = teamSlug;
+        data.displayName = teamName;
+        teamSetup = { slug: teamSlug, name: teamName };
+      } else if (typeof body.username === "string") {
+        const handle = body.username.trim().toLowerCase();
+        if (!HANDLE_RE.test(handle)) {
+          return NextResponse.json({ error: "Handle must be 3-20 lowercase letters, numbers or underscores", code: "INVALID_HANDLE" }, { status: 400 });
+        }
+        if (RESERVED_HANDLES.has(handle)) {
+          return NextResponse.json({ error: "This handle is reserved", code: "HANDLE_RESERVED" }, { status: 400 });
+        }
+        const handleConflict = await db.user.findFirst({
+          where: { username: handle, NOT: { id: user.id } },
+          select: { id: true },
+        });
+        if (handleConflict) {
+          return NextResponse.json({ error: "This handle is already taken", code: "HANDLE_TAKEN" }, { status: 409 });
+        }
+        data.username = handle;
+      }
+    }
+
     // ---- Identity ----
-    if (typeof body.displayName === "string") {
+    if (!teamSetup && typeof body.displayName === "string") {
       const displayName = normalizeDisplayName(body.displayName);
       if (!displayName) {
         return NextResponse.json({ error: "Display name must be 2-20 characters and contain no control characters" }, { status: 400 });
@@ -284,6 +341,25 @@ export async function PATCH(req: NextRequest) {
     }
 
     const updated = await db.user.update({ where: { id: user.id }, data });
+    if (teamSetup) {
+      const ownedTeam = await db.dubTeam.findFirst({
+        where: { ownerId: user.id },
+        orderBy: { createdAt: "asc" },
+        select: { id: true },
+      });
+      if (ownedTeam) {
+        await db.dubTeam.update({ where: { id: ownedTeam.id }, data: { name: teamSetup.name } });
+      } else {
+        const team = await db.dubTeam.create({
+          data: { name: teamSetup.name, slug: teamSetup.slug, ownerId: user.id },
+        });
+        try {
+          await ensureTeamClub(team.id);
+        } catch (error) {
+          console.error("team club setup failed", error);
+        }
+      }
+    }
     return NextResponse.json({ user: toPublicUser(updated) });
   } catch (e) {
     console.error("profile update error", e);

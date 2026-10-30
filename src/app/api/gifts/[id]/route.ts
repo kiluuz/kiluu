@@ -23,6 +23,9 @@ export async function POST(
     return NextResponse.json({ error: "action must be claim or decline" }, { status: 400 });
   } catch (e: unknown) {
     const code = (e as { code?: string }).code;
+    if (code === "CREATOR_RECIPIENT") {
+      return NextResponse.json({ error: "Creator accounts can't receive anime gifts", code }, { status: 403 });
+    }
     if (code === "FORBIDDEN") return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     if (code === "NOT_PENDING") return NextResponse.json({ error: "Gift is no longer pending" }, { status: 409 });
     return NextResponse.json({ error: "Failed" }, { status: 500 });

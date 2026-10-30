@@ -148,7 +148,7 @@ export function ProfilePopupCard({
           </div>
           <p className="profile-name-frame-follow text-xs text-muted-foreground">
             @{profile.username}{profile.pronouns ? ` · ${profile.pronouns}` : ""}
-            {profile.stats.level !== undefined && <span className="ml-1.5 rounded bg-secondary px-1.5 py-0.5 font-bold">Lv.{profile.stats.level}</span>}
+            {profile.role !== "CREATOR" && profile.stats.level !== undefined && <span className="ml-1.5 rounded bg-secondary px-1.5 py-0.5 font-bold">Lv.{profile.stats.level}</span>}
           </p>
 
           {/* status line */}
@@ -239,7 +239,7 @@ export function ProfilePopupCard({
         {/* Stats mini-row */}
         <div className="mt-4 grid grid-cols-3 gap-2 text-center">
           {[
-            { label: "Owned", value: profile.stats.purchaseCount },
+            { label: profile.role === "CREATOR" ? "Created" : "Owned", value: profile.stats.purchaseCount },
             { label: "Followers", value: profile.stats.followers },
             { label: "Posts", value: profile.stats.postCount },
           ].filter((s) => s.value !== null).map((s) => (

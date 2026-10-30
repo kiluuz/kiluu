@@ -45,7 +45,7 @@ export const NAV_ITEMS: readonly NavItemDef[] = [
   { id: "schedule",       label: "Schedule",      shortLabel: "Schedule", icon: CalendarDays, group: "browse" },
   { id: "dubbing",        label: "AI Dubbing",    shortLabel: "AI Dub",   icon: AudioLines,   group: "browse", mobileCenter: true, badge: "soon" },
   { id: "community",      label: "Community",     shortLabel: "Community",icon: Users,        group: "browse", mobilePrimary: true },
-  { id: "watch-together", label: "Watch Together",shortLabel: "Together", icon: Video,        group: "browse", badge: "soon" },
+  { id: "watch-together", label: "Watch Together",shortLabel: "Together", icon: Video,        group: "browse" },
   { id: "library",        label: "My Library",    shortLabel: "Library",  icon: Clock,        group: "my" },
   { id: "gifts",          label: "Gifts",         shortLabel: "Gifts",    icon: Gift,         group: "my" },
   { id: "credits",        label: "Get Credits",   shortLabel: "Credits",  icon: Wallet,       group: "my" },

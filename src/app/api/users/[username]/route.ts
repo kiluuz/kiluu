@@ -9,6 +9,7 @@ import { sqlTable } from "@/lib/sql-table";
 import { isVerifiedByFollowerCount } from "@/lib/verification";
 import { giftRarityRankById, collectibleRarity } from "@/lib/gift-rarity";
 import { animeDubSignals, dubTeamTitle } from "@/lib/dub-teams";
+import { canonicalRole, clientRole } from "@/lib/rbac";
 
 const ANIME_CARD = {
   id: true, slug: true, title: true, coverImage: true, bannerImage: true,
@@ -82,6 +83,10 @@ export async function GET(
     const xpTotal = Number(stats.xp ?? 0);
     const levelInfo = levelFromXp(xpTotal);
     const count = (value: bigint | number) => Number(value);
+    const isCreatorCard = canonicalRole(user.role) === "creator";
+    const createdCardCount = isCreatorCard
+      ? await db.anime.count({ where: { creatorId: user.id, hidden: false } })
+      : 0;
     const isOnline = Boolean(user.lastSeenAt && Date.now() - new Date(user.lastSeenAt).getTime() < 3 * 60_000);
 
     return NextResponse.json({
@@ -89,7 +94,7 @@ export async function GET(
         id: user.id,
         username: user.username,
         displayName: user.displayName,
-        role: user.role,
+        role: clientRole(user.role),
         isVerified: isVerifiedByFollowerCount(count(stats.followers)),
         avatarUrl: user.avatarUrl || null,
         bannerUrl: user.bannerUrl || null,
@@ -103,7 +108,7 @@ export async function GET(
         createdAt: user.createdAt,
         isOnline,
         lastSeenAt: user.lastSeenAt ? user.lastSeenAt.toISOString() : null,
-        pronouns: user.pronouns || null,
+        pronouns: isCreatorCard ? null : user.pronouns || null,
         tagline: user.tagline || null,
         country: user.country || null,
         timezone: user.timezone || null,
@@ -121,9 +126,9 @@ export async function GET(
         privacy: isMe ? privacy : undefined,
         canFollow: privacy.allowFollows,
         stats: {
-          purchaseCount: privacy.showCollection || isMe ? count(stats.purchaseCount) : null,
+          purchaseCount: isCreatorCard ? createdCardCount : privacy.showCollection || isMe ? count(stats.purchaseCount) : null,
           postCount: privacy.showActivity || isMe ? count(stats.postCount) : null,
-          watchSeconds: privacy.showWatchTime || isMe ? count(stats.watchSeconds ?? 0) : null,
+          watchSeconds: isCreatorCard ? null : privacy.showWatchTime || isMe ? count(stats.watchSeconds ?? 0) : null,
           followers: privacy.showFollowers || isMe ? count(stats.followers) : null,
           following: privacy.showFollowers || isMe ? count(stats.following) : null,
           favoriteCount: privacy.showFavorites || isMe ? count(stats.favoriteCount) : null,
@@ -155,25 +160,13 @@ export async function GET(
   });
 
   const [
-    favoriteAnimesRows, favoriteUsersRows, followersRows,
+    favoriteAnimesRows,
     ownedRows, orderRows, postCount, postsRows, latestProgress, favoriteUserCount, followerCount,
   ] = await Promise.all([
     db.favoriteAnime.findMany({
       where: { userId: user.id },
       orderBy: { createdAt: "desc" },
       include: { anime: { select: ANIME_CARD } },
-    }),
-    db.follow.findMany({
-      where: { followerId: user.id },
-      take: 8,
-      orderBy: { createdAt: "desc" },
-      include: { followed: { select: USER_MINI } },
-    }),
-    db.follow.findMany({
-      where: { followedId: user.id },
-      take: 8,
-      orderBy: { createdAt: "desc" },
-      include: { follower: { select: USER_MINI } },
     }),
     db.purchase.findMany({
       where: { userId: user.id },
@@ -236,6 +229,7 @@ export async function GET(
   const purchaseCount = ownedAnimes.length;
 
   const { calculateBadges, calculateLevel } = await import("@/lib/level-utils");
+  const isCreatorAccount = canonicalRole(user.role) === "creator";
   const createdAnimesCount = await db.anime.count({ where: { creatorId: user.id } });
   const totalPurchases = purchaseCount;
   const [xpTotal, achievements] = await Promise.all([
@@ -244,22 +238,61 @@ export async function GET(
   ]);
   const levelInfo = calculateLevel(xpTotal);
   const badges = calculateBadges({
-    isCreator: user.role === "CREATOR",
+    isCreator: isCreatorAccount,
     createdAnimes: createdAnimesCount,
     purchasedAnimes: totalPurchases,
     levelInfo,
   });
 
+  const createdAnimesRows = isCreatorAccount
+    ? await db.anime.findMany({
+        where: { creatorId: user.id, hidden: false },
+        orderBy: [{ rating: "desc" }, { createdAt: "desc" }],
+        take: 60,
+        select: ANIME_CARD,
+      })
+    : [];
+  const createdVisibleCount = isCreatorAccount
+    ? await db.anime.count({ where: { creatorId: user.id, hidden: false } })
+    : 0;
+
   const stats = {
-    purchaseCount: totalPurchases, postCount, watchSeconds,
-    followers: followerCount, following: favoriteUserCount,
-    favoriteCount: favoriteAnimes.length,
-    giftsSent: await db.gift.count({ where: { senderId: user.id, status: { in: ["PENDING", "CLAIMED"] } } }),
+    purchaseCount: isCreatorAccount ? createdVisibleCount : totalPurchases,
+    postCount,
+    watchSeconds: isCreatorAccount ? null : watchSeconds,
+    followers: followerCount,
+    following: favoriteUserCount,
+    favoriteCount: isCreatorAccount ? null : favoriteAnimes.length,
+    giftsSent: isCreatorAccount ? 0 : await db.gift.count({ where: { senderId: user.id, status: { in: ["PENDING", "CLAIMED"] } } }),
     level: levelInfo.level,
     xp: xpTotal,
     xpToNext: Math.max(0, levelInfo.nextLevelXp - xpTotal),
     badges,
   };
+
+  const ownedTeam = isCreatorAccount
+    ? await db.dubTeam.findFirst({
+        where: { ownerId: user.id, status: "active" },
+        orderBy: { createdAt: "asc" },
+        select: {
+          id: true,
+          name: true,
+          slug: true,
+          avatarUrl: true,
+          reputation: true,
+          verified: true,
+          _count: { select: { members: true } },
+        },
+      })
+    : null;
+  const teamMembers = ownedTeam
+    ? await db.dubTeamMember.findMany({
+        where: { teamId: ownedTeam.id },
+        orderBy: { createdAt: "asc" },
+        take: 60,
+        select: { id: true, name: true, role: true, user: { select: USER_MINI } },
+      })
+    : [];
 
   const currentlyWatching = latestProgress && latestProgress.anime && latestProgress.episode ? {
     anime: latestProgress.anime,
@@ -271,7 +304,7 @@ export async function GET(
 
   const isOnline = Boolean(user.lastSeenAt && Date.now() - new Date(user.lastSeenAt).getTime() < 3 * 60_000);
 
-  const receivedGiftRows = privacy.showCollection || isMe
+  const receivedGiftRows = !isCreatorAccount && (privacy.showCollection || isMe)
     ? await db.gift.findMany({
         where: {
           status: "CLAIMED",
@@ -325,6 +358,7 @@ export async function GET(
           avatarUrl: true,
           reputation: true,
           verified: true,
+          owner: { select: { username: true } },
           _count: { select: { members: true } },
         },
       },
@@ -336,7 +370,7 @@ export async function GET(
       id: user.id,
       username: user.username,
       displayName: user.displayName,
-      role: user.role,
+      role: clientRole(user.role),
       isVerified: isVerifiedByFollowerCount(followerCount),
       avatarUrl: user.avatarUrl || null,
       bannerUrl: user.bannerUrl || null,
@@ -350,7 +384,7 @@ export async function GET(
       isOnline,
       lastSeenAt: user.lastSeenAt ? user.lastSeenAt.toISOString() : null,
       // identity
-      pronouns: user.pronouns || null,
+      pronouns: isCreatorAccount ? null : user.pronouns || null,
       tagline: user.tagline || null,
       country: user.country || null,
       timezone: user.timezone || null,
@@ -366,19 +400,23 @@ export async function GET(
       canFollow: privacy.allowFollows,
       stats: {
         ...stats,
-        purchaseCount: privacy.showCollection || isMe ? stats.purchaseCount : null,
+        purchaseCount: isCreatorAccount || privacy.showCollection || isMe ? stats.purchaseCount : null,
         postCount: privacy.showActivity || isMe ? stats.postCount : null,
-        watchSeconds: privacy.showWatchTime || isMe ? stats.watchSeconds : null,
+        watchSeconds: isCreatorAccount ? null : privacy.showWatchTime || isMe ? stats.watchSeconds : null,
         followers: privacy.showFollowers || isMe ? stats.followers : null,
         following: privacy.showFollowers || isMe ? stats.following : null,
         favoriteCount: privacy.showFavorites || isMe ? stats.favoriteCount : null,
       },
       achievements,
-      currentlyWatching: privacy.showWatchTime || isMe ? currentlyWatching : null,
-      favoriteAnimes: privacy.showFavorites || isMe ? favoriteAnimes : [],
-      favoriteUsers: privacy.showFollowers || isMe ? favoriteUsersRows.map((f) => f.followed) : [],
-      followersList: privacy.showFollowers || isMe ? followersRows.map((f) => f.follower) : [],
-      ownedAnimes: privacy.showCollection || isMe ? ownedAnimes : [],
+      currentlyWatching: isCreatorAccount ? null : privacy.showWatchTime || isMe ? currentlyWatching : null,
+      favoriteAnimes: isCreatorAccount ? [] : privacy.showFavorites || isMe ? favoriteAnimes : [],
+      favoriteUsers: [],
+      followersList: [],
+      ownedAnimes: isCreatorAccount
+        ? createdAnimesRows
+        : privacy.showCollection || isMe ? ownedAnimes : [],
+      createdAnimes: createdAnimesRows,
+      teamMembers,
       receivedGifts,
       posts: privacy.showActivity || isMe ? postsRows.map((p) => ({
         id: p.id,
@@ -390,20 +428,36 @@ export async function GET(
         commentCount: p._count.comments,
         liked: myLikedPostIds.includes(p.id),
       })) : [],
-      watchSeconds: privacy.showWatchTime || isMe ? watchSeconds : null,
-      dubTeam: dubMembership
+      watchSeconds: isCreatorAccount ? null : privacy.showWatchTime || isMe ? watchSeconds : null,
+      dubTeam: ownedTeam
         ? {
-            id: dubMembership.team.id,
-            name: dubMembership.team.name,
-            slug: dubMembership.team.slug,
-            avatarUrl: dubMembership.team.avatarUrl,
-            reputation: dubMembership.team.reputation,
-            verified: dubMembership.team.verified,
-            memberCount: dubMembership.team._count.members,
-            role: dubMembership.role,
-            title: dubTeamTitle(dubMembership.team.reputation, dubMembership.team.verified),
+            id: ownedTeam.id,
+            name: ownedTeam.name,
+            slug: ownedTeam.slug,
+            avatarUrl: ownedTeam.avatarUrl,
+            reputation: ownedTeam.reputation,
+            verified: ownedTeam.verified,
+            memberCount: ownedTeam._count.members + 1,
+            role: "owner",
+            title: dubTeamTitle(ownedTeam.reputation, ownedTeam.verified),
+            ownerUsername: user.username,
+            isOwner: true,
           }
-        : null,
+        : dubMembership
+          ? {
+              id: dubMembership.team.id,
+              name: dubMembership.team.name,
+              slug: dubMembership.team.slug,
+              avatarUrl: dubMembership.team.avatarUrl,
+              reputation: dubMembership.team.reputation,
+              verified: dubMembership.team.verified,
+              memberCount: dubMembership.team._count.members,
+              role: dubMembership.role,
+              title: dubTeamTitle(dubMembership.team.reputation, dubMembership.team.verified),
+              ownerUsername: dubMembership.team.owner?.username ?? null,
+              isOwner: false,
+            }
+          : null,
       isFollowing,
       isMe,
     },

@@ -14,7 +14,7 @@ export async function GET(req: NextRequest) {
 
   const user = await db.user.findFirst({
     where: { username: { equals: username, mode: "insensitive" }, deletedAt: null },
-    select: { id: true, username: true, displayName: true, avatarUrl: true, accentColor: true },
+    select: { id: true, username: true, displayName: true, avatarUrl: true, accentColor: true, role: true },
   });
 
   return NextResponse.json(

@@ -86,6 +86,9 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Not enough credits", need: (e as { need?: number }).need }, { status: 400 });
     }
     if (code === "SELF") return NextResponse.json({ error: "Cannot gift yourself" }, { status: 400 });
+    if (code === "CREATOR_RECIPIENT") {
+      return NextResponse.json({ error: "Creator accounts can't receive anime gifts", code }, { status: 400 });
+    }
     if (code === "FREE") return NextResponse.json({ error: "Free titles cannot be gifted" }, { status: 400 });
     if (code === "NO_ANIME" || code === "NO_VERSION" || code === "NOT_FOR_SALE") {
       return NextResponse.json({ error: "Not available to gift" }, { status: 400 });

@@ -736,10 +736,12 @@ export function ProfileEditor({
                   previewName={draft.displayName || initial.displayName || initial.username}
                 />
               </div>
-              <div>
-                <FieldLabel>Pronouns</FieldLabel>
-                <Input value={draft.pronouns} maxLength={24} onChange={(e) => set("pronouns", e.target.value)} className="mt-1" placeholder="she/her" />
-              </div>
+              {initial.role !== "CREATOR" && (
+                <div>
+                  <FieldLabel>Pronouns</FieldLabel>
+                  <Input value={draft.pronouns} maxLength={24} onChange={(e) => set("pronouns", e.target.value)} className="mt-1" placeholder="she/her" />
+                </div>
+              )}
               <div>
                 <FieldLabel>Country</FieldLabel>
                 <Input value={draft.country} maxLength={40} onChange={(e) => set("country", e.target.value)} className="mt-1" placeholder="Kazakhstan" />

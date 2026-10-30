@@ -6,6 +6,7 @@ import { grantPurchase } from "./bot-api";
 import { officialVersionId, userOwnsVersion } from "./owns";
 import { sendGiftNotificationEmail } from "./email";
 import { emitEvent } from "./events";
+import { isCreator } from "./rbac";
 
 export function giftExpiryDate(from = new Date()) {
   const d = new Date(from);
@@ -84,6 +85,9 @@ export async function sendGift(opts: {
 
   const sender = await db.user.findUnique({ where: { id: opts.senderId } });
   if (!sender) throw new Error("NO_USER");
+  if (recipient && isCreator(recipient)) {
+    throw Object.assign(new Error("CREATOR_RECIPIENT"), { code: "CREATOR_RECIPIENT" });
+  }
   if (recipient && recipient.id === sender.id) {
     throw Object.assign(new Error("SELF"), { code: "SELF" });
   }
@@ -206,6 +210,7 @@ export async function claimGift(opts: { giftId: string; userId: string }) {
   }
   const user = await db.user.findUnique({ where: { id: opts.userId } });
   if (!user) throw new Error("NO_USER");
+  if (isCreator(user)) throw Object.assign(new Error("CREATOR_RECIPIENT"), { code: "CREATOR_RECIPIENT" });
   const uname = user.username.toLowerCase();
   if (gift.recipientId && gift.recipientId !== user.id && gift.recipientUsername.toLowerCase() !== uname) {
     throw Object.assign(new Error("FORBIDDEN"), { code: "FORBIDDEN" });
@@ -268,6 +273,7 @@ export async function declineGift(opts: { giftId: string; userId: string }) {
   }
   const user = await db.user.findUnique({ where: { id: opts.userId } });
   if (!user) throw new Error("NO_USER");
+  if (isCreator(user)) throw Object.assign(new Error("CREATOR_RECIPIENT"), { code: "CREATOR_RECIPIENT" });
   const uname = user.username.toLowerCase();
   const allowed = gift.recipientId === user.id || gift.recipientUsername.toLowerCase() === uname;
   if (!allowed) throw Object.assign(new Error("FORBIDDEN"), { code: "FORBIDDEN" });

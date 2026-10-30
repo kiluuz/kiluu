@@ -539,24 +539,24 @@ export function ScheduleView() {
               <div
                 key={entry.scheduleId}
                 className={cn(
-                  "group flex items-center gap-4 sm:gap-5 rounded-2xl border bg-card p-3 sm:p-4 transition-all hover:border-primary/40 hover:shadow-lg",
+                  "group flex items-center gap-4 sm:gap-5 rounded-2xl border bg-card p-3.5 sm:p-5 transition-all hover:border-primary/40 hover:shadow-lg",
                   msLeft > 0 && "airing-today"
                 )}
               >
                 {/* Time block */}
-                <div className="flex flex-col items-center justify-center w-[74px] sm:w-[92px] shrink-0 rounded-xl bg-background border py-2.5">
-                  <Clock className="w-3.5 h-3.5 text-primary mb-1" />
-                  <span className="text-lg sm:text-xl font-black tabular-nums leading-none">{timeStr}</span>
+                <div className="flex flex-col items-center justify-center w-[86px] sm:w-[106px] shrink-0 rounded-xl bg-background border py-3">
+                  <Clock className="w-4 h-4 text-primary mb-1" />
+                  <span className="text-xl sm:text-2xl font-black tabular-nums leading-none">{timeStr}</span>
                   {msLeft > 0 ? (
-                    <span className="text-[9.5px] font-bold text-primary mt-1.5">{t("schedule.in")} {formatCountdown(msLeft)}</span>
+                    <span className="text-[10px] font-bold text-primary mt-1.5">{t("schedule.in")} {formatCountdown(msLeft)}</span>
                   ) : (
-                    <span className="text-[9.5px] font-bold text-muted-foreground mt-1.5">{t("schedule.released")}</span>
+                    <span className="text-[10px] font-bold text-muted-foreground mt-1.5">{t("schedule.released")}</span>
                   )}
                 </div>
 
                 {/* Poster */}
                 <div
-                  className={cn("w-[58px] sm:w-[68px] aspect-[2/3] rounded-xl overflow-hidden shrink-0", "cursor-pointer glow-hover")}
+                  className={cn("w-[66px] sm:w-[80px] aspect-[2/3] rounded-xl overflow-hidden shrink-0", "cursor-pointer glow-hover")}
                   onClick={() => {
                     if (local) navigate("detail", { animeId: local.slug });
                     else {

@@ -23,3 +23,16 @@ test("level badge shows the Japanese title without duplicating the numeric level
     { id: "level_title", label: "見習い" },
   ]);
 });
+
+test("creator accounts get no viewer level title badge", () => {
+  const levelInfo = calculateLevel(xpForLevel(2));
+  const badges = calculateBadges({
+    isCreator: true,
+    createdAnimes: 2,
+    purchasedAnimes: 0,
+    levelInfo,
+  });
+
+  assert.deepEqual(badges.map(({ id }) => id), ["creator"]);
+  assert.equal(calculateBadges({ isCreator: true, createdAnimes: 0, purchasedAnimes: 0, levelInfo }).length, 0);
+});

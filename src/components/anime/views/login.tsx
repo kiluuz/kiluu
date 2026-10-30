@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Loader2, Eye, Mail, Lock, User, ArrowLeft, Sparkles, Coins, Clapperboard, Swords, Gift, Check } from "lucide-react";
+import { Loader2, Eye, Mail, Lock, ArrowLeft, Sparkles, Coins, Clapperboard, Swords, Gift, Check } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -77,7 +77,7 @@ export function LoginView() {
     };
   }, []);
 
-  async function handleSubmit(mode: "login" | "register", e: React.FormEvent<HTMLFormElement>) {
+  async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setLoading(true);
     const form = new FormData(e.currentTarget);
@@ -85,16 +85,8 @@ export function LoginView() {
       email: String(form.get("email") || ""),
       password: String(form.get("password") || ""),
     };
-    if (mode === "register") {
-      payload.username = String(form.get("username") || "");
-      if (payload.password !== String(form.get("confirm") || "")) {
-        toast.error(t("auth.passwordMismatch"));
-        setLoading(false);
-        return;
-      }
-    }
     try {
-      const res = await fetch(`/api/auth/${mode}`, {
+      const res = await fetch("/api/auth/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
@@ -105,7 +97,7 @@ export function LoginView() {
         return;
       }
       setUser(data.user as AuthUser);
-      toast.success(mode === "login" ? `${t("auth.welcomeBack")}, ${data.user.displayName || data.user.username}!` : t("auth.accountWelcome"));
+      toast.success(`${t("auth.welcomeBack")}, ${data.user.displayName || data.user.username}!`);
       navigate("home");
     } catch {
       toast.error(t("auth.networkError"));
@@ -119,7 +111,6 @@ export function LoginView() {
     setLoading(true);
     const form = new FormData(e.currentTarget);
     const email = String(form.get("email") || "");
-    const username = String(form.get("username") || "");
     const password = String(form.get("password") || "");
     const confirm = String(form.get("confirm") || "");
     if (password !== confirm) {
@@ -133,8 +124,7 @@ export function LoginView() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           email,
-          username,
-          displayName: registerDisplayName.trim() || username,
+          displayName: registerDisplayName.trim(),
           password,
           referralCode: referralCode.trim() || undefined,
         }),
@@ -341,7 +331,7 @@ export function LoginView() {
               </TabsList>
 
             <TabsContent value="login">
-              <form onSubmit={(e) => handleSubmit("login", e)} className="space-y-4">
+              <form onSubmit={handleSubmit} className="space-y-4">
                 <div className="space-y-1.5">
                   <Label htmlFor="login-email" className="text-xs font-semibold">{t("auth.email")}</Label>
                   <div className="relative">
@@ -368,15 +358,8 @@ export function LoginView() {
             <TabsContent value="register">
               <form onSubmit={handleRegister} className="space-y-3.5">
                 <div className="space-y-1.5">
-                  <Label htmlFor="reg-username" className="text-xs font-semibold">{t("auth.username")}</Label>
-                  <div className="relative">
-                    <User className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
-                    <Input id="reg-username" name="username" required minLength={3} maxLength={20} pattern="[a-zA-Z0-9_]+" placeholder="coolotaku_7" className="pl-9 h-12 rounded-xl text-[15px]" />
-                  </div>
-                </div>
-                <div className="space-y-1.5">
                   <div className="flex items-center justify-between">
-                    <Label htmlFor="reg-display-name" className="text-xs font-semibold">Display name</Label>
+                    <Label htmlFor="reg-display-name" className="text-xs font-semibold">{t("auth.displayName")}</Label>
                     <span className="text-[10px] text-muted-foreground">{[...registerDisplayName].length}/20</span>
                   </div>
                   <Input

@@ -347,6 +347,8 @@ export interface PublicProfile {
   favoriteUsers: UserMini[];
   followersList: UserMini[];
   ownedAnimes: AnimeSummary[];
+  createdAnimes?: AnimeSummary[];
+  teamMembers?: { id: string; name: string; role: string; user: UserMini | null }[];
   receivedGifts?: ReceivedGift[];
   posts: {
     id: string;
@@ -369,6 +371,8 @@ export interface PublicProfile {
     memberCount: number;
     role: string;
     title: { key: DubTitleKey; color: string };
+    ownerUsername?: string | null;
+    isOwner?: boolean;
   } | null;
   isFollowing: boolean;
   canFollow: boolean;

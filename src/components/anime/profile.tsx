@@ -286,7 +286,7 @@ export function AchievementTile({
 /* ================================================================
    POSTER GRID — large poster-first tiles with hover meta
    ================================================================ */
-function PosterTile({ anime, rank }: { anime: AnimeSummary; rank?: number }) {
+function PosterTile({ anime, rank, showRating }: { anime: AnimeSummary; rank?: number; showRating?: boolean }) {
   const navigate = useAppStore((s) => s.navigate);
   return (
     <div
@@ -302,6 +302,12 @@ function PosterTile({ anime, rank }: { anime: AnimeSummary; rank?: number }) {
         {rank !== undefined && (
           <span className="rank-numeral absolute -bottom-2 -left-1 text-[64px] select-none" aria-hidden>
             {rank}
+          </span>
+        )}
+        {showRating && (
+          <span className="absolute top-2 right-2 flex items-center gap-1 rounded-full bg-black/70 px-2 py-0.5 text-[11px] font-bold text-white backdrop-blur-sm">
+            <Star className="w-3 h-3 fill-amber-400 text-amber-400" />
+            {anime.rating?.toFixed?.(1) ?? "0.0"}
           </span>
         )}
         <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex flex-col justify-end p-3">
@@ -550,7 +556,7 @@ function ProfileIdentity({ profile, onEdit }: { profile: PublicProfile; onEdit?:
             {profile.pronouns && (
               <span className="text-xs px-2 py-0.5 rounded-full bg-accent text-muted-foreground">{profile.pronouns}</span>
             )}
-            {profile.stats.level && (
+            {profile.role !== "CREATOR" && profile.stats.level && (
               <span className="text-[10px] font-bold bg-secondary/80 px-1.5 py-0.5 rounded text-muted-foreground shrink-0 uppercase tracking-wide">
                 Level {profile.stats.level}
               </span>
@@ -608,7 +614,6 @@ function StatChip({ icon, label, value, suffix, accent, accentHex }: { icon: Rea
 function IdentityColumn({ profile }: { profile: PublicProfile }) {
   const openProfile = useOpenProfile();
   const { t } = useI18n();
-  const mutuals = profile.favoriteUsers.slice(0, 5);
   const genres = profile.showcase?.genres ?? [];
   const joinDate = new Date(profile.createdAt).toLocaleDateString("en-US", { month: "long", year: "numeric" });
   const countryLabel = profile.country || null;
@@ -651,20 +656,40 @@ function IdentityColumn({ profile }: { profile: PublicProfile }) {
         {profile.dubTeam && (
           <div className="flex items-center gap-2.5 text-sm">
             <Mic2 className="w-4 h-4 text-muted-foreground shrink-0" />
-            <span className="text-muted-foreground">{t("dub.profileTeam")}</span>
-            <span className="ml-auto font-semibold text-right flex items-center gap-1.5">
-              {profile.dubTeam.name}
-              <span
-                className="text-[10px] font-bold rounded-full px-2 py-0.5 border"
-                style={{
-                  color: profile.dubTeam.title.color,
-                  borderColor: `${profile.dubTeam.title.color}55`,
-                  backgroundColor: `${profile.dubTeam.title.color}14`,
-                }}
-              >
-                {t(`dub.title.${profile.dubTeam.title.key}`)}
+            {profile.dubTeam.isOwner ? (
+              <span className="ml-auto flex min-w-0 items-center gap-1.5 font-semibold">
+                <span className="truncate">{profile.dubTeam.name}</span>
+                <span
+                  className="shrink-0 text-[10px] font-bold rounded-full px-2 py-0.5 border"
+                  style={{
+                    color: profile.dubTeam.title.color,
+                    borderColor: `${profile.dubTeam.title.color}55`,
+                    backgroundColor: `${profile.dubTeam.title.color}14`,
+                  }}
+                >
+                  {t(`dub.title.${profile.dubTeam.title.key}`)}
+                </span>
               </span>
-            </span>
+            ) : (
+              <button
+                type="button"
+                onClick={() => openProfile(profile.dubTeam!.ownerUsername ?? profile.dubTeam!.slug)}
+                className="ml-auto flex min-w-0 items-center gap-1.5 text-right font-semibold hover:text-[var(--user-accent)] transition-colors focus-ring-accent"
+                title={profile.dubTeam.ownerUsername ? `@${profile.dubTeam.ownerUsername}` : profile.dubTeam.name}
+              >
+                <span className="truncate">{t("profile.memberOf", { team: profile.dubTeam.name })}</span>
+                <span
+                  className="shrink-0 text-[10px] font-bold rounded-full px-2 py-0.5 border"
+                  style={{
+                    color: profile.dubTeam.title.color,
+                    borderColor: `${profile.dubTeam.title.color}55`,
+                    backgroundColor: `${profile.dubTeam.title.color}14`,
+                  }}
+                >
+                  {t(`dub.title.${profile.dubTeam.title.key}`)}
+                </span>
+              </button>
+            )}
           </div>
         )}
         <SocialLinksRow links={profile.socialLinks ?? {}} />
@@ -684,26 +709,61 @@ function IdentityColumn({ profile }: { profile: PublicProfile }) {
         </section>
       )}
 
-      {/* Following list */}
-      {mutuals.length > 0 && (
+      {/* Creator team members */}
+      {profile.role === "CREATOR" && profile.dubTeam && (
         <section className="rounded-2xl border bg-card p-4">
           <h3 className="text-[11px] font-black uppercase tracking-wider text-muted-foreground mb-2.5">
-            Following · {profile.stats.following}
+            {t("profile.members")} · {profile.dubTeam.memberCount}
           </h3>
           <div className="space-y-1">
-            {mutuals.map((u) => (
-              <button
-                key={u.id}
-                onClick={() => openProfile(u.username)}
-                className="w-full flex items-center gap-2.5 p-1.5 rounded-xl hover:bg-accent transition text-left focus-ring-accent"
-              >
-                <FramedAvatar user={u} size={30} />
-                <div className="min-w-0">
-                  <NameWithFrame user={u} compact className="text-[13px] font-semibold truncate" avatarSize={30} />
-                  <p className="text-[10px] text-muted-foreground truncate">@{u.username}</p>
+            <button
+              onClick={() => openProfile(profile.username)}
+              className="w-full flex items-center gap-2.5 p-1.5 rounded-xl hover:bg-accent transition text-left focus-ring-accent"
+            >
+              <FramedAvatar user={profile} size={30} />
+              <div className="min-w-0 flex-1">
+                <NameWithFrame user={profile} compact className="text-[13px] font-semibold truncate" avatarSize={30} />
+                <p className="text-[10px] text-muted-foreground truncate">@{profile.username}</p>
+              </div>
+              <span className="shrink-0 text-[10px] font-bold uppercase tracking-wide text-[var(--user-accent)]">
+                {t("profile.teamLeader")}
+              </span>
+            </button>
+            {(profile.teamMembers ?? []).map((member) => {
+              const roleLabel = member.role === "voice" || member.role === "director" || member.role === "sound"
+                ? t(`dub.role.${member.role}`)
+                : member.role;
+              const row = (
+                <>
+                  {member.user ? (
+                    <FramedAvatar user={member.user} size={30} />
+                  ) : (
+                    <span className="grid h-[30px] w-[30px] shrink-0 place-items-center rounded-full bg-accent text-[11px] font-black text-muted-foreground">
+                      {member.name.slice(0, 2).toUpperCase()}
+                    </span>
+                  )}
+                  <div className="min-w-0 flex-1">
+                    <p className="text-[13px] font-semibold truncate">{member.name}</p>
+                    <p className="text-[10px] text-muted-foreground truncate">
+                      {member.user ? `@${member.user.username} · ` : ""}{roleLabel}
+                    </p>
+                  </div>
+                </>
+              );
+              return member.user ? (
+                <button
+                  key={member.id}
+                  onClick={() => openProfile(member.user!.username)}
+                  className="w-full flex items-center gap-2.5 p-1.5 rounded-xl hover:bg-accent transition text-left focus-ring-accent"
+                >
+                  {row}
+                </button>
+              ) : (
+                <div key={member.id} className="w-full flex items-center gap-2.5 p-1.5">
+                  {row}
                 </div>
-              </button>
-            ))}
+              );
+            })}
           </div>
         </section>
       )}
@@ -715,7 +775,7 @@ function IdentityColumn({ profile }: { profile: PublicProfile }) {
             <Clapperboard className="w-3.5 h-3.5" /> Creator
           </span>
         )}
-        {(profile.stats.giftsSent ?? 0) > 0 && (
+        {profile.role !== "CREATOR" && (profile.stats.giftsSent ?? 0) > 0 && (
           <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-bold border border-emerald-500/40 text-emerald-500 bg-emerald-500/10">
             <Sparkles className="w-3.5 h-3.5" /> Gift sender
           </span>
@@ -731,8 +791,61 @@ function IdentityColumn({ profile }: { profile: PublicProfile }) {
 /* ================================================================
    TAB CONTENTS
    ================================================================ */
+function CreatorOverviewTab({ profile }: { profile: PublicProfile }) {
+  const { t } = useI18n();
+  const states = getAchievementStates(profile);
+  const earned = states.filter((s) => s.earned);
+  const showcaseIds = (profile.showcase?.achievementIds ?? []).slice(0, 6);
+  const showcaseAch = showcaseIds.length
+    ? showcaseIds.map((id) => states.find((s) => s.def.id === id)).filter(Boolean) as AchievementState[]
+    : earned.slice(0, 4);
+  const topRated = [...(profile.createdAnimes ?? [])]
+    .sort((a, b) => (b.rating ?? 0) - (a.rating ?? 0))
+    .slice(0, 5);
+
+  return (
+    <div className="space-y-8">
+      <section aria-label={t("profile.topRated")}>
+        <div className="flex items-center justify-between mb-3">
+          <h2 className="text-lg font-bold flex items-center gap-2">
+            <Star className="w-5 h-5 text-[var(--user-accent)]" /> {t("profile.topRated")}
+          </h2>
+          <span className="text-xs font-semibold text-muted-foreground">
+            {t("profile.created")} · {profile.createdAnimes?.length ?? 0}
+          </span>
+        </div>
+        {topRated.length > 0 ? (
+          <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-5 gap-4">
+            {topRated.map((anime) => <PosterTile key={anime.id} anime={anime} showRating />)}
+          </div>
+        ) : (
+          <RichEmptyState
+            icon={<Clapperboard className="w-5 h-5" />}
+            title="No published anime yet"
+            hint="Published titles will show up here, best rated first."
+          />
+        )}
+      </section>
+
+      {showcaseAch.length > 0 && (
+        <section aria-label="Achievement showcase">
+          <h2 className="text-lg font-bold flex items-center gap-2 mb-3">
+            <Trophy className="w-5 h-5 text-[var(--user-accent)]" /> Achievements
+            <span className="text-xs font-semibold text-muted-foreground">{earned.length}/{states.length} earned</span>
+          </h2>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            {showcaseAch.map((a) => <AchievementTile key={a.def.id} a={a} size="sm" />)}
+          </div>
+        </section>
+      )}
+    </div>
+  );
+}
+
 function OverviewTab({ profile, onEdit }: { profile: PublicProfile; onEdit?: () => void }) {
   const navigate = useAppStore((s) => s.navigate);
+  const isCreatorProfile = profile.role === "CREATOR";
+  if (isCreatorProfile) return <CreatorOverviewTab profile={profile} />;
   const states = getAchievementStates(profile);
   const earned = states.filter((s) => s.earned);
   const showcaseIds = (profile.showcase?.achievementIds ?? []).slice(0, 6);
@@ -1215,11 +1328,12 @@ export function ProfilePageBody({
   }
   const setT = (t: string) => { setTab(t); onTabChange?.(t); };
 
+  const isCreatorProfile = profile.role === "CREATOR";
   const TABS = [
     { id: "overview", label: t("profile.overview") },
-    { id: "collection", label: t("profile.collection"), count: profile.ownedAnimes.length },
+    { id: "collection", label: isCreatorProfile ? t("profile.created") : t("profile.collection"), count: isCreatorProfile ? (profile.createdAnimes?.length ?? profile.ownedAnimes.length) : profile.ownedAnimes.length },
     { id: "favorites", label: t("profile.favorites"), count: profile.favoriteAnimes.length },
-    { id: "gifts", label: "Gifts", count: profile.receivedGifts?.length ?? 0 },
+    ...(isCreatorProfile ? [] : [{ id: "gifts", label: t("nav.gifts"), count: profile.receivedGifts?.length ?? 0 }]),
     { id: "activity", label: t("profile.activity"), count: profile.posts.length },
     { id: "achievements", label: t("profile.achievements"), count: getAchievementStates(profile).filter((a) => a.earned).length },
   ];
@@ -1241,12 +1355,24 @@ export function ProfilePageBody({
       {/* Stats strip */}
       <div className="max-w-[1280px] mx-auto px-4 sm:px-8 mt-6">
         <div className="flex flex-wrap gap-3">
-          {stats.purchaseCount != null && <StatChip icon={<Package className="w-4 h-4" />} label={t("profile.owned")} value={stats.purchaseCount} />}
-          {stats.watchSeconds != null && (
-            <StatChip icon={<Timer className="w-4 h-4" />} label={t("profile.watchTime")} value={Math.round(stats.watchSeconds / 3600)} suffix={t("profile.hours")} />
+          {isCreatorProfile ? (
+            <>
+              {stats.purchaseCount != null && <StatChip icon={<Package className="w-4 h-4" />} label={t("profile.created")} value={stats.purchaseCount} />}
+              {profile.dubTeam && <StatChip icon={<Mic2 className="w-4 h-4" />} label={t("profile.members")} value={profile.dubTeam.memberCount} />}
+              {stats.followers != null && <StatChip icon={<Users className="w-4 h-4" />} label={t("profile.followers")} value={stats.followers} accent accentHex={profile.accentColor} />}
+              {stats.postCount != null && <StatChip icon={<MessageSquare className="w-4 h-4" />} label={t("profile.posts")} value={stats.postCount} />}
+            </>
+          ) : (
+            <>
+              {stats.purchaseCount != null && <StatChip icon={<Package className="w-4 h-4" />} label={t("profile.owned")} value={stats.purchaseCount} />}
+              {stats.watchSeconds != null && (
+                <StatChip icon={<Timer className="w-4 h-4" />} label={t("profile.watchTime")} value={Math.round(stats.watchSeconds / 3600)} suffix={t("profile.hours")} />
+              )}
+              {stats.followers != null && <StatChip icon={<Users className="w-4 h-4" />} label={t("profile.followers")} value={stats.followers} accent accentHex={profile.accentColor} />}
+              {stats.following != null && <StatChip icon={<Users className="w-4 h-4" />} label={t("profile.following")} value={stats.following} />}
+              {stats.postCount != null && <StatChip icon={<MessageSquare className="w-4 h-4" />} label={t("profile.posts")} value={stats.postCount} />}
+            </>
           )}
-          {stats.followers != null && <StatChip icon={<Users className="w-4 h-4" />} label={t("profile.followers")} value={stats.followers} accent accentHex={profile.accentColor} />}
-          {stats.postCount != null && <StatChip icon={<MessageSquare className="w-4 h-4" />} label={t("profile.posts")} value={stats.postCount} />}
         </div>
       </div>
 
@@ -1285,7 +1411,7 @@ export function ProfilePageBody({
               {tab === "overview" && <OverviewTab profile={profile} onEdit={onEdit} />}
               {tab === "collection" && <CollectionTab profile={profile} />}
               {tab === "favorites" && <FavoritesTab profile={profile} />}
-              {tab === "gifts" && <GiftsTab profile={profile} />}
+              {tab === "gifts" && !isCreatorProfile && <GiftsTab profile={profile} />}
               {tab === "activity" && <ActivityTab profile={profile} />}
               {tab === "achievements" && <AchievementsTab profile={profile} />}
             </>

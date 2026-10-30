@@ -84,7 +84,7 @@ export function RightSidebar({ user, stats }: { user: AuthUser | null; stats: Co
               <div key={contributor.id} className="flex items-center gap-3">
                 <FramedAvatar user={contributor} size={32} />
                 <div className="flex-1 min-w-0">
-                  <NameWithFrame user={contributor} height={32} className="text-sm font-bold truncate" avatarSize={32} />
+                  <NameWithFrame user={contributor} height={26} maxHeight={26} className="text-sm font-bold truncate" avatarSize={32} />
                   <p className="text-[11px] text-primary">Lv.{contributor.level} · {contributor.postCount} posts · {contributor.likeCount} likes</p>
                 </div>
               </div>

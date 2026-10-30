@@ -59,6 +59,7 @@ interface Recipient {
   displayName: string | null;
   avatarUrl: string | null;
   accentColor: string | null;
+  role?: string;
 }
 
 const MESSAGE_LIMIT = 80;
@@ -130,12 +131,16 @@ export function GiftsView() {
   const selectedAnime = useMemo(() => catalog.find((anime) => anime.id === animeId) ?? null, [catalog, animeId]);
   const normalizedRecipient = recipientQuery.replace(/^@/, "").trim();
   const currentLookup = lookup && lookup.query === normalizedRecipient ? lookup : null;
-  const recipient = normalizedRecipient && currentLookup?.status === "valid" ? currentLookup.user : null;
-  const recipientStatus: "idle" | "checking" | "valid" | "invalid" = !normalizedRecipient
+  const lookupUser = currentLookup?.status === "valid" ? currentLookup.user : null;
+  const lookupUserIsCreator = lookupUser?.role?.toLowerCase() === "creator";
+  const recipient = normalizedRecipient && !lookupUserIsCreator ? lookupUser : null;
+  const recipientStatus: "idle" | "checking" | "valid" | "invalid" | "creator" = !normalizedRecipient
     ? "idle"
     : !currentLookup
       ? "checking"
-      : currentLookup.status;
+      : currentLookup.status === "valid" && lookupUserIsCreator
+        ? "creator"
+        : currentLookup.status;
   const price = selectedAnime?.price ?? 0;
   const need = selectedAnime ? Math.max(0, price - (user?.credits ?? 0)) : 0;
   const canSend = Boolean(recipient && selectedAnime) && !sending && need === 0;
@@ -261,7 +266,7 @@ export function GiftsView() {
       const data = await response.json();
       if (!response.ok) {
         if (typeof data.need === "number") setServerNeed(data.need);
-        toast.error(data.error || t("gifts.sendError"));
+        toast.error(data.code === "CREATOR_RECIPIENT" ? t("gifts.creatorBlocked") : data.error || t("gifts.sendError"));
         return;
       }
       if (typeof data.credits === "number") updateUser({ credits: data.credits });
@@ -308,7 +313,7 @@ export function GiftsView() {
       });
       const data = await response.json();
       if (!response.ok) {
-        toast.error(data.error || t("gifts.actionError"));
+        toast.error(data.code === "CREATOR_RECIPIENT" ? t("gifts.creatorBlocked") : data.error || t("gifts.actionError"));
         return false;
       }
       toast.success(t("gifts.claimed"));
@@ -336,7 +341,7 @@ export function GiftsView() {
       });
       const data = await response.json();
       if (!response.ok) {
-        toast.error(data.error || t("gifts.actionError"));
+        toast.error(data.code === "CREATOR_RECIPIENT" ? t("gifts.creatorBlocked") : data.error || t("gifts.actionError"));
         return false;
       }
       toast.success(t("gifts.declined"));
@@ -415,13 +420,13 @@ export function GiftsView() {
                 autoComplete="off"
                 spellCheck={false}
                 aria-label="Recipient username"
-                aria-invalid={recipientStatus === "invalid"}
+                aria-invalid={recipientStatus === "invalid" || recipientStatus === "creator"}
                 className="h-11 rounded-xl pl-7 pr-10"
               />
               <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2">
                 {recipientStatus === "checking" ? <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" /> : null}
                 {recipientStatus === "valid" ? <Check className="h-4 w-4 text-emerald-400" /> : null}
-                {recipientStatus === "invalid" ? <X className="h-4 w-4 text-destructive" /> : null}
+                {recipientStatus === "invalid" || recipientStatus === "creator" ? <X className="h-4 w-4 text-destructive" /> : null}
               </span>
             </div>
             {recipientStatus === "valid" && recipient ? (
@@ -445,6 +450,11 @@ export function GiftsView() {
             {recipientStatus === "invalid" ? (
               <p className="mt-1.5 text-xs font-medium text-destructive">
                 No user found with that username.
+              </p>
+            ) : null}
+            {recipientStatus === "creator" ? (
+              <p className="mt-1.5 text-xs font-medium text-destructive">
+                {t("gifts.creatorBlocked")}
               </p>
             ) : null}
           </div>
