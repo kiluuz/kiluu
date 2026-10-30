@@ -492,6 +492,7 @@ export function TopBar() {
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [notificationsLoading, setNotificationsLoading] = useState(false);
   const [notificationsError, setNotificationsError] = useState<string | null>(null);
+  const notificationsRef = useRef<HTMLDivElement>(null);
   const reducedMotion = useReducedMotion();
 
   const inSubView = ["detail", "watch", "user-profile", "studio", "settings"].includes(view.name);
@@ -543,28 +544,37 @@ export function TopBar() {
     };
   }, [user]);
 
-  async function markNotificationRead(id?: string) {
+  /* close the notifications popover on outside click / Esc */
+  useEffect(() => {
+    if (!notificationsOpen) return;
+    const onPointerDown = (event: PointerEvent) => {
+      if (notificationsRef.current && !notificationsRef.current.contains(event.target as Node)) {
+        setNotificationsOpen(false);
+      }
+    };
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setNotificationsOpen(false);
+    };
+    document.addEventListener("pointerdown", onPointerDown);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("pointerdown", onPointerDown);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [notificationsOpen]);
+
+  async function markAllNotificationsRead() {
     try {
       const response = await fetch("/api/community/notifications", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(id ? { id } : { all: true }),
+        body: JSON.stringify({ all: true }),
       });
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || "Could not update notification");
-      if (id) {
-        const notification = notifications.find((item) => item.id === id);
-        setNotifications((items) => items.map((item) =>
-          item.id === id ? { ...item, readAt: new Date().toISOString() } : item
-        ));
-        if (notification && !notification.readAt) {
-          setUnreadNotifications((count) => Math.max(0, count - 1));
-        }
-      } else {
-        const readAt = new Date().toISOString();
-        setNotifications((items) => items.map((item) => ({ ...item, readAt })));
-        setUnreadNotifications(0);
-      }
+      const readAt = new Date().toISOString();
+      setNotifications((items) => items.map((item) => ({ ...item, readAt })));
+      setUnreadNotifications(0);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Could not update notification");
     }
@@ -679,7 +689,7 @@ export function TopBar() {
             <Moon className="w-[18px] h-[18px] dark:hidden" />
           </button>
 
-          <div className="relative">
+          <div className="relative" ref={notificationsRef}>
             <button
               className="p-2.5 rounded-xl hover:bg-accent transition relative min-h-[44px] min-w-[44px] inline-flex items-center justify-center"
               aria-label="Notifications"
@@ -708,7 +718,7 @@ export function TopBar() {
                 <div className="flex items-center justify-between p-2">
                   <strong className="text-sm">Notifications</strong>
                   {unreadNotifications > 0 && (
-                    <button onClick={() => void markNotificationRead()} className="text-xs text-primary">
+                    <button onClick={() => void markAllNotificationsRead()} className="text-xs text-primary">
                       Mark all read
                     </button>
                   )}
@@ -723,7 +733,7 @@ export function TopBar() {
                   notifications.map((notification) => (
                     <button
                       key={notification.id}
-                      onClick={() => notification.readAt ? undefined : void markNotificationRead(notification.id)}
+                      onClick={() => { if (!notification.readAt) void markAllNotificationsRead(); }}
                       className={cn(
                         "block w-full rounded-xl p-3 text-left text-xs hover:bg-secondary/50",
                         !notification.readAt && "bg-primary/5"
