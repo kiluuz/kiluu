@@ -20,6 +20,7 @@ import { COVER_BANNER_PRESETS } from "../profile-assets";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { TelegramLinkWidget } from "../bot-ui";
+import { DubTeamPanel } from "../dub-team-panel";
 
 const GENRES = [
   "Action", "Adventure", "Comedy", "Drama", "Fantasy", "Sci-Fi", "Romance",
@@ -306,6 +307,8 @@ export function StudioView() {
           <TelegramLinkWidget onLinked={() => user && setLinkedUserId(user.id)} />
         )}
       </section>
+
+      <DubTeamPanel animes={animes} />
 
       {/* My animes */}
       {loading ? (

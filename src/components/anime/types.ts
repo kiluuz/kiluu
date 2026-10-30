@@ -368,6 +368,7 @@ export interface ReceivedGift {
   message: string | null;
   createdAt: string;
   claimedAt: string | null;
+  rarity?: string | null;
   anime: { id: string; slug: string; title: string; coverImage: string | null };
   sender: { username: string; displayName: string | null; avatarUrl: string | null } | null;
 }

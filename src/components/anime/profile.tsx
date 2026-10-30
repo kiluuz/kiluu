@@ -18,7 +18,7 @@ import { ProfileEditor } from "./profile-editor";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { useI18n } from "@/components/i18n-provider";
-import { GIFT_RARITIES, giftRarity, type GiftRarityId } from "@/lib/gift-rarity";
+import { GIFT_RARITIES, giftRarity, giftRarityById, type GiftRarityId } from "@/lib/gift-rarity";
 import { GiftCard, GiftDetailDialog, formatGiftDate } from "./gift-card";
 
 /* ================================================================
@@ -944,7 +944,7 @@ function GiftsTab({ profile }: { profile: PublicProfile }) {
     );
   }
 
-  const filtered = filter === "all" ? gifts : gifts.filter((gift) => giftRarity(gift.pricePaid).id === filter);
+  const filtered = filter === "all" ? gifts : gifts.filter((gift) => (giftRarityById(gift.rarity) ?? giftRarity(gift.pricePaid)).id === filter);
   const dialogGift = selected
     ? {
         id: selected.id,
@@ -955,6 +955,7 @@ function GiftsTab({ profile }: { profile: PublicProfile }) {
         status: "CLAIMED",
         incoming: true,
         recipientUsername: profile.username,
+        rarity: selected.rarity ?? null,
         anime: selected.anime,
         sender: selected.sender,
       }
@@ -1002,7 +1003,7 @@ function GiftsTab({ profile }: { profile: PublicProfile }) {
       ) : (
         <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 xl:grid-cols-4">
           {filtered.map((gift) => {
-            const rarity = giftRarity(gift.pricePaid);
+            const rarity = giftRarityById(gift.rarity) ?? giftRarity(gift.pricePaid);
             return (
               <button
                 key={gift.id}
@@ -1011,7 +1012,7 @@ function GiftsTab({ profile }: { profile: PublicProfile }) {
                 aria-label={`Open ${rarity.label} gift card — ${gift.anime.title} from @${gift.sender?.username ?? "unknown"}`}
                 className="group rounded-[18px] text-left focus-ring-accent"
               >
-                <GiftCard size="mini" anime={gift.anime} price={gift.pricePaid} />
+                <GiftCard size="mini" anime={gift.anime} price={gift.pricePaid} rarity={rarity} />
                 <div className="mt-2 px-0.5">
                   <p className="truncate text-xs font-bold">From @{gift.sender?.username ?? "unknown"}</p>
                   <p className="text-[10px] text-muted-foreground">

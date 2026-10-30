@@ -25,9 +25,56 @@ export function giftRarityById(id: string | null | undefined): GiftRarity | null
   return GIFT_RARITIES.find((rarity) => rarity.id === id) ?? null;
 }
 
+/**
+ * Sifat signallari narx darajasini yuqoriga ko‘taradi:
+ * reyting, dub speakerlar soni va dub jamoasi obro‘si.
+ */
+export const COLLECTIBLE_BOOSTS = {
+  rating: { high: 9, medium: 8 },
+  speakers: { high: 12, medium: 6 },
+  reputation: { high: 85, medium: 65 },
+} as const;
+
+export interface CollectibleSignals {
+  price: number;
+  rating?: number | null;
+  speakerCount?: number | null;
+  teamReputation?: number | null;
+}
+
+const RARITY_LADDER: readonly GiftRarityId[] = ["common", "rare", "epic", "legendary"] as const;
+
+function priceTier(price: number): number {
+  const index = GIFT_RARITIES.findIndex((rarity) => rarity.id === giftRarity(price).id);
+  return RARITY_LADDER.length - 1 - index;
+}
+
+export function collectibleRarity(signals: CollectibleSignals): GiftRarity {
+  let tier = priceTier(signals.price);
+
+  const rating = Number.isFinite(signals.rating) ? Math.min(10, Math.max(0, signals.rating ?? 0)) : 0;
+  if (rating >= COLLECTIBLE_BOOSTS.rating.high) tier += 2;
+  else if (rating >= COLLECTIBLE_BOOSTS.rating.medium) tier += 1;
+
+  const speakers = Math.max(0, signals.speakerCount ?? 0);
+  if (speakers >= COLLECTIBLE_BOOSTS.speakers.high) tier += 2;
+  else if (speakers >= COLLECTIBLE_BOOSTS.speakers.medium) tier += 1;
+
+  const reputation = Math.min(100, Math.max(0, signals.teamReputation ?? 0));
+  if (reputation >= COLLECTIBLE_BOOSTS.reputation.high) tier += 2;
+  else if (reputation >= COLLECTIBLE_BOOSTS.reputation.medium) tier += 1;
+
+  return giftRarityById(RARITY_LADDER[Math.min(RARITY_LADDER.length - 1, tier)])!;
+}
+
 /** Lower number = rarer, for "rarest first" sorting. */
 export function giftRarityRank(price: number): number {
   const rarity = giftRarity(price);
+  return GIFT_RARITIES.findIndex((item) => item.id === rarity.id);
+}
+
+export function giftRarityRankById(id: string | null | undefined, price: number): number {
+  const rarity = giftRarityById(id) ?? giftRarity(price);
   return GIFT_RARITIES.findIndex((item) => item.id === rarity.id);
 }
 

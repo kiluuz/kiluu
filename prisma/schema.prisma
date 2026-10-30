@@ -103,6 +103,9 @@ model User {
   equippedAvatarFrame Frame? @relation("EquippedAvatarFrame", fields: [equippedAvatarFrameId], references: [id], onDelete: SetNull)
   equippedNameFrame   Frame? @relation("EquippedNameFrame", fields: [equippedNameFrameId], references: [id], onDelete: SetNull)
   frames              UserFrame[]
+  dubTeamsOwned       DubTeam[]          @relation("DubTeamOwner")
+  dubTeamMemberships  DubTeamMember[]    @relation("DubTeamMemberUser")
+  dubTeamRatings      DubTeamRating[]    @relation("DubTeamRatingUser")
 
   // 11-QISM: Streak, Referral, Quests, Weekly Votes
   referralCode        String?   @unique
@@ -519,6 +522,7 @@ model Anime {
   watchParties WatchParty[]
   setItems    AnimeSetItem[]
   ratings     AnimeRating[]
+  dubCredits  DubCredit[]
   watchEvents WatchEvent[]
   versions         Anime[] @relation("AnimeVersions")
   catalogVersions  AnimeVersion[]
@@ -541,6 +545,7 @@ model AnimeVersion {
   episodes   Episode[]
   purchases  Purchase[]
   gifts      Gift[]
+  dubCredits DubCredit[]
 
   @@index([animeId, kind])
   @@map("anime_versions")
@@ -772,6 +777,100 @@ model DubJob {
   episode    Episode  @relation(fields: [episodeId], references: [id], onDelete: Cascade)
 
   @@unique([userId, episodeId, targetLang])
+}
+
+// ---- Dub jamoalari, cast va obro' ----
+model DubTeam {
+  id          String   @id @default(cuid())
+  name        String
+  slug        String   @unique
+  description String?
+  avatarUrl   String?
+  ownerId     String?
+  reputation  Int      @default(0) // 0..100, dub reytinglari + faollikdan hisoblanadi
+  verified    Boolean  @default(false)
+  status      String   @default("active") // active | archived
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  owner   User?           @relation("DubTeamOwner", fields: [ownerId], references: [id], onDelete: SetNull)
+  members DubTeamMember[]
+  credits DubCredit[]
+  ratings DubTeamRating[]
+
+  @@index([ownerId])
+  @@index([reputation])
+  @@map("dub_teams")
+}
+
+model DubTeamMember {
+  id        String   @id @default(cuid())
+  teamId    String
+  userId    String?
+  name      String
+  role      String   @default("voice") // voice | director | sound
+  createdAt DateTime @default(now())
+
+  team      DubTeam       @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  user      User?         @relation("DubTeamMemberUser", fields: [userId], references: [id], onDelete: SetNull)
+  castRoles DubCastMember[]
+
+  @@unique([teamId, name])
+  @@index([userId])
+  @@map("dub_team_members")
+}
+
+model DubCredit {
+  id           String   @id @default(cuid())
+  teamId       String
+  animeId      String
+  versionId    String?
+  language     String   @default("uz") // uz | kk | ky | ru
+  speakerCount Int      @default(0)
+  createdAt    DateTime @default(now())
+
+  team    DubTeam      @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  anime   Anime        @relation(fields: [animeId], references: [id], onDelete: Cascade)
+  version AnimeVersion? @relation(fields: [versionId], references: [id], onDelete: SetNull)
+  cast    DubCastMember[]
+  ratings DubTeamRating[]
+
+  @@unique([teamId, animeId, language])
+  @@index([animeId])
+  @@map("dub_credits")
+}
+
+model DubCastMember {
+  id          String   @id @default(cuid())
+  creditId    String
+  memberId    String?
+  speakerName String
+  character   String
+  createdAt   DateTime @default(now())
+
+  credit DubCredit      @relation(fields: [creditId], references: [id], onDelete: Cascade)
+  member DubTeamMember? @relation(fields: [memberId], references: [id], onDelete: SetNull)
+
+  @@index([creditId])
+  @@map("dub_cast_members")
+}
+
+model DubTeamRating {
+  id        String   @id @default(cuid())
+  teamId    String
+  creditId  String
+  userId    String
+  rating    Int      // 1..10
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  team   DubTeam   @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  credit DubCredit @relation(fields: [creditId], references: [id], onDelete: Cascade)
+  user   User      @relation("DubTeamRatingUser", fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, creditId])
+  @@index([teamId])
+  @@map("dub_team_ratings")
 }
 
 // ---- Telegram Bot Purchases ----

@@ -5,7 +5,7 @@ import { Coins, Loader2, Sparkles, Star, X } from "lucide-react";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { giftRarity, giftSerialNumber, type GiftRarity } from "@/lib/gift-rarity";
+import { giftRarity, giftRarityById, giftSerialNumber, type GiftRarity } from "@/lib/gift-rarity";
 
 export interface GiftCardAnime {
   title: string;
@@ -21,6 +21,7 @@ export interface GiftCardRecord {
   claimedAt?: string | null;
   status?: string;
   incoming?: boolean;
+  rarity?: string | null;
   recipientUsername: string;
   anime: {
     slug: string;
@@ -29,6 +30,10 @@ export interface GiftCardRecord {
     genres?: string[] | string | null;
   };
   sender?: { username: string; displayName?: string | null; avatarUrl?: string | null } | null;
+}
+
+function giftRarityFor(gift: GiftCardRecord): GiftRarity {
+  return giftRarityById(gift.rarity) ?? giftRarity(gift.pricePaid);
 }
 
 function formatPrice(value: number) {
@@ -334,7 +339,7 @@ export interface GiftDetailDialogProps {
 export function GiftDetailDialog(props: GiftDetailDialogProps) {
   const { gift, open, onOpenChange } = props;
   if (!gift) return null;
-  const rarity = giftRarity(gift.pricePaid);
+  const rarity = giftRarityFor(gift);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -364,7 +369,7 @@ function GiftDetailBody({
   const [revealed, setRevealed] = useState(!unopened);
   const [opening, setOpening] = useState(false);
 
-  const rarity = giftRarity(gift.pricePaid);
+  const rarity = giftRarityFor(gift);
   const status = gift.status ?? "PENDING";
   const senderName = gift.sender?.username;
   const serial = giftSerialNumber(gift.id);
@@ -410,6 +415,7 @@ function GiftDetailBody({
             <GiftCard
               anime={gift.anime}
               price={gift.pricePaid}
+              rarity={rarity}
               toUsername={mode === "sent" ? gift.recipientUsername : undefined}
               fromUsername={senderName}
               message={gift.message}

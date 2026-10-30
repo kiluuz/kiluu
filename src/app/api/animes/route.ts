@@ -3,6 +3,8 @@ import { db } from "@/lib/db";
 import { getCurrentUser } from "@/lib/auth";
 import { getBotCatalog, getDeletedAnimes } from "@/lib/bot-api";
 import { ensureAnimeInDatabase } from "@/lib/anime-enricher";
+import { animeDubSignals } from "@/lib/dub-teams";
+import { collectibleRarity } from "@/lib/gift-rarity";
 
 // Auto-sync cache: fire-and-forget so users never wait for Render cold-start
 let lastBotSyncTime = 0;
@@ -120,27 +122,37 @@ export async function GET(req: NextRequest) {
     ownedIds = new Set(purchases.map((p) => p.animeId));
   }
 
-  const result = animes.map((a) => ({
-    id: a.id,
-    slug: a.slug,
-    title: a.title,
-    altTitle: a.altTitle,
-    description: a.description,
-    coverImage: a.coverImage,
-    bannerImage: a.bannerImage,
-    genres: a.genres.split(",").filter(Boolean),
-    year: a.year,
-    rating: a.rating,
-    studio: a.studio,
-    status: a.status,
-    type: a.type,
-    isFree: a.isFree,
-    price: a.price,
-    episodeCount: a._count.episodes,
-    creator: a.creator,
-    source: a.source,
-    owned: ownedIds.has(a.id),
-  }));
+  const dubSignals = await animeDubSignals(animes.map((anime) => anime.id));
+  const result = animes.map((a) => {
+    const dub = dubSignals.get(a.id);
+    return {
+      id: a.id,
+      slug: a.slug,
+      title: a.title,
+      altTitle: a.altTitle,
+      description: a.description,
+      coverImage: a.coverImage,
+      bannerImage: a.bannerImage,
+      genres: a.genres.split(",").filter(Boolean),
+      year: a.year,
+      rating: a.rating,
+      studio: a.studio,
+      status: a.status,
+      type: a.type,
+      isFree: a.isFree,
+      price: a.price,
+      episodeCount: a._count.episodes,
+      creator: a.creator,
+      source: a.source,
+      owned: ownedIds.has(a.id),
+      rarity: collectibleRarity({
+        price: a.price,
+        rating: a.rating,
+        speakerCount: dub?.speakerCount,
+        teamReputation: dub?.teamReputation,
+      }).id,
+    };
+  });
 
   return NextResponse.json({ animes: result });
 }

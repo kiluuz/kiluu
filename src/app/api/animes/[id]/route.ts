@@ -7,6 +7,7 @@ import { isCreator } from "@/lib/rbac";
 import { userOwnsVersion } from "@/lib/owns";
 import { sqlTable } from "@/lib/sql-table";
 import { isVerifiedByFollowerCount } from "@/lib/verification";
+import { dubCreditsForAnime } from "@/lib/dub-teams";
 
 const episodeSyncCooldowns = new Map<string, number>();
 
@@ -161,6 +162,13 @@ export async function GET(
     .slice(0, 6)
     .map(({ overlap: _overlap, ...candidate }) => candidate);
 
+  let dubCredits: Awaited<ReturnType<typeof dubCreditsForAnime>> = [];
+  try {
+    dubCredits = await dubCreditsForAnime(anime.id, user?.id);
+  } catch {
+    // Dub jadvallari hali migratsiya qilinmagan bo‘lsa, sahifa ishlashda davom etadi.
+  }
+
   return NextResponse.json({
     anime: {
       ...anime,
@@ -198,6 +206,7 @@ export async function GET(
       progress: progressMap[e.id] || null,
     })),
     related,
+    dubCredits,
   });
 }
 

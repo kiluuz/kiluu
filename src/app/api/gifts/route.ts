@@ -5,6 +5,8 @@ import { getCurrentUser } from "@/lib/auth";
 import { expirePendingGifts, sendGift } from "@/lib/gifts";
 import { rateLimit } from "@/lib/rate-limit";
 import { rateKey } from "@/lib/client-ip";
+import { animeDubSignals } from "@/lib/dub-teams";
+import { collectibleRarity } from "@/lib/gift-rarity";
 
 export async function GET() {
   const user = await getCurrentUser();
@@ -20,12 +22,13 @@ export async function GET() {
       ],
     },
     include: {
-      anime: { select: { id: true, slug: true, title: true, coverImage: true } },
+      anime: { select: { id: true, slug: true, title: true, coverImage: true, rating: true } },
       sender: { select: { username: true, displayName: true, avatarUrl: true } },
     },
     orderBy: { createdAt: "desc" },
     take: 80,
   });
+  const signals = await animeDubSignals([...new Set(gifts.map((gift) => gift.animeId))]);
   return NextResponse.json({
     gifts: gifts.map((g) => ({
       id: g.id,
@@ -38,6 +41,12 @@ export async function GET() {
       claimedAt: g.claimedAt?.toISOString() ?? null,
       incoming: g.senderId !== user.id,
       recipientUsername: g.recipientUsername,
+      rarity: collectibleRarity({
+        price: g.pricePaid,
+        rating: g.anime.rating,
+        speakerCount: signals.get(g.animeId)?.speakerCount,
+        teamReputation: signals.get(g.animeId)?.teamReputation,
+      }).id,
       anime: g.anime,
       sender: g.sender,
     })),

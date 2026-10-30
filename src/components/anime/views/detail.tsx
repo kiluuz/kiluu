@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   Play, Star, Plus, Check, Coins, Heart, Share2, Users, Video,
-  Clock3, Loader2, BadgeCheck, Tv, Film, Package, Sparkles, Clapperboard, Send, ShoppingCart, Bell, BellOff, Link2, Lock, MessageSquare
+  Clock3, Loader2, BadgeCheck, Tv, Film, Package, Sparkles, Clapperboard, Send, ShoppingCart, Bell, BellOff, Link2, Lock, MessageSquare, Mic2, ShieldCheck
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -17,11 +17,32 @@ import { CreditPurchaseModal, LinkTelegramModal } from "../bot-ui";
 import { ChatPanel } from "../chat/chat-panel";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import { DUB_LANGUAGE_LABELS, dubTeamTitle } from "@/lib/dub-team-shared";
+
+interface DubCreditItem {
+  id: string;
+  language: string;
+  speakerCount: number;
+  createdAt: string;
+  team: {
+    id: string;
+    name: string;
+    slug: string;
+    avatarUrl: string | null;
+    reputation: number;
+    verified: boolean;
+  };
+  cast: { id: string; speakerName: string; character: string }[];
+  rating: number | null;
+  ratingCount: number;
+  myRating: number | null;
+}
 
 interface DetailResponse {
   anime: AnimeDetail;
   episodes: EpisodeItem[];
   related: AnimeSummary[];
+  dubCredits?: DubCreditItem[];
 }
 
 function formatDetailCountdown(ms: number): string {
@@ -61,6 +82,7 @@ export function DetailView() {
   });
   const [favBusy, setFavBusy] = useState(false);
   const [ratingBusy, setRatingBusy] = useState(false);
+  const [dubRatingBusyId, setDubRatingBusyId] = useState<string | null>(null);
 
   const [showCreditModal, setShowCreditModal] = useState(false);
   const [showLinkModal, setShowLinkModal] = useState(false);
@@ -146,6 +168,29 @@ export function DetailView() {
     }
   }
 
+  async function rateDub(creditId: string, rating: number) {
+    if (!user) {
+      setAuthOpen(true);
+      return;
+    }
+    setDubRatingBusyId(creditId);
+    try {
+      const response = await fetch(`/api/dub-credits/${creditId}/rate`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ rating }),
+      });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error || "Could not save dub rating");
+      await queryClient.invalidateQueries({ queryKey: detailKey });
+      toast.success("Dub bahosi saqlandi");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Could not save dub rating");
+    } finally {
+      setDubRatingBusyId(null);
+    }
+  }
+
   useEffect(() => {
     if (detailError) {
       toast.error(detailError instanceof Error ? detailError.message : "Failed to load anime");
@@ -198,6 +243,7 @@ export function DetailView() {
   }
 
   const { anime, episodes, related } = data;
+  const dubCredits = data.dubCredits ?? [];
   const versions: AnimeVersionCard[] = anime.versions || [];
   const selectedVersion =
     versions.find((v) => v.id === selectedVersionId) ||
@@ -843,6 +889,80 @@ export function DetailView() {
                   })}
                 </div>
               )
+            )}
+
+            {dubCredits.length > 0 && (
+              <>
+                <Separator className="my-7" />
+                <div className="flex items-center gap-2 mb-1">
+                  <Mic2 className="w-5 h-5 text-primary" />
+                  <h2 className="text-lg font-bold">Dub jamoasi</h2>
+                </div>
+                <p className="text-xs text-muted-foreground mb-4">
+                  Ovoz bergan jamoa, speakerlar va tomoshabinlar bahosi — bu anime gift kartochkasining rare darajasiga ta’sir qiladi.
+                </p>
+                <div className="space-y-3">
+                  {dubCredits.map((credit) => {
+                    const title = dubTeamTitle(credit.team.reputation, credit.team.verified);
+                    return (
+                      <div key={credit.id} className="glass rounded-2xl p-4">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <p className="font-bold">{credit.team.name}</p>
+                          <span
+                            className="text-[10px] font-bold rounded-full px-2 py-0.5 border"
+                            style={{ color: title.color, borderColor: `${title.color}55`, backgroundColor: `${title.color}14` }}
+                          >
+                            {title.label}
+                          </span>
+                          {credit.team.verified && (
+                            <span className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-500">
+                              <ShieldCheck className="w-3.5 h-3.5" /> Tasdiqlangan
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-[11px] text-muted-foreground mt-1">
+                          {DUB_LANGUAGE_LABELS[credit.language] ?? credit.language} · {credit.speakerCount} speaker · obro‘{" "}
+                          {credit.team.reputation}/100
+                          {credit.ratingCount > 0 ? ` · ${credit.rating} / 10 (${credit.ratingCount} baho)` : ""}
+                        </p>
+                        <div className="flex flex-wrap gap-1.5 mt-3">
+                          {credit.cast.map((row) => (
+                            <span key={row.id} className="rounded-full bg-secondary/60 border px-2.5 py-1 text-[11px]">
+                              <span className="font-semibold">{row.speakerName}</span>
+                              <span className="text-muted-foreground"> — {row.character}</span>
+                            </span>
+                          ))}
+                        </div>
+                        <div className="border-t mt-3 pt-3">
+                          <p className="text-[11px] font-semibold mb-1.5">
+                            {credit.myRating ? `Sizning bahoyingiz: ${credit.myRating}/10` : "Bu dubni baholang"}
+                          </p>
+                          <div className="grid grid-cols-10 gap-1">
+                            {Array.from({ length: 10 }, (_, index) => index + 1).map((value) => (
+                              <button
+                                key={value}
+                                type="button"
+                                disabled={dubRatingBusyId === credit.id}
+                                onClick={() => void rateDub(credit.id, value)}
+                                aria-label={`Rate dub ${value} out of 10`}
+                                aria-pressed={credit.myRating === value}
+                                className={cn(
+                                  "h-7 rounded-md border text-[10px] font-bold transition-colors disabled:opacity-50",
+                                  credit.myRating === value
+                                    ? "border-primary bg-primary text-primary-foreground"
+                                    : "border-border hover:border-primary hover:text-primary"
+                                )}
+                              >
+                                {value}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </>
             )}
           </div>
 

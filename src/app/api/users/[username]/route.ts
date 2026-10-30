@@ -7,7 +7,8 @@ import { getXpTotal, levelFromXp } from "@/lib/xp";
 import { Prisma } from "@prisma/client";
 import { sqlTable } from "@/lib/sql-table";
 import { isVerifiedByFollowerCount } from "@/lib/verification";
-import { giftRarityRank } from "@/lib/gift-rarity";
+import { giftRarityRankById, collectibleRarity } from "@/lib/gift-rarity";
+import { animeDubSignals } from "@/lib/dub-teams";
 
 const ANIME_CARD = {
   id: true, slug: true, title: true, coverImage: true, bannerImage: true,
@@ -280,23 +281,33 @@ export async function GET(
           ],
         },
         include: {
-          anime: { select: { id: true, slug: true, title: true, coverImage: true } },
+          anime: { select: { id: true, slug: true, title: true, coverImage: true, rating: true } },
           sender: { select: { username: true, displayName: true, avatarUrl: true } },
         },
         orderBy: { createdAt: "desc" },
         take: 60,
       })
     : [];
+  const receivedSignals = await animeDubSignals([...new Set(receivedGiftRows.map((gift) => gift.animeId))]);
   const receivedGifts = receivedGiftRows
-    .slice()
-    .sort((a, b) => giftRarityRank(a.pricePaid) - giftRarityRank(b.pricePaid) || b.createdAt.getTime() - a.createdAt.getTime())
-    .slice(0, 30)
     .map((gift) => ({
+      gift,
+      rarity: collectibleRarity({
+        price: gift.pricePaid,
+        rating: gift.anime.rating,
+        speakerCount: receivedSignals.get(gift.animeId)?.speakerCount,
+        teamReputation: receivedSignals.get(gift.animeId)?.teamReputation,
+      }).id,
+    }))
+    .sort((a, b) => giftRarityRankById(a.rarity, a.gift.pricePaid) - giftRarityRankById(b.rarity, b.gift.pricePaid) || b.gift.createdAt.getTime() - a.gift.createdAt.getTime())
+    .slice(0, 30)
+    .map(({ gift, rarity }) => ({
       id: gift.id,
       pricePaid: gift.pricePaid,
       message: gift.message,
       createdAt: gift.createdAt.toISOString(),
       claimedAt: gift.claimedAt?.toISOString() ?? null,
+      rarity,
       anime: gift.anime,
       sender: gift.sender,
     }));

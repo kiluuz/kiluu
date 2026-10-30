@@ -19,7 +19,7 @@ import { formatCredits } from "../ui-bits";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { useI18n } from "@/components/i18n-provider";
-import { giftRarity, giftSerialNumber } from "@/lib/gift-rarity";
+import { giftRarity, giftRarityById, giftSerialNumber } from "@/lib/gift-rarity";
 import {
   GiftBox,
   GiftCard,
@@ -38,6 +38,7 @@ interface GiftRow {
   claimedAt: string | null;
   incoming: boolean;
   recipientUsername: string;
+  rarity?: string | null;
   anime: { id: string; slug: string; title: string; coverImage: string | null; genres?: string[] };
   sender: { username: string; displayName: string | null; avatarUrl: string | null };
 }
@@ -49,6 +50,7 @@ interface CatalogAnime {
   price: number;
   coverImage: string | null;
   genres: string[];
+  rarity?: string | null;
 }
 
 interface Recipient {
@@ -170,12 +172,14 @@ export function GiftsView() {
               price: number;
               coverImage?: string | null;
               genres?: string[] | string;
+              rarity?: string | null;
             }) => ({
               id: anime.id,
               slug: anime.slug,
               title: anime.title,
               price: anime.price,
               coverImage: anime.coverImage ?? null,
+              rarity: anime.rarity ?? null,
               genres: Array.isArray(anime.genres)
                 ? anime.genres
                 : String(anime.genres || "").split(",").filter(Boolean),
@@ -270,6 +274,7 @@ export function GiftsView() {
         status: "PENDING",
         incoming: false,
         recipientUsername: recipient.username,
+        rarity: selectedAnime.rarity ?? null,
         sender: { username: user.username, displayName: user.displayName, avatarUrl: user.avatarUrl },
         anime: {
           slug: selectedAnime.slug,
@@ -361,7 +366,7 @@ export function GiftsView() {
     );
   }
 
-  const previewRarity = giftRarity(price);
+  const previewRarity = (selectedAnime?.rarity ? giftRarityById(selectedAnime.rarity) : null) ?? giftRarity(price);
   const unopenedSelected = Boolean(selectedGift?.incoming && selectedGift.status === "PENDING");
 
   return (
@@ -477,7 +482,7 @@ export function GiftsView() {
                 aria-label="Giftable anime"
               >
                 {filteredCatalog.map((anime) => {
-                  const rarity = giftRarity(anime.price);
+                  const rarity = giftRarityById(anime.rarity) ?? giftRarity(anime.price);
                   const selected = anime.id === animeId;
                   return (
                     <button
@@ -597,6 +602,7 @@ export function GiftsView() {
                   : null
               }
               price={price}
+              rarity={previewRarity}
               toUsername={recipient?.username ?? null}
               message={message}
               serialNumber={null}
@@ -708,7 +714,7 @@ export function GiftsView() {
                           </span>
                         </div>
                       ) : (
-                        <GiftCard size="mini" anime={gift.anime} price={gift.pricePaid} />
+                        <GiftCard size="mini" anime={gift.anime} price={gift.pricePaid} rarity={giftRarityById(gift.rarity) ?? undefined} />
                       )}
                       <div className="mt-2 px-0.5">
                         <p className="truncate text-xs font-bold">
@@ -763,7 +769,7 @@ export function GiftsView() {
 }
 
 function SendCelebration({ gift, onClose }: { gift: GiftCardRecord; onClose: () => void }) {
-  const rarity = giftRarity(gift.pricePaid);
+  const rarity = giftRarityById(gift.rarity) ?? giftRarity(gift.pricePaid);
   const reducedMotion = useRef(false);
   const [revealed, setRevealed] = useState(false);
   const petals = useMemo(
@@ -838,6 +844,7 @@ function SendCelebration({ gift, onClose }: { gift: GiftCardRecord; onClose: () 
             <GiftCard
               anime={gift.anime}
               price={gift.pricePaid}
+              rarity={rarity}
               toUsername={gift.recipientUsername}
               fromUsername={gift.sender?.username}
               message={gift.message}
