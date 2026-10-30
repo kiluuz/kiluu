@@ -12,10 +12,19 @@ import {
   getOrCreateRoom,
 } from "@/lib/chat";
 import { emitEvent } from "@/lib/events";
+import { isDurableMediaUrl } from "@/lib/storage";
 import { calculateLevel } from "@/lib/level-utils";
 
 interface RouteContext {
   params: Promise<{ id: string }>;
+}
+
+// Telegram HTML parse_mode: foydalanuvchi kiritgan matn teglarni buzmasligi uchun
+function escapeHtml(value: string) {
+  return value
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;");
 }
 
 export async function GET(req: NextRequest, context: RouteContext) {
@@ -262,24 +271,26 @@ export async function POST(req: NextRequest, context: RouteContext) {
 
     // Rate limit
     if (!chatRateLimit(user.id, room.id)) {
-      return NextResponse.json({ error: "Juda tez yozmoqdasiz. 10 soniya kuting." }, { status: 429 });
+      return NextResponse.json({ error: "Juda tez yozmoqdasiz. 10 soniya kuting.", retryAfter: 10 }, { status: 429 });
     }
 
-    // Slow mode tekshiruvi
-    if (room.slowMode > 0 && access.role !== "owner" && access.role !== "mod" && access.role !== "admin") {
-      const lastMsg = await db.chatMessage.findFirst({
-        where: { roomId: room.id, userId: user.id },
-        orderBy: { createdAt: "desc" },
-        select: { createdAt: true },
-      });
-      if (lastMsg) {
-        const diffSec = Math.floor((Date.now() - new Date(lastMsg.createdAt).getTime()) / 1000);
-        if (diffSec < room.slowMode) {
-          return NextResponse.json(
-            { error: `Sekin rejim yoqilgan. Keyingi xabar uchun ${room.slowMode - diffSec} soniya kuting.` },
-            { status: 429 }
-          );
-        }
+    // Sekin rejim + universal 5 soniyalik minimal interval
+    const POST_COOLDOWN_SECONDS = 5;
+    const lastMsg = await db.chatMessage.findFirst({
+      where: { roomId: room.id, userId: user.id },
+      orderBy: { createdAt: "desc" },
+      select: { createdAt: true },
+    });
+    if (lastMsg) {
+      const isStaff = access.role === "owner" || access.role === "mod" || access.role === "admin";
+      const waitSec = Math.max(POST_COOLDOWN_SECONDS, isStaff ? 0 : room.slowMode);
+      const elapsedMs = Date.now() - new Date(lastMsg.createdAt).getTime();
+      if (elapsedMs < waitSec * 1000) {
+        const retryAfter = Math.ceil((waitSec * 1000 - elapsedMs) / 1000);
+        return NextResponse.json(
+          { error: `Sekin rejim. Keyingi xabar uchun ${retryAfter} soniya kuting.`, retryAfter },
+          { status: 429 }
+        );
       }
     }
 
@@ -301,6 +312,20 @@ export async function POST(req: NextRequest, context: RouteContext) {
 
     if (text.length > 2000) {
       return NextResponse.json({ error: "Xabar hajmi 2000 belgidan oshmasligi kerak" }, { status: 400 });
+    }
+
+    if (attachmentUrl && (typeof attachmentUrl !== "string" || attachmentUrl.length > 500 || !isDurableMediaUrl(attachmentUrl))) {
+      return NextResponse.json({ error: "Noto'g'ri fayl havolasi" }, { status: 400 });
+    }
+
+    if (replyToId) {
+      const parent = await db.chatMessage.findFirst({
+        where: { id: String(replyToId), roomId: room.id },
+        select: { id: true },
+      });
+      if (!parent) {
+        return NextResponse.json({ error: "Javob berilayotgan xabar topilmadi" }, { status: 400 });
+      }
     }
 
     // Level gate tekshiruvlari
@@ -457,11 +482,13 @@ export async function POST(req: NextRequest, context: RouteContext) {
 
     // Telegram bildirishnomasi: Mention (@username) yoki javob bo'lsa
     try {
+      const safeName = escapeHtml(user.displayName || user.username);
+      const safeSnippet = escapeHtml(sanitizedText.slice(0, 100));
       if (newMessage.replyTo && newMessage.replyTo.userId !== user.id) {
         await notifyTelegramUser(
           newMessage.replyTo.userId,
           rawRoomId,
-          `<b>${user.displayName || user.username}</b> sizning xabaringizga javob berdi:\n\n<i>"${sanitizedText.slice(0, 100)}..."</i>`
+          `<b>${safeName}</b> sizning xabaringizga javob berdi:\n\n<i>"${safeSnippet}..."</i>`
         );
       }
       const mentionMatches = sanitizedText.match(/@([a-zA-Z0-9_]{3,30})/g);
@@ -477,7 +504,7 @@ export async function POST(req: NextRequest, context: RouteContext) {
               await notifyTelegramUser(
                 targetUser.id,
                 rawRoomId,
-                `<b>${user.displayName || user.username}</b> sizni eslatib o'tdi:\n\n<i>"${sanitizedText.slice(0, 100)}..."</i>`
+                `<b>${safeName}</b> sizni eslatib o'tdi:\n\n<i>"${safeSnippet}..."</i>`
               );
             }
           }

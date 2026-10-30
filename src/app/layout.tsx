@@ -3,6 +3,7 @@ import {
   Geist, Geist_Mono, Space_Grotesk,
   Unbounded, Shippori_Mincho, Fraunces, Cormorant_Garamond,
   Playfair_Display, Noto_Serif_SC, Amiri, PT_Serif,
+  Dela_Gothic_One,
 } from "next/font/google";
 import "./globals.css";
 import { Toaster } from "@/components/ui/sonner";
@@ -84,6 +85,12 @@ const ptSerif = PT_Serif({
   style: "italic",
 });
 
+const delaGothic = Dela_Gothic_One({
+  variable: "--font-club-display",
+  subsets: ["latin"],
+  weight: "400",
+});
+
 export const metadata: Metadata = {
   metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000"),
   title: "Kiluu — Stream, Collect & Gift Anime",
@@ -137,7 +144,7 @@ export default async function RootLayout({
   return (
     <html lang={initialLocale} suppressHydrationWarning>
       <body
-        className={`${geistSans.variable} ${geistMono.variable} ${spaceGrotesk.variable} ${unbounded.variable} ${shipporiMincho.variable} ${fraunces.variable} ${cormorantGaramond.variable} ${playfairDisplay.variable} ${notoSerifSC.variable} ${amiri.variable} ${ptSerif.variable} antialiased bg-background text-foreground`}
+        className={`${geistSans.variable} ${geistMono.variable} ${spaceGrotesk.variable} ${unbounded.variable} ${shipporiMincho.variable} ${fraunces.variable} ${cormorantGaramond.variable} ${playfairDisplay.variable} ${notoSerifSC.variable} ${amiri.variable} ${ptSerif.variable} ${delaGothic.variable} antialiased bg-background text-foreground`}
       >
         <script
           dangerouslySetInnerHTML={{

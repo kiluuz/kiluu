@@ -539,24 +539,24 @@ export function ScheduleView() {
               <div
                 key={entry.scheduleId}
                 className={cn(
-                  "group flex items-center gap-4 sm:gap-5 rounded-2xl border bg-card p-3.5 sm:p-5 transition-all hover:border-primary/40 hover:shadow-lg",
+                  "group flex items-center gap-3 sm:gap-4 rounded-2xl border bg-card p-3 sm:p-4 transition-all hover:border-primary/40 hover:shadow-lg",
                   msLeft > 0 && "airing-today"
                 )}
               >
                 {/* Time block */}
-                <div className="flex flex-col items-center justify-center w-[86px] sm:w-[106px] shrink-0 rounded-xl bg-background border py-3">
-                  <Clock className="w-4 h-4 text-primary mb-1" />
-                  <span className="text-xl sm:text-2xl font-black tabular-nums leading-none">{timeStr}</span>
+                <div className="flex flex-col items-center justify-center w-[66px] sm:w-[92px] shrink-0 rounded-xl bg-background border py-2 sm:py-2.5">
+                  <Clock className="w-3.5 h-3.5 text-primary mb-1" />
+                  <span className="text-base sm:text-xl font-black tabular-nums leading-none">{timeStr}</span>
                   {msLeft > 0 ? (
-                    <span className="text-[10px] font-bold text-primary mt-1.5">{t("schedule.in")} {formatCountdown(msLeft)}</span>
+                    <span className="text-[9.5px] font-bold text-primary mt-1">{t("schedule.in")} {formatCountdown(msLeft)}</span>
                   ) : (
-                    <span className="text-[10px] font-bold text-muted-foreground mt-1.5">{t("schedule.released")}</span>
+                    <span className="text-[9.5px] font-bold text-muted-foreground mt-1">{t("schedule.released")}</span>
                   )}
                 </div>
 
                 {/* Poster */}
                 <div
-                  className={cn("w-[66px] sm:w-[80px] aspect-[2/3] rounded-xl overflow-hidden shrink-0", "cursor-pointer glow-hover")}
+                  className={cn("w-[50px] sm:w-[68px] aspect-[2/3] rounded-lg sm:rounded-xl overflow-hidden shrink-0", "cursor-pointer glow-hover")}
                   onClick={() => {
                     if (local) navigate("detail", { animeId: local.slug });
                     else {
@@ -596,7 +596,7 @@ export function ScheduleView() {
                       });
                     }
                   }} className={cn("text-left w-full cursor-pointer")}>
-                    <h3 className={cn("font-display text-base sm:text-lg font-black leading-tight truncate transition-colors", "group-hover:text-primary")}>
+                    <h3 className={cn("font-display text-sm sm:text-lg font-black leading-tight truncate transition-colors", "group-hover:text-primary")}>
                       {local ? local.title : entry.media.title}
                     </h3>
                   </div>
@@ -605,33 +605,33 @@ export function ScheduleView() {
                       {t("schedule.episode")} {entry.episode}
                     </span>
                     {(seasonStr || entry.media.seasonYear) && (
-                      <span className="font-bold text-emerald-400 px-1.5 py-0.5 rounded-md bg-emerald-400/10 flex items-center gap-1">
+                      <span className="hidden sm:inline-flex font-bold text-emerald-400 px-1.5 py-0.5 rounded-md bg-emerald-400/10 items-center gap-1">
                         <Calendar className="w-3 h-3" /> {seasonStr} {entry.media.seasonYear || ""}
                       </span>
                     )}
                     {local ? (
                       <>
                         <span className="font-semibold text-foreground/80">★ {local.rating.toFixed(1)}</span>
-                        <span>·</span>
-                        <span>{local.type}</span>
-                        <span>·</span>
-                        <span>{local.genres.slice(0, 3).join(", ")}</span>
-                        <span>·</span>
-                        <span>
+                        <span className="hidden sm:inline">·</span>
+                        <span className="hidden sm:inline">{local.type}</span>
+                        <span className="hidden sm:inline">·</span>
+                        <span className="hidden sm:inline truncate max-w-[220px]">{local.genres.slice(0, 3).join(", ")}</span>
+                        <span className="hidden sm:inline">·</span>
+                        <span className="hidden sm:inline">
                           {local.episodeCount} ep{local.episodeCount === 1 ? "" : "s"}
                         </span>
                       </>
                     ) : (
                       <>
                         {entry.media.score && <span className="font-semibold text-foreground/80">★ {(entry.media.score / 10).toFixed(1)}</span>}
-                        <span>·</span>
-                        <span>{translateFormat(entry.media.format, t)}</span>
-                        <span>·</span>
-                        <span>{entry.media.genres.slice(0, 3).join(", ")}</span>
+                        <span className="hidden sm:inline">·</span>
+                        <span className="hidden sm:inline">{translateFormat(entry.media.format, t)}</span>
+                        <span className="hidden sm:inline">·</span>
+                        <span className="hidden sm:inline truncate max-w-[220px]">{entry.media.genres.slice(0, 3).join(", ")}</span>
                         {entry.media.totalEpisodes && (
                           <>
-                            <span>·</span>
-                            <span>{entry.media.totalEpisodes} eps</span>
+                            <span className="hidden sm:inline">·</span>
+                            <span className="hidden sm:inline">{entry.media.totalEpisodes} eps</span>
                           </>
                         )}
                       </>

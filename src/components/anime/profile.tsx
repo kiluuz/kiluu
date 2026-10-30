@@ -561,7 +561,7 @@ function ProfileIdentity({ profile, onEdit }: { profile: PublicProfile; onEdit?:
                 Level {profile.stats.level}
               </span>
             )}
-            {profile.stats.badges?.map(b => (
+            {profile.stats.badges?.filter((b) => b.id !== "creator").map(b => (
               <span key={b.id} className={cn("text-[10px] font-bold px-2 py-0.5 rounded-full shrink-0 shadow-sm", b.id !== "level_title" && "uppercase tracking-wide", b.color, b.glow && "animate-pulse shadow-[0_0_8px_currentColor]")}>
                 {b.label}
               </span>
@@ -770,11 +770,6 @@ function IdentityColumn({ profile }: { profile: PublicProfile }) {
 
       {/* Badge strip — role & exchange status */}
       <section className="rounded-2xl border bg-card p-4 flex flex-wrap gap-2">
-        {profile.role === "CREATOR" && (
-          <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-bold text-white brand-gradient">
-            <Clapperboard className="w-3.5 h-3.5" /> Creator
-          </span>
-        )}
         {profile.role !== "CREATOR" && (profile.stats.giftsSent ?? 0) > 0 && (
           <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-bold border border-emerald-500/40 text-emerald-500 bg-emerald-500/10">
             <Sparkles className="w-3.5 h-3.5" /> Gift sender

@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { calculateLevel } from "@/lib/level-utils";
+import { clubLevelFromXp } from "@/lib/chat";
 
 interface RouteContext {
   params: Promise<{ id: string }>;
@@ -118,6 +119,36 @@ export async function GET(req: NextRequest, context: RouteContext) {
       };
     });
 
+    const weeklySince = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+    const weeklyRows = await db.clubXpEvent.groupBy({
+      by: ["userId"],
+      where: { clubId: id, createdAt: { gte: weeklySince } },
+      _sum: { xp: true },
+      orderBy: { _sum: { xp: "desc" } },
+      take: 3,
+    });
+    const weeklyUsers = weeklyRows.length
+      ? await db.user.findMany({
+          where: { id: { in: weeklyRows.map((row) => row.userId) } },
+          select: { id: true, username: true, displayName: true, avatarUrl: true, avatarFrame: true },
+        })
+      : [];
+    const weeklyTop = weeklyRows.map((row) => {
+      const member = weeklyUsers.find((u) => u.id === row.userId);
+      return {
+        userId: row.userId,
+        username: member?.username ?? "",
+        displayName: member?.displayName || member?.username || "",
+        avatarUrl: member?.avatarUrl ?? null,
+        avatarFrame: member?.avatarFrame ?? null,
+        xp: row._sum.xp ?? 0,
+      };
+    });
+
+    const effectiveLevel = clubLevelFromXp(club.xp);
+    const levelStartXp = 120 * Math.pow(effectiveLevel - 1, 2);
+    const nextLevelXp = effectiveLevel >= 20 ? club.xp : 120 * Math.pow(effectiveLevel, 2);
+
     return NextResponse.json({
       club: {
         id: club.id,
@@ -137,6 +168,9 @@ export async function GET(req: NextRequest, context: RouteContext) {
         slowMode: club.chatRoom?.slowMode || 0,
         myRole: myMembership?.role || null,
         members: formattedMembers,
+        weeklyTop,
+        levelStartXp,
+        nextLevelXp,
         joinRequests,
         invites,
       },

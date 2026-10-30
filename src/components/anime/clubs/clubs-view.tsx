@@ -17,8 +17,6 @@ import {
   Settings,
   UserPlus,
   Share2,
-  Copy,
-  LogOut,
   Trash2,
   Check,
   X,
@@ -33,10 +31,51 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { useAppStore, useOpenProfile } from "../store";
 import { useI18n } from "@/components/i18n-provider";
-import { FramedAvatar, SmartImage } from "../ui-bits";
+import { FramedAvatar } from "../ui-bits";
 import { ChatPanel } from "../chat/chat-panel";
+import { ClubSettingsDrawer } from "./club-settings-drawer";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+
+function ClubBannerScene() {
+  return (
+    <svg
+      viewBox="0 0 1200 160"
+      preserveAspectRatio="xMidYMid slice"
+      className="h-full w-full"
+      aria-hidden
+    >
+      <defs>
+        <linearGradient id="club-sky" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor="var(--primary)" stopOpacity="0.22" />
+          <stop offset="100%" stopColor="var(--background)" stopOpacity="0.05" />
+        </linearGradient>
+        <linearGradient id="club-hill" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor="var(--primary)" stopOpacity="0.35" />
+          <stop offset="100%" stopColor="var(--primary)" stopOpacity="0.08" />
+        </linearGradient>
+      </defs>
+      <rect width="1200" height="160" fill="url(#club-sky)" />
+      <circle cx="1000" cy="42" r="26" fill="#fde68a" opacity="0.85" />
+      <circle cx="1000" cy="42" r="40" fill="#fde68a" opacity="0.15" />
+      <path d="M0 132 L180 58 L320 128 Z" fill="url(#club-hill)" />
+      <path d="M220 140 L430 44 L620 140 Z" fill="url(#club-hill)" opacity="0.8" />
+      <path d="M520 142 L760 62 L980 142 Z" fill="url(#club-hill)" opacity="0.6" />
+      <path d="M900 148 L1080 78 L1200 148 Z" fill="url(#club-hill)" opacity="0.5" />
+      <g stroke="var(--primary)" strokeWidth="6" fill="none" opacity="0.85">
+        <path d="M150 132 V84" />
+        <path d="M210 132 V84" />
+        <path d="M132 84 H228" strokeWidth="7" />
+        <path d="M140 96 H220" strokeWidth="5" />
+        <path d="M120 74 Q180 64 240 74" strokeWidth="6" />
+      </g>
+      <g stroke="var(--foreground)" strokeWidth="2" fill="none" opacity="0.35">
+        <path d="M380 40 q6 -6 12 0 q6 -6 12 0" />
+        <path d="M430 56 q5 -5 10 0 q5 -5 10 0" />
+      </g>
+    </svg>
+  );
+}
 
 interface ClubItem {
   id: string;
@@ -84,7 +123,8 @@ export function ClubsView({ initialClubId }: { initialClubId?: string }) {
   const [selectedClubId, setSelectedClubId] = useState<string | null>(initialClubId ?? null);
   const [clubDetail, setClubDetail] = useState<any | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
-  const [detailTab, setDetailTab] = useState<"chat" | "members" | "settings">("chat");
+  const [detailTab, setDetailTab] = useState<"chat" | "members">("chat");
+  const [settingsOpen, setSettingsOpen] = useState(false);
 
   // Create club modal states
   const [createOpen, setCreateOpen] = useState(false);
@@ -96,6 +136,7 @@ export function ClubsView({ initialClubId }: { initialClubId?: string }) {
 
   // Invite code generation states
   const [inviteCode, setInviteCode] = useState<string | null>(null);
+  const [inviteBusy, setInviteBusy] = useState(false);
 
   // Dub jamoasi takliflari
   const [dubInvites, setDubInvites] = useState<
@@ -239,6 +280,7 @@ export function ClubsView({ initialClubId }: { initialClubId?: string }) {
       setNewDesc("");
       fetchClubs();
       if (d.club?.id) {
+        setInviteCode(null);
         setSelectedClubId(d.club.id);
       }
     } catch (e: any) {
@@ -258,6 +300,7 @@ export function ClubsView({ initialClubId }: { initialClubId?: string }) {
       if (d.status === "joined") {
         toast.success("Klubga qo'shildingiz!");
         fetchClubs();
+        setInviteCode(null);
         setSelectedClubId(clubId);
       } else {
         toast.info("Klubga a'zo bo'lish so'rovi yuborildi");
@@ -268,13 +311,13 @@ export function ClubsView({ initialClubId }: { initialClubId?: string }) {
   };
 
   const handleLeaveClub = async (clubId: string) => {
-    if (!confirm("Haqiqatan ham klubdan chiqmoqchimisiz?")) return;
     try {
       const res = await fetch(`/api/clubs/${clubId}/join`, { method: "DELETE" });
       const d = await res.json();
       if (!res.ok) throw new Error(d.error);
 
       toast.success("Klubdan chiqdingiz");
+      setSettingsOpen(false);
       setSelectedClubId(null);
       fetchClubs();
     } catch (e: any) {
@@ -283,6 +326,7 @@ export function ClubsView({ initialClubId }: { initialClubId?: string }) {
   };
 
   const handleGenerateInvite = async (clubId: string) => {
+    setInviteBusy(true);
     try {
       const res = await fetch(`/api/clubs/${clubId}/invite`, {
         method: "POST",
@@ -292,10 +336,16 @@ export function ClubsView({ initialClubId }: { initialClubId?: string }) {
       const d = await res.json();
       if (!res.ok) throw new Error(d.error);
       setInviteCode(d.invite.code);
-      navigator.clipboard.writeText(d.invite.code);
-      toast.success("Taklif kodi nusxalandi: " + d.invite.code);
+      try {
+        await navigator.clipboard.writeText(d.invite.code);
+        toast.success("Taklif kodi nusxalandi");
+      } catch {
+        toast.success("Taklif kodi yaratildi");
+      }
     } catch (e: any) {
       toast.error(e.message);
+    } finally {
+      setInviteBusy(false);
     }
   };
 
@@ -345,151 +395,171 @@ export function ClubsView({ initialClubId }: { initialClubId?: string }) {
       clubDetail.myRole === "mod" ||
       user?.role === "ADMIN";
 
+    const onlineMembers = (clubDetail.members as ClubMemberItem[])
+      .filter((m) => m.user.isOnline)
+      .map((m) => m.user);
+
     return (
-      <div className="space-y-5 animate-in fade-in duration-300">
+      <div className="space-y-4 animate-in fade-in duration-300">
         {/* Back Button */}
         <Button
           variant="ghost"
           size="sm"
-          onClick={() => setSelectedClubId(null)}
+          onClick={() => {
+            setSelectedClubId(null);
+            setSettingsOpen(false);
+            setInviteCode(null);
+          }}
           className="gap-2 rounded-xl text-xs font-bold text-muted-foreground hover:text-foreground"
         >
           <ArrowLeft className="w-4 h-4" /> Barcha klublarga qaytish
         </Button>
-
-        {/* Club Banner & Header */}
-        <div className="relative rounded-3xl overflow-hidden border bg-card shadow-sm">
+        {/* Club Header */}
+        <div className="overflow-hidden rounded-[26px] border bg-card shadow-sm">
           {/* Banner */}
-          <div className="h-36 sm:h-48 w-full bg-linear-to-r from-primary/20 via-primary/5 to-secondary/30 relative">
-            {clubDetail.bannerUrl && (
-              <img
-                src={clubDetail.bannerUrl}
-                alt={clubDetail.name}
-                className="w-full h-full object-cover"
-              />
+          <div className="relative h-[90px] w-full overflow-hidden bg-primary/10 sm:h-[118px]">
+            {clubDetail.bannerUrl ? (
+              <img src={clubDetail.bannerUrl} alt="" className="h-full w-full object-cover" />
+            ) : (
+              <ClubBannerScene />
             )}
-            <div className="absolute inset-0 bg-linear-to-t from-background/90 via-background/30 to-transparent" />
+            <div className="absolute inset-0 bg-gradient-to-t from-background/80 via-background/10 to-transparent" />
+            <div className="pointer-events-none absolute inset-0 overflow-hidden" aria-hidden>
+              {[0, 1, 2, 3, 4, 5].map((i) => (
+                <span
+                  key={i}
+                  className="club-petal absolute block h-1.5 w-1.5 rounded-full bg-primary/40"
+                  style={{ left: `${10 + i * 16}%`, top: `${12 + (i % 3) * 20}%`, animationDelay: `${i * 1.7}s` }}
+                />
+              ))}
+            </div>
+            <span className="absolute right-3 top-3 rounded-full border border-border/60 bg-background/70 px-2.5 py-1 text-[10px] font-bold text-foreground backdrop-blur-sm">
+              {clubDetail.isPublic ? "Ochiq klub" : "Yopiq klub"}
+            </span>
           </div>
 
-          {/* Info bar */}
-          <div className="px-6 pb-6 pt-0 relative -mt-12 sm:-mt-16 flex flex-col sm:flex-row sm:items-end justify-between gap-4">
-            <div className="flex items-end gap-4 min-w-0">
-              <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-3xl border-4 border-background bg-secondary flex items-center justify-center text-3xl font-black text-primary shadow-lg shrink-0">
-                {clubDetail.avatarUrl ? (
-                  <img
-                    src={clubDetail.avatarUrl}
-                    alt={clubDetail.name}
-                    className="w-full h-full object-cover rounded-2xl"
-                  />
-                ) : (
-                  clubDetail.tag
-                )}
-              </div>
-              <div className="min-w-0 pb-1">
-                <div className="flex items-center gap-2 flex-wrap">
-                  <h2 className="text-xl sm:text-2xl font-black truncate">{clubDetail.name}</h2>
-                  <span className="px-2 py-0.5 rounded-lg bg-primary text-primary-foreground font-black text-xs tracking-wider">
-                    [{clubDetail.tag}]
-                  </span>
-                  <Badge variant="outline" className="text-xs gap-1 border-primary/30 text-primary">
-                    <Trophy className="w-3 h-3" /> Lv.{clubDetail.level}
-                  </Badge>
-                </div>
-                <p className="text-xs text-muted-foreground mt-1 flex items-center gap-3">
-                  <span className="flex items-center gap-1">
-                    <Users className="w-3.5 h-3.5" /> {clubDetail.memberCount} a&apos;zo
-                  </span>
-                  <span>•</span>
-                  <span className="inline-flex items-center gap-1.5 font-bold text-emerald-500">
-                    <span className="relative flex h-2 w-2">
-                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                      <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+          {/* Info */}
+          <div className="px-4 sm:px-6">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+              <div className="flex min-w-0 items-end gap-3 sm:gap-4">
+                <div className="-mt-10 shrink-0 sm:-mt-12">
+                  <div className="relative">
+                    <div className="club-hex bg-gradient-to-br from-primary via-primary to-amber-500 p-[2px] shadow-[0_0_24px_-6px_var(--primary)]">
+                      <div className="club-hex flex h-[76px] w-[72px] items-center justify-center overflow-hidden bg-card sm:h-[92px] sm:w-[86px]">
+                        {clubDetail.avatarUrl ? (
+                          <img
+                            src={clubDetail.avatarUrl}
+                            alt={clubDetail.name}
+                            className="h-full w-full object-cover"
+                          />
+                        ) : (
+                          <span className="club-display text-xl text-primary sm:text-2xl">{clubDetail.tag}</span>
+                        )}
+                      </div>
+                    </div>
+                    <span className="absolute -bottom-2 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-full bg-gradient-to-r from-amber-400 to-amber-600 px-2 py-0.5 text-[9px] font-black text-black shadow sm:text-[10px]">
+                      LV.{clubDetail.level}
                     </span>
-                    {clubDetail.onlineCount ?? 1} online
-                  </span>
-                  <span>•</span>
-                  <span>XP: {clubDetail.xp}</span>
-                  <span>•</span>
-                  <span>{clubDetail.isPublic ? "Ochiq klub" : "Yopiq klub"}</span>
-                </p>
+                  </div>
+                </div>
+                <div className="min-w-0 pb-1.5">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <h2 className="club-display truncate text-[22px] leading-tight sm:text-[28px]">
+                      {clubDetail.name}
+                    </h2>
+                    <span className="shrink-0 rounded-full border border-primary/30 bg-primary/10 px-2 py-0.5 text-[11px] font-black tracking-wide text-primary">
+                      [{clubDetail.tag}]
+                    </span>
+                  </div>
+                  <p className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] text-muted-foreground">
+                    <span className="inline-flex items-center gap-1">
+                      <Users className="h-3.5 w-3.5" /> {clubDetail.memberCount} a’zo
+                    </span>
+                    <span aria-hidden>·</span>
+                    <span className="inline-flex items-center gap-1.5 font-bold text-emerald-500">
+                      <span className="relative flex h-2 w-2">
+                        <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75" />
+                        <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-500" />
+                      </span>
+                      {clubDetail.onlineCount ?? 1} online
+                    </span>
+                    <span aria-hidden>·</span>
+                    <span>{clubDetail.xp.toLocaleString()} XP</span>
+                  </p>
+                </div>
               </div>
-            </div>
 
-            {/* Actions */}
-            <div className="flex items-center gap-2 shrink-0">
-              {clubDetail.myRole ? (
-                <>
+              <div className="flex items-center gap-2 pb-2 sm:pb-3">
+                {clubDetail.myRole ? (
+                  <>
+                    {isStaff && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="h-9 gap-1.5 rounded-full text-xs font-bold"
+                        onClick={() => handleGenerateInvite(clubDetail.id)}
+                        disabled={inviteBusy}
+                      >
+                        {inviteBusy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Share2 className="h-3.5 w-3.5" />}
+                        Taklif kodi
+                      </Button>
+                    )}
+                    <button
+                      onClick={() => setSettingsOpen(true)}
+                      aria-label="Klub sozlamalari"
+                      className="flex h-10 w-10 items-center justify-center rounded-full bg-gradient-to-br from-primary to-amber-500 text-primary-foreground shadow-md transition hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring active:scale-95"
+                    >
+                      <Settings className="h-4.5 w-4.5" />
+                    </button>
+                  </>
+                ) : (
                   <Button
                     size="sm"
-                    variant="outline"
-                    className="rounded-xl text-xs gap-1.5"
-                    onClick={() => handleGenerateInvite(clubDetail.id)}
+                    onClick={() => handleJoinClub(clubDetail.id)}
+                    className="h-9 gap-1.5 rounded-full bg-gradient-to-r from-primary to-amber-500 text-xs font-bold text-primary-foreground"
                   >
-                    <Share2 className="w-3.5 h-3.5" /> Taklif kodi
+                    <UserPlus className="h-3.5 w-3.5" /> Klubga qo’shilish
                   </Button>
-                  {clubDetail.myRole !== "owner" && (
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      className="rounded-xl text-xs text-destructive hover:bg-destructive/10"
-                      onClick={() => handleLeaveClub(clubDetail.id)}
-                    >
-                      <LogOut className="w-3.5 h-3.5 mr-1" /> Chiqish
-                    </Button>
-                  )}
-                </>
-              ) : (
-                <Button
-                  size="sm"
-                  onClick={() => handleJoinClub(clubDetail.id)}
-                  className="rounded-xl text-xs font-bold"
-                >
-                  <UserPlus className="w-3.5 h-3.5 mr-1.5" /> Klubga qo'shilish
-                </Button>
-              )}
+                )}
+              </div>
             </div>
           </div>
 
-          {/* Sub Navigation Tabs */}
-          <div className="px-6 border-t bg-secondary/20 flex gap-4">
+          {/* Tabs */}
+          <div className="mt-2 flex items-center gap-1 overflow-x-auto border-t px-2 sm:px-4">
             <button
               onClick={() => setDetailTab("chat")}
               className={cn(
-                "py-3 text-sm font-bold border-b-2 flex items-center gap-2 transition",
+                "-mb-px flex items-center gap-2 whitespace-nowrap border-b-2 px-3 py-3 text-[13px] font-bold transition",
                 detailTab === "chat"
                   ? "border-primary text-primary"
                   : "border-transparent text-muted-foreground hover:text-foreground"
               )}
+              aria-current={detailTab === "chat" ? "page" : undefined}
             >
-              <MessageSquare className="w-4 h-4" /> Jamoaviy Chat
+              <MessageSquare className="h-4 w-4" /> Jamoaviy Chat
             </button>
             <button
               onClick={() => setDetailTab("members")}
               className={cn(
-                "py-3 text-sm font-bold border-b-2 flex items-center gap-2 transition",
+                "-mb-px flex items-center gap-2 whitespace-nowrap border-b-2 px-3 py-3 text-[13px] font-bold transition",
                 detailTab === "members"
                   ? "border-primary text-primary"
                   : "border-transparent text-muted-foreground hover:text-foreground"
               )}
+              aria-current={detailTab === "members" ? "page" : undefined}
             >
-              <Users className="w-4 h-4" /> A&apos;zolar ({clubDetail.memberCount})
-              {clubDetail.onlineCount > 0 && (
-                <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-emerald-500/10 text-emerald-500 font-bold border border-emerald-500/20">
-                  {clubDetail.onlineCount} online
-                </span>
-              )}
+              <Users className="h-4 w-4" /> A’zolar
+              <span className="rounded-full border border-border bg-secondary/60 px-1.5 py-0.5 text-[10px] font-black tabular-nums text-muted-foreground">
+                {clubDetail.memberCount}
+              </span>
             </button>
             {isStaff && (
               <button
-                onClick={() => setDetailTab("settings")}
-                className={cn(
-                  "py-3 text-sm font-bold border-b-2 flex items-center gap-2 transition",
-                  detailTab === "settings"
-                    ? "border-primary text-primary"
-                    : "border-transparent text-muted-foreground hover:text-foreground"
-                )}
+                onClick={() => setSettingsOpen(true)}
+                className="-mb-px flex items-center gap-2 whitespace-nowrap border-b-2 border-transparent px-3 py-3 text-[13px] font-bold text-muted-foreground transition hover:text-foreground"
               >
-                <Settings className="w-4 h-4" /> Boshqaruv
+                <Settings className="h-4 w-4" /> Boshqaruv
               </button>
             )}
           </div>
@@ -497,39 +567,14 @@ export function ClubsView({ initialClubId }: { initialClubId?: string }) {
 
         {/* Tab Content */}
         {detailTab === "chat" && (
-          <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-            <div className="lg:col-span-3">
-              <ChatPanel
-                roomId={`club:${clubDetail.id}`}
-                title={`[${clubDetail.tag}] ${clubDetail.name} chati`}
-                subtitle={`${clubDetail.memberCount} ta a'zo • ${clubDetail.onlineCount ?? 1} online`}
-              />
-            </div>
-            <div className="space-y-4">
-              <div className="glass rounded-3xl p-5 border space-y-3">
-                <h4 className="font-bold text-sm">Klub qoidalari</h4>
-                <p className="text-xs text-muted-foreground leading-relaxed">
-                  {clubDetail.description ||
-                    "Ushbu klub a'zolari bir-biriga hurmat bilan munosabatda bo'lishadi. Reklama va haqorat taqiqlanadi."}
-                </p>
-              </div>
-
-              <div className="glass rounded-3xl p-5 border space-y-3">
-                <h4 className="font-bold text-sm flex items-center gap-1.5">
-                  <Trophy className="w-4 h-4 text-amber-500" /> Klub Darajasi: {clubDetail.level}
-                </h4>
-                <div className="w-full h-2 rounded-full bg-secondary overflow-hidden">
-                  <div
-                    className="h-full bg-primary"
-                    style={{ width: `${Math.min(100, (clubDetail.xp % 500) / 5)}%` }}
-                  />
-                </div>
-                <p className="text-[11px] text-muted-foreground">
-                  A'zolar chatda yozishi, anime ko'rishi va xarid qilishi klubga XP beradi!
-                </p>
-              </div>
-            </div>
-          </div>
+          <ChatPanel
+            roomId={`club:${clubDetail.id}`}
+            title="jamoaviy-chat"
+            subtitle={`${clubDetail.memberCount} a’zo`}
+            onlineMembers={onlineMembers}
+            memberCount={clubDetail.memberCount}
+            slowModeSeconds={clubDetail.slowMode}
+          />
         )}
 
         {detailTab === "members" && (
@@ -602,27 +647,30 @@ export function ClubsView({ initialClubId }: { initialClubId?: string }) {
           </div>
         )}
 
-        {detailTab === "settings" && isStaff && (
-          <div className="glass rounded-3xl p-6 border space-y-6 max-w-xl">
-            <h3 className="font-bold text-base">Klub sozlamalari</h3>
-            <div className="space-y-4">
-              <div>
-                <label className="text-xs font-semibold text-muted-foreground">Tavsif / Qoidalar</label>
-                <Textarea
-                  defaultValue={clubDetail.description || ""}
-                  rows={3}
-                  className="mt-1 rounded-2xl"
-                  placeholder="Klub qoidalarini kiriting..."
-                />
-              </div>
-
-              <div className="pt-2 flex justify-end">
-                <Button size="sm" className="rounded-xl">
-                  Saqlash
-                </Button>
-              </div>
-            </div>
-          </div>
+        {settingsOpen && (
+          <ClubSettingsDrawer
+            club={{
+              id: clubDetail.id,
+              name: clubDetail.name,
+              tag: clubDetail.tag,
+              description: clubDetail.description,
+              isPublic: clubDetail.isPublic,
+              level: clubDetail.level,
+              xp: clubDetail.xp,
+              memberCount: clubDetail.memberCount,
+              onlineCount: clubDetail.onlineCount ?? 0,
+              myRole: clubDetail.myRole,
+              weeklyTop: clubDetail.weeklyTop,
+              levelStartXp: clubDetail.levelStartXp,
+              nextLevelXp: clubDetail.nextLevelXp,
+              invites: clubDetail.invites,
+            }}
+            inviteCode={inviteCode}
+            inviteBusy={inviteBusy}
+            onClose={() => setSettingsOpen(false)}
+            onCreateInvite={() => handleGenerateInvite(clubDetail.id)}
+            onLeave={() => handleLeaveClub(clubDetail.id)}
+          />
         )}
       </div>
     );
@@ -891,7 +939,10 @@ export function ClubsView({ initialClubId }: { initialClubId?: string }) {
 
                   <Button
                     size="sm"
-                    onClick={() => setSelectedClubId(c.id)}
+                    onClick={() => {
+                      setInviteCode(null);
+                      setSelectedClubId(c.id);
+                    }}
                     className="rounded-xl text-xs font-bold h-8 px-3"
                   >
                     {c.myRole ? "Chatga kirish" : "Ko'rish"}
