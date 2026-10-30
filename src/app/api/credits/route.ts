@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { getCurrentUser } from "@/lib/auth";
 import { ensureRuntimeSeed } from "@/lib/seed-runtime";
+import { daCurrency, daDonationUrl } from "@/lib/donationalerts";
 
 export async function GET() {
   await ensureRuntimeSeed();
@@ -37,9 +38,11 @@ export async function GET() {
       name: p.name,
       credits: p.credits,
       starsPrice: p.starsPrice,
+      priceDa: p.priceDa,
       bonus: p.bonus,
       popular: p.popular,
     })),
+    payment: { provider: "donationalerts", currency: daCurrency(), donationUrl: daDonationUrl() },
     balance: user?.credits ?? 0,
     transactions,
   });

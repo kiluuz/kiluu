@@ -2,7 +2,7 @@
 
 import {
   Home, Compass, Users, Clock, Gift, Wallet, Video, AudioLines,
-  CalendarDays, Clapperboard, Settings2, UsersRound, type LucideIcon,
+  CalendarDays, Clapperboard, Settings2, UsersRound, Banknote, CreditCard, type LucideIcon,
 } from "lucide-react";
 import { useAppStore } from "./store";
 import type { ViewName } from "./types";
@@ -49,12 +49,16 @@ export const NAV_ITEMS: readonly NavItemDef[] = [
   { id: "library",        label: "My Library",    shortLabel: "Library",  icon: Clock,        group: "my" },
   { id: "gifts",          label: "Gifts",         shortLabel: "Gifts",    icon: Gift,         group: "my" },
   { id: "credits",        label: "Get Credits",   shortLabel: "Credits",  icon: Wallet,       group: "my" },
+  { id: "payouts",        label: "Payouts",       shortLabel: "Payouts",  icon: Banknote,     group: "my", creatorOnly: true,
+    lockHint: "Payouts are available to Creator accounts only." },
   { id: "studio",         label: "Creator Studio",shortLabel: "Studio",   icon: Clapperboard, group: "creator", creatorOnly: true,
     lockHint: "You picked the Viewer path at sign-up — Creator Studio is for Creator accounts." },
   { id: "bot-admin",      label: "Bot Admin",      shortLabel: "Admin",    icon: Settings2,    group: "creator", adminOnly: true,
     lockHint: "Admin panel is for admin accounts only." },
   { id: "admin-users",    label: "Users",          shortLabel: "Users",    icon: UsersRound,   group: "creator", adminOnly: true,
     lockHint: "User directory is for admin accounts only." },
+  { id: "admin-payments", label: "Payments",       shortLabel: "Payments", icon: CreditCard,   group: "creator", adminOnly: true,
+    lockHint: "Payment console is for admin accounts only." },
 ] as const;
 
 export const NAV_GROUP_LABELS: Record<NavGroup, string> = {

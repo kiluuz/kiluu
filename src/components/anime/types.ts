@@ -440,6 +440,7 @@ export interface CreditPackage {
   name?: string;
   credits: number;
   starsPrice?: number;
+  priceDa?: number;
   priceUsd?: number;
   bonus: number;
   popular: boolean;
@@ -500,7 +501,9 @@ export type ViewName =
   | "schedule"
   | "dubbing"
   | "bot-admin"
-  | "admin-users";
+  | "admin-users"
+  | "payouts"
+  | "admin-payments";
 
 export interface View {
   name: ViewName;

@@ -1,7 +1,10 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Zap, Gift, History, Check, Loader2, Sparkles } from "lucide-react";
+import {
+  Zap, Gift, History, Loader2, Sparkles, Copy, ExternalLink,
+  Clock, CheckCircle2, ShieldCheck, AlertTriangle,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { useAppStore } from "../store";
@@ -16,16 +19,50 @@ interface CreditsData {
   packages: CreditPackage[];
   balance: number;
   transactions: CreditTx[];
+  payment?: { provider: string; currency: string; donationUrl: string };
+}
+
+interface DonationIntent {
+  id: string;
+  code: string;
+  amountMinor: number;
+  credits: number;
+  currency: string;
+  status: "pending" | "completed" | "expired" | "cancelled";
+  expiresAt: string;
+  donateUrl: string;
+  creditsGranted: number | null;
+}
+
+const ERROR_KEYS: Record<string, string> = {
+  PAYMENTS_UNAVAILABLE: "credits.daUnavailable",
+  TOO_MANY_PENDING: "credits.daTooMany",
+  INVALID_PACKAGE: "credits.daError",
+  TOO_MANY_REQUESTS: "credits.daRate",
+};
+
+function formatMoney(minor: number, currency: string) {
+  return `${(minor / 100).toLocaleString("ru-RU", { maximumFractionDigits: 2 })} ${currency}`;
+}
+
+function minutesLeft(expiresAt: string, now: number) {
+  const diff = new Date(expiresAt).getTime() - now;
+  if (diff <= 0) return "00:00";
+  const total = Math.floor(diff / 1000);
+  const mm = String(Math.floor(total / 60)).padStart(2, "0");
+  const ss = String(total % 60).padStart(2, "0");
+  return `${mm}:${ss}`;
 }
 
 export function CreditsView() {
-  const { user, setAuthOpen } = useAppStore();
+  const { user, setUser, setAuthOpen } = useAppStore();
   const { t } = useI18n();
   const [loadedData, setLoadedData] = useState<{ userId: string | null; value: CreditsData } | null>(null);
   const data = loadedData?.userId === (user?.id ?? null) ? loadedData.value : null;
-  const [checkout, setCheckout] = useState<CreditPackage | null>(null);
-  const [processing, setProcessing] = useState(false);
   const [activeTab, setActiveTab] = useState<"credits" | "frames">("credits");
+  const [topUp, setTopUp] = useState<{ pkg: CreditPackage; intent: DonationIntent } | null>(null);
+  const [creatingId, setCreatingId] = useState<string | null>(null);
+  const [now, setNow] = useState(() => Date.now());
 
   useEffect(() => {
     let active = true;
@@ -43,37 +80,89 @@ export function CreditsView() {
     return () => { active = false; };
   }, [user?.id]);
 
-  async function pay() {
+  const intentStatus = topUp?.intent.status;
+
+  useEffect(() => {
+    if (!intentStatus || intentStatus !== "pending") return;
+    const id = setInterval(() => setNow(Date.now()), 15_000);
+    return () => clearInterval(id);
+  }, [intentStatus, topUp?.intent.id]);
+
+  useEffect(() => {
+    if (!topUp || topUp.intent.status !== "pending") return;
+    let active = true;
+    const intentId = topUp.intent.id;
+
+    const check = async () => {
+      try {
+        const res = await fetch(`/api/credits/donation-intent/${intentId}`, { cache: "no-store" });
+        if (!res.ok) return;
+        const fresh = (await res.json()) as DonationIntent;
+        if (!active) return;
+        setTopUp((current) => (current && current.intent.id === fresh.id ? { ...current, intent: fresh } : current));
+        if (fresh.status === "completed") {
+          const granted = fresh.creditsGranted ?? fresh.credits;
+          toast.success(t("credits.daSuccess", { count: formatCredits(granted) }));
+          const [me, credits] = await Promise.all([
+            fetch("/api/auth/me", { cache: "no-store" }),
+            fetch("/api/credits", { cache: "no-store" }),
+          ]);
+          const payload = await me.json().catch(() => null);
+          const creditsPayload = await credits.json().catch(() => null);
+          if (!active) return;
+          if (payload?.user) setUser(payload.user);
+          if (credits.ok && creditsPayload) {
+            setLoadedData({ userId: payload?.user?.id ?? null, value: creditsPayload });
+          }
+        }
+      } catch {
+        /* transient network error — keep polling */
+      }
+    };
+
+    void check();
+    const id = setInterval(check, 4000);
+    return () => {
+      active = false;
+      clearInterval(id);
+    };
+  }, [topUp?.intent.id, intentStatus, setUser, t]);
+
+  async function startTopUp(pkg: CreditPackage) {
     if (!user) {
       setAuthOpen(true);
       return;
     }
-    if (!checkout) return;
-    setProcessing(true);
+    setCreatingId(pkg.id);
     try {
-      const res = await fetch("/api/credits/invoice", {
+      const res = await fetch("/api/credits/donation-intent", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ packageId: checkout.id }),
+        body: JSON.stringify({ packageId: pkg.id }),
       });
       const d = await res.json();
       if (!res.ok) {
-        toast.error(d.error || t("credits.invoiceError"));
+        toast.error(t(ERROR_KEYS[d.error] ?? "credits.daError"));
         return;
       }
-      if (d.invoiceLink) {
-        window.open(d.invoiceLink, "_blank");
-        toast.success(t("credits.invoiceOpened"));
-        setCheckout(null);
-      }
+      setNow(Date.now());
+      setTopUp({ pkg, intent: d });
     } catch {
       toast.error(t("auth.networkErrorShort"));
     } finally {
-      setProcessing(false);
+      setCreatingId(null);
     }
   }
 
-  const starsOf = (pkg: CreditPackage) => pkg.starsPrice ?? 0;
+  async function copyCode() {
+    if (!topUp) return;
+    try {
+      await navigator.clipboard.writeText(topUp.intent.code);
+      toast.success(t("credits.daCopied"));
+    } catch {
+      toast.error(t("credits.daCopyFailed"));
+    }
+  }
 
   return (
     <div className="max-w-[1100px] mx-auto px-4 sm:px-8 py-6 pb-10">
@@ -98,13 +187,14 @@ export function CreditsView() {
         </div>
       </div>
 
-      <div className="grid grid-cols-2 lg:grid-cols-5 gap-3 sm:gap-4 mb-10">
+      <div className="grid grid-cols-2 lg:grid-cols-5 gap-3 sm:gap-4 mb-4">
         {(data?.packages || []).map((pkg) => (
           <button
             key={pkg.id}
-            onClick={() => (user ? setCheckout(pkg) : setAuthOpen(true))}
+            disabled={creatingId === pkg.id}
+            onClick={() => startTopUp(pkg)}
             className={cn(
-              "relative rounded-3xl border p-5 text-left transition-all hover:-translate-y-1.5",
+              "relative rounded-3xl border p-5 text-left transition-all hover:-translate-y-1.5 disabled:opacity-70",
               pkg.popular
                 ? "border-primary bg-gradient-to-b from-primary/15 to-transparent shadow-xl shadow-primary/15"
                 : "bg-card hover:border-primary/50"
@@ -125,10 +215,17 @@ export function CreditsView() {
               </p>
             )}
             <p className="text-xs text-muted-foreground mt-1">{t("credits.total")} {formatCredits(pkg.credits + pkg.bonus)}</p>
-            <p className="text-lg font-black mt-2">{starsOf(pkg)} Stars</p>
+            <p className="text-lg font-black mt-2 flex items-center gap-1.5">
+              {creatingId === pkg.id ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
+              {pkg.priceDa && pkg.priceDa > 0 ? formatMoney(pkg.priceDa * 100, data?.payment?.currency || "RUB") : "—"}
+            </p>
           </button>
         ))}
       </div>
+      <p className="text-[11px] text-muted-foreground flex items-center gap-1.5 mb-10">
+        <ShieldCheck className="w-3.5 h-3.5 text-emerald-500" />
+        {t("credits.daSecured")}
+      </p>
 
       <div className="glass rounded-3xl p-5 sm:p-6">
         <h2 className="font-bold flex items-center gap-2 mb-4">
@@ -163,45 +260,85 @@ export function CreditsView() {
         )}
       </div>
 
-      <Dialog open={Boolean(checkout)} onOpenChange={(open) => !processing && setCheckout(open ? checkout : null)}>
-        <DialogContent className="sm:max-w-[420px] rounded-2xl">
+      <Dialog open={Boolean(topUp)} onOpenChange={(open) => { if (!open) setTopUp(null); }}>
+        <DialogContent className="sm:max-w-[460px] rounded-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
-              <Sparkles className="w-5 h-5 text-primary" /> Telegram Stars
+              <Sparkles className="w-5 h-5 text-primary" /> {t("credits.daTitle")}
             </DialogTitle>
-            <DialogDescription>{t("credits.paymentDescription")}</DialogDescription>
+            <DialogDescription>{t("credits.daDescription")}</DialogDescription>
           </DialogHeader>
-          {checkout && (
-            <div className="space-y-5 pt-2">
-              <div className="rounded-2xl border bg-card p-4 flex items-center justify-between">
-                <div>
-                  <p className="font-black text-lg">{formatCredits(checkout.credits)} {t("credits.credits")}</p>
-                  {checkout.bonus > 0 && (
-                    <p className="text-xs text-emerald-500 font-bold">+{formatCredits(checkout.bonus)} {t("credits.bonusIncluded")}</p>
-                  )}
-                </div>
-                <p className="text-2xl font-black">{starsOf(checkout)} ★</p>
+
+          {topUp && topUp.intent.status === "completed" ? (
+            <div className="space-y-4 py-4 text-center">
+              <div className="w-16 h-16 mx-auto rounded-full bg-emerald-500/15 flex items-center justify-center">
+                <CheckCircle2 className="w-9 h-9 text-emerald-500" />
               </div>
-              <Button
-                disabled={processing}
-                onClick={pay}
-                className="w-full h-12 rounded-xl brand-gradient text-white font-bold text-base"
-              >
-                {processing ? (
-                  <>
-                    <Loader2 className="w-5 h-5 animate-spin" /> {t("credits.invoiceLoading")}
-                  </>
-                ) : (
-                  <>
-                    <Sparkles className="w-5 h-5" /> {t("credits.payStars", { count: starsOf(checkout) })}
-                  </>
-                )}
+              <div>
+                <p className="text-lg font-black">{t("credits.daSuccessTitle")}</p>
+                <p className="text-sm text-muted-foreground mt-1">
+                  {t("credits.daSuccess", { count: formatCredits(topUp.intent.creditsGranted ?? topUp.intent.credits) })}
+                </p>
+              </div>
+              <Button className="w-full h-11 rounded-xl" onClick={() => setTopUp(null)}>{t("credits.daClose")}</Button>
+            </div>
+          ) : topUp && topUp.intent.status === "expired" ? (
+            <div className="space-y-4 py-4 text-center">
+              <div className="w-16 h-16 mx-auto rounded-full bg-amber-500/15 flex items-center justify-center">
+                <Clock className="w-9 h-9 text-amber-500" />
+              </div>
+              <p className="text-sm text-muted-foreground">{t("credits.daExpired")}</p>
+              <Button className="w-full h-11 rounded-xl brand-gradient text-white" onClick={() => { const pkg = topUp.pkg; setTopUp(null); void startTopUp(pkg); }}>
+                {t("credits.daNewCode")}
               </Button>
-              <p className="text-[10px] text-center text-muted-foreground flex items-center justify-center gap-1">
-                <Check className="w-3 h-3" /> {t("credits.realStarsCheckout")}
+            </div>
+          ) : topUp ? (
+            <div className="space-y-5 pt-2">
+              <div className="rounded-2xl border bg-card p-4 flex items-center justify-between gap-3">
+                <div>
+                  <p className="text-[11px] uppercase tracking-wider text-muted-foreground font-bold">{t("credits.daAmount")}</p>
+                  <p className="text-2xl font-black">{formatMoney(topUp.intent.amountMinor, topUp.intent.currency)}</p>
+                  <p className="text-xs text-muted-foreground">{formatCredits(topUp.intent.credits)} {t("credits.credits")}</p>
+                </div>
+                <div className="text-right">
+                  <p className="text-[11px] uppercase tracking-wider text-muted-foreground font-bold">{t("credits.daExpires")}</p>
+                  <p className="text-xl font-black tabular-nums text-amber-500">{minutesLeft(topUp.intent.expiresAt, now)}</p>
+                </div>
+              </div>
+
+              <div className="rounded-2xl border-2 border-dashed border-primary/40 bg-primary/5 p-4 text-center">
+                <p className="text-[11px] uppercase tracking-wider text-muted-foreground font-bold mb-2">{t("credits.daCode")}</p>
+                <div className="flex items-center justify-center gap-2">
+                  <code className="text-2xl sm:text-3xl font-black tracking-[0.14em] tabular-nums">{topUp.intent.code}</code>
+                  <Button size="icon" variant="outline" className="rounded-xl shrink-0" onClick={copyCode} aria-label={t("credits.daCopy")}>
+                    <Copy className="w-4 h-4" />
+                  </Button>
+                </div>
+                <p className="text-[11px] text-muted-foreground mt-2">{t("credits.daCodeHint")}</p>
+              </div>
+
+              <div className="space-y-1.5 text-xs text-muted-foreground">
+                <p className="flex gap-2"><span className="font-black text-primary">1.</span> {t("credits.daStep1")}</p>
+                <p className="flex gap-2"><span className="font-black text-primary">2.</span> {t("credits.daStep2")}</p>
+                <p className="flex gap-2"><span className="font-black text-primary">3.</span> {t("credits.daStep3", { amount: formatMoney(topUp.intent.amountMinor, topUp.intent.currency) })}</p>
+              </div>
+
+              <div className="flex gap-2 rounded-xl border border-amber-500/30 bg-amber-500/10 p-3 text-[11px] text-amber-600 dark:text-amber-400">
+                <AlertTriangle className="w-4 h-4 shrink-0" />
+                <span>{t("credits.daWarning")}</span>
+              </div>
+
+              <a href={topUp.intent.donateUrl} target="_blank" rel="noopener noreferrer" className="block">
+                <Button className="w-full h-12 rounded-xl brand-gradient text-white font-bold text-base">
+                  <ExternalLink className="w-5 h-5" /> {t("credits.daOpen")}
+                </Button>
+              </a>
+
+              <p className="text-[11px] text-center text-muted-foreground flex items-center justify-center gap-1.5">
+                <Loader2 className="w-3.5 h-3.5 animate-spin" /> {t("credits.daWaiting")}
               </p>
             </div>
-          )}
+          ) : null}
         </DialogContent>
       </Dialog>
       </>

@@ -87,6 +87,9 @@ model User {
   watchPartyMembers    WatchPartyMember[]
   watchPartyMessages   WatchPartyMessage[]
   creditPackagesPaid   StarsPayment[]
+  donationIntents      DonationIntent[]         @relation("DonationIntentUser")
+  payoutRequests       PayoutRequest[]          @relation("PayoutUser")
+  payoutsProcessed     PayoutRequest[]          @relation("PayoutAdmin")
   animeRatings         AnimeRating[]
   watchEvents          WatchEvent[]
   // 10-QISM
@@ -180,11 +183,14 @@ model CreditPackage {
   id         String  @id
   name       String
   credits    Int
-  starsPrice Int
+  starsPrice Int // legacy Telegram Stars price, kept for historical rows
+  priceDa    Int     @default(0) @map("price_da") // price in DonationAlerts currency units
   bonus      Int     @default(0)
   popular    Boolean @default(false)
   active     Boolean @default(true)
   sortOrder  Int     @default(0)
+
+  donationIntents DonationIntent[]
 }
 
 model StarsPayment {
@@ -205,6 +211,89 @@ model StarsPayment {
 
   @@index([userId, status])
   @@map("star_payments")
+}
+
+/// Encrypted OAuth credentials for the platform's DonationAlerts account.
+/// Tokens are sealed with AES-256-GCM (DONATIONALERTS_TOKEN_KEY).
+model DonationAlertsAuth {
+  id              String   @id @default("primary")
+  daUserId        String   @map("da_user_id")
+  daUserName      String?  @map("da_user_name")
+  accessToken     String   @map("access_token")
+  refreshToken    String   @map("refresh_token")
+  accessExpiresAt DateTime @map("access_expires_at")
+  connectedById   String?  @map("connected_by_id")
+  connectedAt     DateTime @default(now()) @map("connected_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  @@map("donation_alerts_auth")
+}
+
+/// One top-up attempt. The user sends exactly amountMinor in the DA currency
+/// with the code in the donation message; the code is single-use.
+model DonationIntent {
+  id             String    @id @default(cuid())
+  userId         String    @map("user_id")
+  packageId      String    @map("package_id")
+  code           String    @unique
+  amountMinor    Int       @map("amount_minor")
+  credits        Int
+  status         String    @default("pending") // pending | completed | expired | cancelled
+  donationId     String?   @unique @map("donation_id")
+  donatedMinor   Int?      @map("donated_minor")
+  creditsGranted Int?      @map("credits_granted")
+  createdAt      DateTime  @default(now()) @map("created_at")
+  expiresAt      DateTime  @map("expires_at")
+  completedAt    DateTime? @map("completed_at")
+  user           User      @relation("DonationIntentUser", fields: [userId], references: [id], onDelete: Cascade)
+  package        CreditPackage @relation(fields: [packageId], references: [id])
+  event          DonationEvent?
+
+  @@index([userId, status, createdAt])
+  @@index([status, expiresAt])
+  @@map("donation_intents")
+}
+
+/// Every donation seen by the listener or the sync job, including unmatched
+/// ones (kept for admin review). donationId is the DA id and the idempotency key.
+model DonationEvent {
+  donationId  String   @id @map("donation_id")
+  amountMinor Int      @map("amount_minor")
+  currency    String
+  message     String?
+  donorName   String?  @map("donor_name")
+  intentId    String?  @unique @map("intent_id")
+  status      String   @default("processed") // processed | unmatched | expired | ignored | wrong_currency
+  reason      String?
+  createdAt   DateTime @default(now()) @map("created_at")
+  receivedAt  DateTime @default(now()) @map("received_at")
+  intent      DonationIntent? @relation(fields: [intentId], references: [id], onDelete: SetNull)
+
+  @@index([status, receivedAt])
+  @@map("donation_events")
+}
+
+/// Creator cash-out request. Credits are held (debited) immediately; a rejection
+/// refunds them. Payout details (card/phone) are sealed at rest.
+model PayoutRequest {
+  id            String    @id @default(cuid())
+  userId        String    @map("user_id")
+  credits       Int
+  amountMinor   Int       @map("amount_minor")
+  currency      String    @default("RUB")
+  method        String // uzcard | humo | payme | click | bank | other
+  details       String // sealed JSON
+  status        String    @default("pending") // pending | paid | rejected | cancelled
+  adminNote     String?   @map("admin_note")
+  processedById String?   @map("processed_by_id")
+  createdAt     DateTime  @default(now()) @map("created_at")
+  processedAt   DateTime? @map("processed_at")
+  user          User      @relation("PayoutUser", fields: [userId], references: [id], onDelete: Cascade)
+  processedBy   User?     @relation("PayoutAdmin", fields: [processedById], references: [id], onDelete: SetNull)
+
+  @@index([userId, status, createdAt])
+  @@index([status, createdAt])
+  @@map("payout_requests")
 }
 
 model Gift {
