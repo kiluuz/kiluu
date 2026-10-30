@@ -3,6 +3,7 @@ import { db } from "@/lib/db";
 import { getCurrentUser } from "@/lib/auth";
 import { isCreator } from "@/lib/rbac";
 import { APP_CONFIG } from "@/lib/config";
+import { assertPublishTeam, dubErrorInfo } from "@/lib/dub-teams";
 
 export async function GET() {
   const user = await getCurrentUser();
@@ -17,6 +18,7 @@ export async function GET() {
     include: {
       _count: { select: { episodes: true, purchases: true, favorites: true } },
       catalogVersions: { select: { id: true, status: true, price: true, kind: true } },
+      dubTeam: { select: { id: true, name: true, reputation: true, verified: true, _count: { select: { members: true } } } },
     },
   });
 
@@ -44,6 +46,9 @@ export async function GET() {
       moderationStatus: a.moderationStatus,
       hidden: a.hidden,
       versions: a.catalogVersions,
+      dubTeam: a.dubTeam
+        ? { id: a.dubTeam.id, name: a.dubTeam.name, memberCount: a.dubTeam._count.members, reputation: a.dubTeam.reputation, verified: a.dubTeam.verified }
+        : null,
       createdAt: a.createdAt,
     })),
   });
@@ -60,8 +65,16 @@ export async function POST(req: NextRequest) {
     const body = await req.json().catch(() => ({}));
     const {
       title, altTitle, description, coverImage, bannerImage,
-      genres, year, studio, status, type, isFree, price, releaseDate,
+      genres, year, studio, status, type, isFree, price, releaseDate, dubTeamId,
     } = body;
+
+    let publishTeam: Awaited<ReturnType<typeof assertPublishTeam>>;
+    try {
+      publishTeam = await assertPublishTeam(dubTeamId, user.id);
+    } catch (error) {
+      const info = dubErrorInfo(error);
+      return NextResponse.json({ error: info.message, code: info.code }, { status: info.status });
+    }
 
     if (!title || typeof title !== "string" || title.trim().length < 2 || title.trim().length > 120) {
       return NextResponse.json({ error: "Title must be 2-120 characters" }, { status: 400 });
@@ -123,6 +136,7 @@ export async function POST(req: NextRequest) {
           isFree: isFreeBool,
           price: priceInt,
           creatorId: user.id,
+          dubTeamId: publishTeam.team.id,
           source: "CREATOR",
           moderationStatus: "PENDING",
           hidden: true,
@@ -142,7 +156,10 @@ export async function POST(req: NextRequest) {
       return created;
     });
 
-    return NextResponse.json({ anime, pending: true }, { status: 201 });
+    return NextResponse.json(
+      { anime, pending: true, dubTeam: { id: publishTeam.team.id, name: publishTeam.team.name, memberCount: publishTeam.linkedMemberCount } },
+      { status: 201 }
+    );
   } catch (e) {
     console.error("publish anime error", e);
     return NextResponse.json({ error: "Failed to publish anime" }, { status: 500 });

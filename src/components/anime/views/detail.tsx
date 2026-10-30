@@ -31,11 +31,13 @@ interface DubCreditItem {
     avatarUrl: string | null;
     reputation: number;
     verified: boolean;
+    _count: { members: number };
   };
   cast: { id: string; speakerName: string; character: string }[];
   rating: number | null;
   ratingCount: number;
   myRating: number | null;
+  verification: { confirmed: number; rejected: number };
 }
 
 interface DetailResponse {
@@ -538,6 +540,31 @@ export function DetailView() {
               ))}
             </div>
 
+            {anime.dubTeam && (
+              <div className="mt-4 inline-flex items-center gap-3 rounded-2xl border bg-secondary/30 px-4 py-2.5">
+                <Mic2 className="w-4 h-4 text-primary shrink-0" />
+                <div className="text-left">
+                  <p className="text-sm font-bold leading-tight">{anime.dubTeam.name}</p>
+                  <p className="text-[11px] text-muted-foreground">
+                    Dub jamoasi · {anime.dubTeam.memberCount} a'zo · obro‘ {anime.dubTeam.reputation}/100
+                  </p>
+                </div>
+                <span
+                  className="text-[10px] font-bold rounded-full px-2 py-0.5 border shrink-0"
+                  style={{
+                    color: anime.dubTeam.title.color,
+                    borderColor: `${anime.dubTeam.title.color}55`,
+                    backgroundColor: `${anime.dubTeam.title.color}14`,
+                  }}
+                >
+                  {anime.dubTeam.title.label}
+                </span>
+                {anime.dubTeam.verified && (
+                  <ShieldCheck className="w-4 h-4 text-emerald-500 shrink-0" />
+                )}
+              </div>
+            )}
+
             {anilistEntry && (anilistEntry.airingAt * 1000 - now > 0) && (
               <div className="mt-6 p-5 rounded-3xl border-2 border-primary/20 bg-primary/5 flex items-center justify-between gap-4 flex-wrap max-w-md mx-auto md:mx-0 shadow-lg shadow-primary/5 relative overflow-hidden">
                 <div className="absolute top-0 left-0 w-full h-1 bg-primary/20" />
@@ -921,10 +948,19 @@ export function DetailView() {
                           )}
                         </div>
                         <p className="text-[11px] text-muted-foreground mt-1">
-                          {DUB_LANGUAGE_LABELS[credit.language] ?? credit.language} · {credit.speakerCount} speaker · obro‘{" "}
-                          {credit.team.reputation}/100
+                          {DUB_LANGUAGE_LABELS[credit.language] ?? credit.language} · {credit.speakerCount} speaker ·{" "}
+                          {credit.team._count.members} a’zo · obro‘ {credit.team.reputation}/100
                           {credit.ratingCount > 0 ? ` · ${credit.rating} / 10 (${credit.ratingCount} baho)` : ""}
                         </p>
+                        {(credit.verification.confirmed > 0 || credit.verification.rejected > 0) && (
+                          <p className="text-[11px] mt-1 flex items-center gap-1.5">
+                            <ShieldCheck className="w-3.5 h-3.5 text-emerald-500" />
+                            <span className="text-emerald-500 font-semibold">{credit.verification.confirmed} tasdiq</span>
+                            <span className="text-muted-foreground">·</span>
+                            <span className="text-muted-foreground">{credit.verification.rejected} rad</span>
+                            <span className="text-muted-foreground">(bot tekshiruvi: {credit.speakerCount} speaker)</span>
+                          </p>
+                        )}
                         <div className="flex flex-wrap gap-1.5 mt-3">
                           {credit.cast.map((row) => (
                             <span key={row.id} className="rounded-full bg-secondary/60 border px-2.5 py-1 text-[11px]">
@@ -1008,25 +1044,45 @@ export function DetailView() {
                 </div>
               ))}
               <div className="border-t pt-3">
-                <p className="text-xs font-semibold mb-2">{anime.myRating ? `Your rating: ${anime.myRating}/10` : "Rate this anime"}</p>
-                <div className="grid grid-cols-10 gap-1">
-                  {Array.from({ length: 10 }, (_, index) => index + 1).map((rating) => (
-                    <button
-                      key={rating}
-                      type="button"
-                      disabled={ratingBusy}
-                      onClick={() => void rateAnime(rating)}
-                      aria-label={`Rate ${rating} out of 10`}
-                      aria-pressed={anime.myRating === rating}
-                      className={cn(
-                        "h-7 rounded-md border text-[10px] font-bold transition-colors disabled:opacity-50",
-                        anime.myRating === rating ? "border-primary bg-primary text-primary-foreground" : "border-border hover:border-primary hover:text-primary"
-                      )}
-                    >
-                      {rating}
-                    </button>
-                  ))}
+                <p className="text-xs font-semibold mb-2">
+                  {anime.myRating
+                    ? `Sizning bahoyingiz: ${(anime.myRating / 2).toFixed(1)} / 5`
+                    : "Animega yulduzcha bering"}
+                </p>
+                <div className="flex items-center gap-1">
+                  {Array.from({ length: 5 }, (_, index) => index + 1).map((star) => {
+                    const filled = anime.myRating !== null && anime.myRating / 2 >= star;
+                    const half = anime.myRating !== null && !filled && anime.myRating / 2 >= star - 0.5;
+                    return (
+                      <button
+                        key={star}
+                        type="button"
+                        disabled={ratingBusy}
+                        onClick={() => void rateAnime(star * 2)}
+                        aria-label={`Rate ${star} out of 5 stars`}
+                        aria-pressed={anime.myRating === star * 2}
+                        className="p-0.5 disabled:opacity-50 hover:scale-110 transition-transform"
+                      >
+                        <Star
+                          className={cn(
+                            "w-6 h-6 transition-colors",
+                            filled
+                              ? "fill-amber-400 text-amber-400"
+                              : half
+                                ? "fill-amber-400/40 text-amber-400"
+                                : "text-muted-foreground/40"
+                          )}
+                        />
+                      </button>
+                    );
+                  })}
+                  {anime.ratingCount > 0 && (
+                    <span className="text-[11px] text-muted-foreground ml-1">{anime.ratingCount} baho</span>
+                  )}
                 </div>
+                <p className="text-[10px] text-muted-foreground mt-1.5">
+                  Botda bergan yulduzchalaringiz shu yerda avtomatik ko‘rinadi.
+                </p>
               </div>
             </div>
 

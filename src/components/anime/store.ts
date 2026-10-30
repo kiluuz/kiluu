@@ -25,7 +25,7 @@ export function viewToPath(view: View): string {
     case "library":
       return "/library";
     case "community":
-      return "/community";
+      return view.filters?.club ? `/community?club=${encodeURIComponent(view.filters.club)}` : "/community";
     case "watch-together":
       return "/watch-together";
     case "credits":
@@ -79,7 +79,8 @@ export function pathToView(pathname: string, search: string = ""): View {
     return { name: "library" };
   }
   if (cleanPath === "/community") {
-    return { name: "community" };
+    const club = params.get("club");
+    return club ? { name: "community", filters: { club } } : { name: "community" };
   }
   if (cleanPath === "/watch-together") {
     return { name: "watch-together" };

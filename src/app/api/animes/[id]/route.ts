@@ -7,7 +7,7 @@ import { isCreator } from "@/lib/rbac";
 import { userOwnsVersion } from "@/lib/owns";
 import { sqlTable } from "@/lib/sql-table";
 import { isVerifiedByFollowerCount } from "@/lib/verification";
-import { dubCreditsForAnime } from "@/lib/dub-teams";
+import { dubCreditsForAnime, dubTeamTitle } from "@/lib/dub-teams";
 
 const episodeSyncCooldowns = new Map<string, number>();
 
@@ -31,6 +31,17 @@ export async function GET(
         include: {
           creator: { select: { username: true, displayName: true } },
           _count: { select: { episodes: true, purchases: true } },
+        },
+      },
+      dubTeam: {
+        select: {
+          id: true,
+          name: true,
+          slug: true,
+          avatarUrl: true,
+          reputation: true,
+          verified: true,
+          _count: { select: { members: true } },
         },
       },
       _count: { select: { purchases: true, favorites: true } },
@@ -186,6 +197,18 @@ export async function GET(
       myRating: myRating?.rating ?? null,
       catalogRating: anime.rating,
       source: anime.source,
+      dubTeam: anime.dubTeam
+        ? {
+            id: anime.dubTeam.id,
+            name: anime.dubTeam.name,
+            slug: anime.dubTeam.slug,
+            avatarUrl: anime.dubTeam.avatarUrl,
+            reputation: anime.dubTeam.reputation,
+            verified: anime.dubTeam.verified,
+            title: dubTeamTitle(anime.dubTeam.reputation, anime.dubTeam.verified),
+            memberCount: anime.dubTeam._count.members,
+          }
+        : null,
       versions: await Promise.all(
         anime.catalogVersions
           .filter((v) => v.status === "published" || staff)

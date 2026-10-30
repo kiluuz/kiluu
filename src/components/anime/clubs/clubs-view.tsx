@@ -71,7 +71,7 @@ interface ClubMemberItem {
   };
 }
 
-export function ClubsView() {
+export function ClubsView({ initialClubId }: { initialClubId?: string }) {
   const { user, setAuthOpen } = useAppStore();
   const openProfile = useOpenProfile();
 
@@ -79,7 +79,7 @@ export function ClubsView() {
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState("popular");
   const [search, setSearch] = useState("");
-  const [selectedClubId, setSelectedClubId] = useState<string | null>(null);
+  const [selectedClubId, setSelectedClubId] = useState<string | null>(initialClubId ?? null);
   const [clubDetail, setClubDetail] = useState<any | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
   const [detailTab, setDetailTab] = useState<"chat" | "members" | "settings">("chat");
@@ -94,6 +94,56 @@ export function ClubsView() {
 
   // Invite code generation states
   const [inviteCode, setInviteCode] = useState<string | null>(null);
+
+  // Dub jamoasi takliflari
+  const [dubInvites, setDubInvites] = useState<
+    { id: string; team: { id: string; name: string; avatarUrl?: string | null } }[]
+  >([]);
+  const [inviteBusyId, setInviteBusyId] = useState<string | null>(null);
+
+  useEffect(() => {
+    let active = true;
+    (async () => {
+      if (!user) {
+        if (active) setDubInvites([]);
+        return;
+      }
+      try {
+        const res = await fetch("/api/dub-team-invites");
+        const data = await res.json();
+        if (active) setDubInvites(Array.isArray(data.invites) ? data.invites : []);
+      } catch {
+        if (active) setDubInvites([]);
+      }
+    })();
+    return () => {
+      active = false;
+    };
+  }, [user]);
+
+  const respondDubInvite = async (inviteId: string, accept: boolean) => {
+    setInviteBusyId(inviteId);
+    try {
+      const res = await fetch(`/api/dub-team-invites/${inviteId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ accept }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Taklifga javob berilmadi");
+      setDubInvites((current) => current.filter((invite) => invite.id !== inviteId));
+      if (accept) {
+        toast.success("Taklif qabul qilindi — jamoa chatiga qo'shildingiz");
+        fetchClubs();
+      } else {
+        toast.info("Taklif rad etildi");
+      }
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Xatolik");
+    } finally {
+      setInviteBusyId(null);
+    }
+  };
 
   const fetchClubs = async () => {
     setLoading(true);
@@ -128,14 +178,14 @@ export function ClubsView() {
 
   // Load single club details when opened
   useEffect(() => {
-    if (!selectedClubId) {
-      setClubDetail(null);
-      return;
-    }
-    setDetailLoading(true);
-    fetch(`/api/clubs/${selectedClubId}`)
-      .then((r) => r.json())
-      .then((d) => {
+    if (!selectedClubId) return;
+    let active = true;
+    (async () => {
+      setDetailLoading(true);
+      try {
+        const r = await fetch(`/api/clubs/${selectedClubId}`);
+        const d = await r.json();
+        if (!active) return;
         if (d.club) {
           setClubDetail(d.club);
           setDetailTab("chat");
@@ -143,11 +193,15 @@ export function ClubsView() {
           toast.error(d.error || "Klub topilmadi");
           setSelectedClubId(null);
         }
-      })
-      .catch(() => {
-        toast.error("Klub ma'lumotlarini yuklashda xatolik");
-      })
-      .finally(() => setDetailLoading(false));
+      } catch {
+        if (active) toast.error("Klub ma'lumotlarini yuklashda xatolik");
+      } finally {
+        if (active) setDetailLoading(false);
+      }
+    })();
+    return () => {
+      active = false;
+    };
   }, [selectedClubId]);
 
   const handleCreateClub = async () => {
@@ -279,7 +333,7 @@ export function ClubsView() {
   };
 
   // ─── Klub Detal Ko'rinishi (Chat + A'zolar + Sozlamalar) ───────────────────
-  if (selectedClubId && clubDetail) {
+  if (selectedClubId && clubDetail && clubDetail.id === selectedClubId) {
     const isStaff =
       clubDetail.myRole === "owner" ||
       clubDetail.myRole === "mod" ||
@@ -705,6 +759,49 @@ export function ClubsView() {
           />
         </div>
       </div>
+
+      {dubInvites.length > 0 && (
+        <div className="space-y-2">
+          {dubInvites.map((invite) => (
+            <div
+              key={invite.id}
+              className="flex flex-wrap items-center gap-3 rounded-2xl border border-primary/30 bg-primary/5 p-3.5"
+            >
+              <div className="w-9 h-9 rounded-full bg-primary/15 flex items-center justify-center shrink-0">
+                <Users className="w-4 h-4 text-primary" />
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="text-sm font-bold truncate">
+                  {invite.team.name} sizni dub jamoasiga taklif qildi
+                </p>
+                <p className="text-[11px] text-muted-foreground">
+                  Qabul qilsangiz jamoa a'zosi bo'lasiz va yopiq jamoa chatiga qo'shilasiz.
+                </p>
+              </div>
+              <div className="flex items-center gap-2 shrink-0">
+                <Button
+                  size="sm"
+                  onClick={() => respondDubInvite(invite.id, true)}
+                  disabled={inviteBusyId === invite.id}
+                  className="rounded-full font-bold"
+                >
+                  {inviteBusyId === invite.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}
+                  Qabul qilish
+                </Button>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => respondDubInvite(invite.id, false)}
+                  disabled={inviteBusyId === invite.id}
+                  className="rounded-full"
+                >
+                  <X className="w-3.5 h-3.5" /> Rad etish
+                </Button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
 
       {/* Clubs Grid */}
       {loading ? (

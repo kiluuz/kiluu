@@ -18,9 +18,16 @@ export async function POST(req: NextRequest, context: RouteContext) {
 
     const club = await db.club.findUnique({
       where: { id },
+      include: { dubTeam: { select: { id: true } } },
     });
     if (!club) {
       return NextResponse.json({ error: "Klub topilmadi" }, { status: 404 });
+    }
+    if (club.dubTeam) {
+      return NextResponse.json(
+        { error: "Dub jamoasi chatiga faqat jamoa egasi yuborgan taklif bilan qo'shilasiz" },
+        { status: 403 }
+      );
     }
 
     // A'zolikni tekshirish

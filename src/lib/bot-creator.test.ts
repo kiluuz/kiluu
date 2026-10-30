@@ -124,7 +124,8 @@ test("creator anime and Telegram episodes persist only in the linked creator col
   assert.match(created.anime.slug, /^creator-uploaded-anime-[a-f0-9]{10}$/);
   const storedAnime = await db.anime.findUniqueOrThrow({ where: { id: created.anime.id } });
   assert.equal(storedAnime.coverImage, `https://bot.example/poster/${created.anime.slug}?v=poster-1`);
-  assert.equal(storedAnime.hidden, true);
+  assert.equal(storedAnime.hidden, false);
+  assert.equal(storedAnime.moderationStatus, "APPROVED");
 
   const repeatedAnimeResponse = await postCreatorContent(createRequest({
     site_user_id: creatorId,
@@ -159,7 +160,7 @@ test("creator anime and Telegram episodes persist only in the linked creator col
   const episode = await episodeResponse.json();
   assert.equal(episode.episode.number, 1);
   assert.equal(await db.episode.count({
-    where: { animeId: created.anime.id, telegramMessageId: "8001001", videoUrl: "telegram" },
+    where: { animeId: created.anime.id, telegramMessageId: "8001001", videoUrl: { endsWith: "/stream/8001001" } },
   }), 1);
 
   const duplicateEpisodeResponse = await postCreatorContent(episodeRequest());

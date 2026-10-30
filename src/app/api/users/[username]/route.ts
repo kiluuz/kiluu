@@ -8,7 +8,7 @@ import { Prisma } from "@prisma/client";
 import { sqlTable } from "@/lib/sql-table";
 import { isVerifiedByFollowerCount } from "@/lib/verification";
 import { giftRarityRankById, collectibleRarity } from "@/lib/gift-rarity";
-import { animeDubSignals } from "@/lib/dub-teams";
+import { animeDubSignals, dubTeamTitle } from "@/lib/dub-teams";
 
 const ANIME_CARD = {
   id: true, slug: true, title: true, coverImage: true, bannerImage: true,
@@ -312,6 +312,25 @@ export async function GET(
       sender: gift.sender,
     }));
 
+  const dubMembership = await db.dubTeamMember.findFirst({
+    where: { userId: user.id, team: { status: "active" } },
+    orderBy: { createdAt: "asc" },
+    select: {
+      role: true,
+      team: {
+        select: {
+          id: true,
+          name: true,
+          slug: true,
+          avatarUrl: true,
+          reputation: true,
+          verified: true,
+          _count: { select: { members: true } },
+        },
+      },
+    },
+  });
+
   return NextResponse.json({
     profile: {
       id: user.id,
@@ -372,6 +391,19 @@ export async function GET(
         liked: myLikedPostIds.includes(p.id),
       })) : [],
       watchSeconds: privacy.showWatchTime || isMe ? watchSeconds : null,
+      dubTeam: dubMembership
+        ? {
+            id: dubMembership.team.id,
+            name: dubMembership.team.name,
+            slug: dubMembership.team.slug,
+            avatarUrl: dubMembership.team.avatarUrl,
+            reputation: dubMembership.team.reputation,
+            verified: dubMembership.team.verified,
+            memberCount: dubMembership.team._count.members,
+            role: dubMembership.role,
+            title: dubTeamTitle(dubMembership.team.reputation, dubMembership.team.verified),
+          }
+        : null,
       isFollowing,
       isMe,
     },

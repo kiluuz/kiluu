@@ -16,19 +16,26 @@ export async function GET(req: NextRequest) {
     if (tab === "level") orderBy = { xp: "desc" };
     if (tab === "new") orderBy = { createdAt: "desc" };
 
-    const where: any = {};
+    const conditions: any[] = [
+      user
+        ? { OR: [{ isPublic: true }, { members: { some: { userId: user.id } } }] }
+        : { isPublic: true },
+    ];
     if (search) {
-      where.OR = [
-        { name: { contains: search, mode: "insensitive" } },
-        { tag: { contains: search.toUpperCase(), mode: "insensitive" } },
-      ];
+      conditions.push({
+        OR: [
+          { name: { contains: search, mode: "insensitive" } },
+          { tag: { contains: search.toUpperCase(), mode: "insensitive" } },
+        ],
+      });
     }
 
     if (tab === "my" && user) {
-      where.members = {
-        some: { userId: user.id },
-      };
+      conditions.push({
+        members: { some: { userId: user.id } },
+      });
     }
+    const where: any = { AND: conditions };
 
     const clubs = await db.club.findMany({
       where,

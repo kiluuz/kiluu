@@ -31,12 +31,14 @@ type CommunityReport = {
 };
 
 export function CommunityView() {
-  const { user, setAuthOpen } = useAppStore();
+  const { user, view, setAuthOpen } = useAppStore();
   const { t } = useI18n();
   const queryClient = useQueryClient();
   const openProfile = useOpenProfile();
 
-  const [communityMode, setCommunityMode] = useState<"feed" | "clubs" | "referral">("feed");
+  const [communityMode, setCommunityMode] = useState<"feed" | "clubs" | "referral">(
+    view.name === "community" && view.filters?.club ? "clubs" : "feed"
+  );
   const [tab, setTab] = useState("latest");
   const [activeCategory, setActiveCategory] = useState("All");
   const feedKey = `${user?.id ?? "anonymous"}:${tab}:${activeCategory}`;
@@ -562,7 +564,7 @@ export function CommunityView() {
       </div>
 
       {communityMode === "clubs" ? (
-        <ClubsView />
+        <ClubsView initialClubId={view.name === "community" ? view.filters?.club : undefined} />
       ) : communityMode === "referral" ? (
         <div className="max-w-4xl mx-auto">
           <ReferralView />

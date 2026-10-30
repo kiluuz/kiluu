@@ -5,7 +5,7 @@ import {
   BadgeCheck, Crown, CalendarDays, Heart, Film, Star, Timer, Package, Users,
   Pencil, Loader2, Smile, Sparkles, Lock, Check,
   Play, MessageSquare, ThumbsUp, Trophy, Clapperboard,
-  Instagram, Youtube, Twitter, MapPin, Clock, Layers, Gift,
+  Instagram, Youtube, Twitter, MapPin, Clock, Layers, Gift, Mic2,
 } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -645,6 +645,13 @@ function IdentityColumn({ profile }: { profile: PublicProfile }) {
           <div className="flex items-center gap-2.5 text-sm">
             <Clock className="w-4 h-4 text-muted-foreground shrink-0" />
             <span className="font-semibold">{profile.timezone}</span>
+          </div>
+        )}
+        {profile.dubTeam && (
+          <div className="flex items-center gap-2.5 text-sm">
+            <Mic2 className="w-4 h-4 text-muted-foreground shrink-0" />
+            <span className="text-muted-foreground">Dubbing jamoasi</span>
+            <span className="ml-auto font-semibold text-right">{profile.dubTeam.name}</span>
           </div>
         )}
         <SocialLinksRow links={profile.socialLinks ?? {}} />

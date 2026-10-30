@@ -245,8 +245,6 @@ export async function POST(req: NextRequest) {
       where: {
         slug: parsed.data.slug,
         creatorId: user.id,
-        moderationStatus: "PENDING",
-        hidden: true,
       },
       select: { id: true },
     });

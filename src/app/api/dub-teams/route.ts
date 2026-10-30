@@ -10,15 +10,23 @@ export async function GET(req: NextRequest) {
     if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     const teams = await listDubTeams({ ownerId: user.id });
     return NextResponse.json(
-      { teams: teams.map(({ credits, ...team }) => ({ ...team, animeCount: new Set(credits.map((row) => row.animeId)).size })) },
+      { teams: teams.map(shapeTeam) },
       { headers: { "Cache-Control": "private, no-store" } }
     );
   }
   const teams = await listDubTeams();
   return NextResponse.json(
-    { teams: teams.map(({ credits, ...team }) => ({ ...team, animeCount: new Set(credits.map((row) => row.animeId)).size })) },
+    { teams: teams.map(shapeTeam) },
     { headers: { "Cache-Control": "public, s-maxage=60, stale-while-revalidate=300" } }
   );
+}
+
+function shapeTeam({ credits, members, ...team }: Awaited<ReturnType<typeof listDubTeams>>[number]) {
+  return {
+    ...team,
+    animeCount: new Set(credits.map((row) => row.animeId)).size,
+    linkedMemberCount: members.length,
+  };
 }
 
 export async function POST(req: NextRequest) {

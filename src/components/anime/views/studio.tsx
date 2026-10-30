@@ -32,6 +32,17 @@ interface CreatorAnime extends AnimeSummary {
   favoriteCount: number;
   moderationStatus?: string;
   hidden?: boolean;
+  dubTeam?: { id: string; name: string; memberCount: number; reputation: number; verified: boolean } | null;
+}
+
+interface MyDubTeam {
+  id: string;
+  name: string;
+  status: string;
+  reputation: number;
+  verified: boolean;
+  linkedMemberCount: number;
+  _count: { members: number; credits: number };
 }
 
 export function StudioView() {
@@ -54,6 +65,7 @@ export function StudioView() {
   const [isFree, setIsFree] = useState(false);
   const [price, setPrice] = useState("100");
   const [releaseDate, setReleaseDate] = useState("");
+  const [dubTeamId, setDubTeamId] = useState("");
   const [publishing, setPublishing] = useState(false);
   const [autoFetching, setAutoFetching] = useState(false);
 
@@ -118,6 +130,26 @@ export function StudioView() {
   const animes = studioData?.animes ?? [];
   const earnings = studioData?.earnings ?? 0;
 
+  const teamsQuery = useQuery({
+    queryKey: ["dub-teams", "mine", user?.id ?? "anonymous"],
+    queryFn: async () => {
+      const response = await fetch("/api/dub-teams?mine=1");
+      if (!response.ok) throw new Error(`Team request failed (${response.status})`);
+      const data: { teams?: MyDubTeam[] } = await response.json();
+      return data.teams ?? [];
+    },
+    enabled: Boolean(user && user.role === "CREATOR"),
+    staleTime: 60_000,
+    retry: false,
+  });
+
+  const eligibleTeams = (teamsQuery.data ?? []).filter(
+    (team) => team.status === "active" && team.linkedMemberCount >= 3
+  );
+  const activeDubTeamId = eligibleTeams.some((team) => team.id === dubTeamId)
+    ? dubTeamId
+    : eligibleTeams[0]?.id ?? "";
+
   useEffect(() => {
     if (studioError) {
       console.error("Failed to load creator studio", studioError);
@@ -173,6 +205,10 @@ export function StudioView() {
       toast.error("Choose at least one genre");
       return;
     }
+    if (!activeDubTeamId) {
+      toast.error("Dub jamoasini tanlang — jamoada kamida 3 ta a'zo bo'lishi kerak");
+      return;
+    }
     setPublishing(true);
     try {
       const res = await fetch("/api/creator", {
@@ -183,6 +219,7 @@ export function StudioView() {
           genres, year, studio, status, type,
           isFree, price: isFree ? 0 : price,
           releaseDate: status === "UPCOMING" && releaseDate ? releaseDate : null,
+          dubTeamId: activeDubTeamId,
         }),
       });
       const d = await res.json();
@@ -355,6 +392,11 @@ export function StudioView() {
                   <span className="flex items-center gap-1"><Film className="w-3 h-3" /> {a.episodeCount} eps</span>
                   <span className="flex items-center gap-1"><Users className="w-3 h-3" /> {a.purchaseCount} buyers</span>
                   <span className="flex items-center gap-1"><Heart className="w-3 h-3" /> {a.favoriteCount}</span>
+                  {a.dubTeam && (
+                    <span className="flex items-center gap-1 text-primary font-semibold">
+                      <Users className="w-3 h-3" /> {a.dubTeam.name} · {a.dubTeam.memberCount} a'zo
+                    </span>
+                  )}
                 </div>
               </div>
               <Button
@@ -518,6 +560,34 @@ export function StudioView() {
                   <p className="text-[10px] text-muted-foreground">Shown to users. A reminder is sent when it is released.</p>
                 </div>
               )}
+            </div>
+
+            <div className="space-y-1.5 rounded-xl border border-primary/25 bg-primary/5 p-3.5">
+              <Label className="text-xs font-semibold flex items-center gap-1.5">
+                <Users className="w-3.5 h-3.5 text-primary" /> Dub jamoasi * <span className="text-muted-foreground font-normal">(kamida 3 a'zo)</span>
+              </Label>
+              {eligibleTeams.length > 0 ? (
+                <Select value={activeDubTeamId} onValueChange={setDubTeamId} disabled={teamsQuery.isPending}>
+                  <SelectTrigger className="h-10 rounded-xl">
+                    <SelectValue placeholder="Jamoani tanlang" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {eligibleTeams.map((team) => (
+                      <SelectItem key={team.id} value={team.id}>
+                        {team.name} · {team.linkedMemberCount} a'zo
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              ) : (
+                <p className="text-[11px] text-amber-600 dark:text-amber-400">
+                  Anime chiqarish uchun kamida 3 ta tizim a'zosi bo'lgan dub jamoasi kerak. Pastdagi
+                  "Dub jamoasi — Cast & Reputation" bo'limida jamoa yaratib, a'zolarni Kiluu saytidan taklif qiling.
+                </p>
+              )}
+              <p className="text-[10px] text-muted-foreground">
+                Jamoa nomi va a'zolar soni anime sahifasida ko'rinadi; har bir a'zoning profilida ham jamoa ko'rsatiladi.
+              </p>
             </div>
 
             <div className="flex items-center justify-between rounded-xl border p-3.5">

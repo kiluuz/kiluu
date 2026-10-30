@@ -62,6 +62,10 @@ export async function GET(req: NextRequest, context: RouteContext) {
       user?.role === "admin" ||
       user?.role === "ADMIN";
 
+    if (!club.isPublic && !myMembership && !isStaff) {
+      return NextResponse.json({ error: "Bu yopiq klub. Faqat a'zolar ko'ra oladi" }, { status: 403 });
+    }
+
     let joinRequests: any = null;
     let invites: any = null;
 

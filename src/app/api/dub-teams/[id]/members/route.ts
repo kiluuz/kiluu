@@ -1,6 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth";
-import { addDubTeamMember, assertTeamManager, dubErrorInfo, removeDubTeamMember } from "@/lib/dub-teams";
+import {
+  addDubTeamMember,
+  assertTeamManager,
+  dubErrorInfo,
+  inviteDubTeamMember,
+  removeDubTeamMember,
+} from "@/lib/dub-teams";
 
 export async function POST(
   req: NextRequest,
@@ -11,6 +17,10 @@ export async function POST(
   try {
     await assertTeamManager(id, user);
     const body = await req.json();
+    if (typeof body?.userId === "string" && body.userId) {
+      const invite = await inviteDubTeamMember(id, user!.id, body.userId);
+      return NextResponse.json({ invite, pending: true }, { status: 201 });
+    }
     const member = await addDubTeamMember(id, { name: body?.name, role: body?.role });
     return NextResponse.json({ member }, { status: 201 });
   } catch (error) {

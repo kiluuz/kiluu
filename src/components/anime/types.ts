@@ -143,6 +143,16 @@ export interface AnimeDetail extends AnimeSummary {
     isVerified?: boolean;
   } | null;
   versions?: AnimeVersionCard[];
+  dubTeam?: {
+    id: string;
+    name: string;
+    slug: string;
+    avatarUrl: string | null;
+    reputation: number;
+    verified: boolean;
+    title: { label: string; color: string };
+    memberCount: number;
+  } | null;
 }
 
 export interface HomeData {
@@ -347,6 +357,17 @@ export interface PublicProfile {
     commentCount: number;
     liked: boolean;
   }[];
+  dubTeam?: {
+    id: string;
+    name: string;
+    slug: string;
+    avatarUrl: string | null;
+    reputation: number;
+    verified: boolean;
+    memberCount: number;
+    role: string;
+    title: { label: string; color: string };
+  } | null;
   isFollowing: boolean;
   canFollow: boolean;
   isMe: boolean;

@@ -4,122 +4,125 @@ generator client {
 
 datasource db {
   provider  = "postgresql"
-  url      = env("DATABASE_URL")
+  url       = env("DATABASE_URL")
   directUrl = env("DIRECT_URL")
 }
 
 model User {
-  id             String   @id @default(cuid())
-  email          String   @unique
-  username       String   @unique
-  password       String
-  displayName    String?
-  role           String   @default("user") // user | creator | admin (legacy: VIEWER | CREATOR | ADMIN)
-  avatarUrl      String?
-  bannerUrl      String?
-  bio            String?
-  accentColor    String   @default("#f97316")
-  credits        Int      @default(0)
-  onboardingDone Boolean  @default(false)
-  favoriteGenres String   @default("")
-  telegramId     String?  @unique
+  id               String    @id @default(cuid())
+  email            String    @unique
+  username         String    @unique
+  password         String
+  displayName      String?
+  role             String    @default("user") // user | creator | admin (legacy: VIEWER | CREATOR | ADMIN)
+  avatarUrl        String?
+  bannerUrl        String?
+  bio              String?
+  accentColor      String    @default("#f97316")
+  credits          Int       @default(0)
+  onboardingDone   Boolean   @default(false)
+  favoriteGenres   String    @default("")
+  telegramId       String?   @unique
   telegramUsername String?
-  locale         String   @default("uz")
-  lastSeenAt     DateTime?
-  communityBlocked Boolean @default(false)
-  emailVerified  Boolean  @default(false)
-  verifyCode     String?
-  verifyCodeExp  DateTime?
-  deletedAt      DateTime? // set when the account is anonymized by the mobile bridge
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  locale           String    @default("uz")
+  lastSeenAt       DateTime?
+  communityBlocked Boolean   @default(false)
+  emailVerified    Boolean   @default(false)
+  verifyCode       String?
+  verifyCodeExp    DateTime?
+  deletedAt        DateTime? // set when the account is anonymized by the mobile bridge
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
 
   // ---- Discord-level customization ----
-  pronouns       String?   // e.g. "they/them"
-  tagline        String?   // short one-liner under name
-  country        String?   // ISO country code
-  timezone       String?   // IANA tz e.g. "Asia/Tashkent"
-  socialLinks    String?   // JSON {telegram, instagram, youtube, x}
-  statusEmoji    String?   // custom status emoji
-  statusText     String?   // custom status text
-  accentTo       String?   // gradient end color (accentColor is "from")
-  avatarFrame    String?   // none | gold | ember | neon | sakura (unlockable)
+  pronouns              String? // e.g. "they/them"
+  tagline               String? // short one-liner under name
+  country               String? // ISO country code
+  timezone              String? // IANA tz e.g. "Asia/Tashkent"
+  socialLinks           String? // JSON {telegram, instagram, youtube, x}
+  statusEmoji           String? // custom status emoji
+  statusText            String? // custom status text
+  accentTo              String? // gradient end color (accentColor is "from")
+  avatarFrame           String? // none | gold | ember | neon | sakura (unlockable)
   equippedAvatarFrameId String? @map("equipped_avatar_frame_id")
   equippedNameFrameId   String? @map("equipped_name_frame_id")
-  bannerPreset   String?   // preset banner id when using gallery
-  showcase       String?   // JSON {topFive:[], pinnedPostId, genres:[], achievementIds:[], order:[], hidden:{}}
-  privacy        String?   // JSON {showWatchTime, showFavorites, showActivity, allowFollows, profileVisibility}
+  bannerPreset          String? // preset banner id when using gallery
+  showcase              String? // JSON {topFive:[], pinnedPostId, genres:[], achievementIds:[], order:[], hidden:{}}
+  privacy               String? // JSON {showWatchTime, showFavorites, showActivity, allowFollows, profileVisibility}
 
-  sessions            Session[]
-  telegramLinkTokens  TelegramLinkToken[]
-  createdVersions     AnimeVersion[]      @relation("VersionCreator")
-  purchases           Purchase[]
-  orders            Order[]             // Telegram Bot Purchases
-  favoriteAnimes    FavoriteAnime[]
-  favoriteUsersFrom FavoriteUser[]      @relation("Favoriter")
-  favoriteUsersTo   FavoriteUser[]      @relation("Favorited")
-  following         Follow[]            @relation("FollowSource")
-  followers         Follow[]            @relation("FollowTarget")
-  posts             Post[]
-  postLikes         PostLike[]
-  comments          Comment[]
-  watchProgress     WatchProgress[]
-  creditTransactions CreditTransaction[]
-  exchangeOffers    ExchangeOffer[]
-  proposalsMade     ExchangeProposal[]  @relation("Proposer")
-  createdAnimes     Anime[]             @relation("AnimeCreator")
-  dubJobs           DubJob[]
-  notifySubscriptions AnimeNotify[]
-  xpEvents            XpEvent[]
-  userAchievements    UserAchievement[]
-  giftsSent           Gift[]            @relation("GiftSender")
-  giftsReceived       Gift[]            @relation("GiftRecipient")
-  notifications       Notification[]
-  postBookmarks       PostBookmark[]
-  postAwardsGiven     PostAward[]
-  reportsFiled        Report[]          @relation("Reporter")
-  commentsLiked       CommentLike[]
-  scheduleSubs        ScheduleSubscription[]
-  scheduleDeliveries  ScheduleDelivery[]
-  dubWaitlist         DubWaitlist[]
-  watchPartiesHosted  WatchParty[]      @relation("PartyHost")
-  watchPartiesCreated WatchParty[]      @relation("PartyCreator")
-  watchPartyMembers   WatchPartyMember[]
-  watchPartyMessages  WatchPartyMessage[]
-  creditPackagesPaid  StarsPayment[]
-  animeRatings        AnimeRating[]
-  watchEvents         WatchEvent[]
+  sessions             Session[]
+  telegramLinkTokens   TelegramLinkToken[]
+  createdVersions      AnimeVersion[]         @relation("VersionCreator")
+  purchases            Purchase[]
+  orders               Order[] // Telegram Bot Purchases
+  favoriteAnimes       FavoriteAnime[]
+  favoriteUsersFrom    FavoriteUser[]         @relation("Favoriter")
+  favoriteUsersTo      FavoriteUser[]         @relation("Favorited")
+  following            Follow[]               @relation("FollowSource")
+  followers            Follow[]               @relation("FollowTarget")
+  posts                Post[]
+  postLikes            PostLike[]
+  comments             Comment[]
+  watchProgress        WatchProgress[]
+  creditTransactions   CreditTransaction[]
+  exchangeOffers       ExchangeOffer[]
+  proposalsMade        ExchangeProposal[]     @relation("Proposer")
+  createdAnimes        Anime[]                @relation("AnimeCreator")
+  dubJobs              DubJob[]
+  notifySubscriptions  AnimeNotify[]
+  xpEvents             XpEvent[]
+  userAchievements     UserAchievement[]
+  giftsSent            Gift[]                 @relation("GiftSender")
+  giftsReceived        Gift[]                 @relation("GiftRecipient")
+  notifications        Notification[]
+  postBookmarks        PostBookmark[]
+  postAwardsGiven      PostAward[]
+  reportsFiled         Report[]               @relation("Reporter")
+  commentsLiked        CommentLike[]
+  scheduleSubs         ScheduleSubscription[]
+  scheduleDeliveries   ScheduleDelivery[]
+  dubWaitlist          DubWaitlist[]
+  watchPartiesHosted   WatchParty[]           @relation("PartyHost")
+  watchPartiesCreated  WatchParty[]           @relation("PartyCreator")
+  watchPartyMembers    WatchPartyMember[]
+  watchPartyMessages   WatchPartyMessage[]
+  creditPackagesPaid   StarsPayment[]
+  animeRatings         AnimeRating[]
+  watchEvents          WatchEvent[]
   // 10-QISM
-  clubsOwned          Club[]            @relation("ClubOwner")
-  clubMemberships     ClubMember[]
-  clubJoinRequests    ClubJoinRequest[]
-  chatMessages        ChatMessage[]
-  messageReactions    MessageReaction[]
-  pollVotes           PollVote[]
-  chatBans            ChatBan[]
-  blockedBy           UserBlock[]       @relation("Blocker")
-  blockedUsers        UserBlock[]       @relation("Blocked")
-  userEmotes          UserEmote[]
-  equippedAvatarFrame Frame? @relation("EquippedAvatarFrame", fields: [equippedAvatarFrameId], references: [id], onDelete: SetNull)
-  equippedNameFrame   Frame? @relation("EquippedNameFrame", fields: [equippedNameFrameId], references: [id], onDelete: SetNull)
-  frames              UserFrame[]
-  dubTeamsOwned       DubTeam[]          @relation("DubTeamOwner")
-  dubTeamMemberships  DubTeamMember[]    @relation("DubTeamMemberUser")
-  dubTeamRatings      DubTeamRating[]    @relation("DubTeamRatingUser")
+  clubsOwned           Club[]                 @relation("ClubOwner")
+  clubMemberships      ClubMember[]
+  clubJoinRequests     ClubJoinRequest[]
+  chatMessages         ChatMessage[]
+  messageReactions     MessageReaction[]
+  pollVotes            PollVote[]
+  chatBans             ChatBan[]
+  blockedBy            UserBlock[]            @relation("Blocker")
+  blockedUsers         UserBlock[]            @relation("Blocked")
+  userEmotes           UserEmote[]
+  equippedAvatarFrame  Frame?                 @relation("EquippedAvatarFrame", fields: [equippedAvatarFrameId], references: [id], onDelete: SetNull)
+  equippedNameFrame    Frame?                 @relation("EquippedNameFrame", fields: [equippedNameFrameId], references: [id], onDelete: SetNull)
+  frames               UserFrame[]
+  dubTeamsOwned        DubTeam[]              @relation("DubTeamOwner")
+  dubTeamMemberships   DubTeamMember[]        @relation("DubTeamMemberUser")
+  dubTeamRatings       DubTeamRating[]        @relation("DubTeamRatingUser")
+  dubTeamInvites       DubTeamInvite[]        @relation("DubTeamInviteUser")
+  dubTeamInvitesSent   DubTeamInvite[]        @relation("DubTeamInviteSender")
+  dubVerificationVotes DubVerificationVote[]
 
   // 11-QISM: Streak, Referral, Quests, Weekly Votes
-  referralCode        String?   @unique
-  referredById        String?
-  streakCount         Int       @default(0)
-  streakLastActiveAt  DateTime?
-  streakFreezeCount   Int       @default(0)
-  streakReminders     Boolean   @default(true)
-  referralsReceived   Referral[] @relation("Referrer")
-  referralRecord      Referral?  @relation("Referred")
-  userQuests          UserQuest[]
-  dailyClaims         UserDailyClaim[]
-  weeklyAnimeVotes    WeeklyAnimeVote[]
-  clubContributions   ClubQuestContribution[]
+  referralCode       String?                 @unique
+  referredById       String?
+  streakCount        Int                     @default(0)
+  streakLastActiveAt DateTime?
+  streakFreezeCount  Int                     @default(0)
+  streakReminders    Boolean                 @default(true)
+  referralsReceived  Referral[]              @relation("Referrer")
+  referralRecord     Referral?               @relation("Referred")
+  userQuests         UserQuest[]
+  dailyClaims        UserDailyClaim[]
+  weeklyAnimeVotes   WeeklyAnimeVote[]
+  clubContributions  ClubQuestContribution[]
 }
 
 model Frame {
@@ -185,44 +188,44 @@ model CreditPackage {
 }
 
 model StarsPayment {
-  id                    String   @id @default(cuid())
-  userId                String
-  kind                  String   // CREDITS | ANIME
-  packageId             String?
-  animeId               String?
-  starsAmount           Int
-  creditsGranted        Int      @default(0)
-  status                String   @default("PENDING") // PENDING | PAID | REFUNDED | FAILED
-  telegramChargeId      String?  @unique
+  id                      String   @id @default(cuid())
+  userId                  String
+  kind                    String // CREDITS | ANIME
+  packageId               String?
+  animeId                 String?
+  starsAmount             Int
+  creditsGranted          Int      @default(0)
+  status                  String   @default("PENDING") // PENDING | PAID | REFUNDED | FAILED
+  telegramChargeId        String?  @unique
   providerPaymentChargeId String?
-  invoicePayload        String?  @unique
-  createdAt             DateTime @default(now())
-  updatedAt             DateTime @updatedAt
-  user                  User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  invoicePayload          String?  @unique
+  createdAt               DateTime @default(now())
+  updatedAt               DateTime @updatedAt
+  user                    User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId, status])
   @@map("star_payments")
 }
 
 model Gift {
-  id               String    @id @default(cuid())
-  senderId         String
-  recipientId      String?
+  id                String        @id @default(cuid())
+  senderId          String
+  recipientId       String?
   recipientUsername String
-  animeId          String
-  versionId        String?
-  pricePaid        Int
-  status           String    @default("PENDING") // PENDING | CLAIMED | DECLINED | EXPIRED | REFUNDED
-  message          String?
-  idempotencyKey   String    @unique
-  expiresAt        DateTime
-  claimedAt        DateTime?
-  createdAt        DateTime  @default(now())
-  updatedAt        DateTime  @updatedAt
-  sender           User      @relation("GiftSender", fields: [senderId], references: [id], onDelete: Cascade)
-  recipient        User?     @relation("GiftRecipient", fields: [recipientId], references: [id], onDelete: SetNull)
-  anime            Anime     @relation(fields: [animeId], references: [id], onDelete: Cascade)
-  version          AnimeVersion? @relation(fields: [versionId], references: [id], onDelete: SetNull)
+  animeId           String
+  versionId         String?
+  pricePaid         Int
+  status            String        @default("PENDING") // PENDING | CLAIMED | DECLINED | EXPIRED | REFUNDED
+  message           String?
+  idempotencyKey    String        @unique
+  expiresAt         DateTime
+  claimedAt         DateTime?
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
+  sender            User          @relation("GiftSender", fields: [senderId], references: [id], onDelete: Cascade)
+  recipient         User?         @relation("GiftRecipient", fields: [recipientId], references: [id], onDelete: SetNull)
+  anime             Anime         @relation(fields: [animeId], references: [id], onDelete: Cascade)
+  version           AnimeVersion? @relation(fields: [versionId], references: [id], onDelete: SetNull)
 
   @@index([recipientId, status])
   @@index([senderId, createdAt])
@@ -244,29 +247,29 @@ model XpEvent {
 }
 
 model Achievement {
-  id            String  @id
+  id            String            @id
   emoji         String
   name          String
   description   String
   rarity        String
   category      String
   conditionJson String
-  rewardJson    String  @default("{}")
-  secret        Boolean @default(false)
-  seasonal      Boolean @default(false)
-  active        Boolean @default(true)
-  sortOrder     Int     @default(0)
+  rewardJson    String            @default("{}")
+  secret        Boolean           @default(false)
+  seasonal      Boolean           @default(false)
+  active        Boolean           @default(true)
+  sortOrder     Int               @default(0)
   users         UserAchievement[]
 }
 
 model UserAchievement {
-  id            String    @id @default(cuid())
+  id            String      @id @default(cuid())
   userId        String
   achievementId String
-  progress      Int       @default(0)
-  target        Int       @default(1)
+  progress      Int         @default(0)
+  target        Int         @default(1)
   unlockedAt    DateTime?
-  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user          User        @relation(fields: [userId], references: [id], onDelete: Cascade)
   achievement   Achievement @relation(fields: [achievementId], references: [id], onDelete: Cascade)
 
   @@unique([userId, achievementId])
@@ -294,6 +297,7 @@ model PostBookmark {
   createdAt DateTime @default(now())
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   post      Post     @relation(fields: [postId], references: [id], onDelete: Cascade)
+
   @@unique([userId, postId])
 }
 
@@ -311,26 +315,26 @@ model Follow {
 }
 
 model PostAward {
-  id        String   @id @default(cuid())
-  userId    String
-  postId    String
-  cost      Int
-  authorShare Int
-  idempotencyKey String @unique
-  createdAt DateTime @default(now())
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  post      Post     @relation(fields: [postId], references: [id], onDelete: Cascade)
+  id             String   @id @default(cuid())
+  userId         String
+  postId         String
+  cost           Int
+  authorShare    Int
+  idempotencyKey String   @unique
+  createdAt      DateTime @default(now())
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  post           Post     @relation(fields: [postId], references: [id], onDelete: Cascade)
 }
 
 model Report {
-  id          String   @id @default(cuid())
-  reporterId  String
-  targetType  String // POST | ANIME | USER | COMMENT
-  targetId    String
-  reason      String
-  status      String   @default("OPEN") // OPEN | HIDDEN | DISMISSED
-  createdAt   DateTime @default(now())
-  reporter    User     @relation("Reporter", fields: [reporterId], references: [id], onDelete: Cascade)
+  id         String   @id @default(cuid())
+  reporterId String
+  targetType String // POST | ANIME | USER | COMMENT
+  targetId   String
+  reason     String
+  status     String   @default("OPEN") // OPEN | HIDDEN | DISMISSED
+  createdAt  DateTime @default(now())
+  reporter   User     @relation("Reporter", fields: [reporterId], references: [id], onDelete: Cascade)
 }
 
 model CommentLike {
@@ -340,6 +344,7 @@ model CommentLike {
   createdAt DateTime @default(now())
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   comment   Comment  @relation(fields: [commentId], references: [id], onDelete: Cascade)
+
   @@unique([userId, commentId])
 }
 
@@ -350,24 +355,25 @@ model ScheduleSubscription {
   title     String
   createdAt DateTime @default(now())
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
   @@unique([userId, anilistId])
   @@index([anilistId])
 }
 
 model ScheduleDelivery {
-  id         String   @id @default(cuid())
+  id         String    @id @default(cuid())
   userId     String
   scheduleId Int
   animeTitle String
   episode    Int
   airingAt   DateTime
-  status     String   @default("PENDING") // PENDING | SENDING | SENT
+  status     String    @default("PENDING") // PENDING | SENDING | SENT
   lockedAt   DateTime?
   sentAt     DateTime?
-  attempts   Int      @default(0)
+  attempts   Int       @default(0)
   lastError  String?
-  createdAt  DateTime @default(now())
-  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt  DateTime  @default(now())
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([userId, scheduleId])
   @@index([status, lockedAt])
@@ -380,74 +386,78 @@ model DubWaitlist {
   email     String?
   createdAt DateTime @default(now())
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
   @@unique([userId])
 }
 
 model WatchParty {
-  id            String   @id @default(cuid())
-  code          String   @unique
-  name          String
-  hostId        String
-  createdById   String?
-  animeId       String
-  episodeId     String
-  videoUrl      String   @default("")
-  isPlaying     Boolean  @default(false)
-  position      Float    @default(0)
-  serverTs      BigInt   @default(0)
-  playbackRate  Float    @default(1)
-  capacity      Int      @default(50)
-  expiresAt     DateTime
-  endedAt       DateTime?
-  createdAt     DateTime @default(now())
-  host          User     @relation("PartyHost", fields: [hostId], references: [id], onDelete: Cascade)
-  createdBy     User?    @relation("PartyCreator", fields: [createdById], references: [id], onDelete: SetNull)
-  anime         Anime    @relation(fields: [animeId], references: [id], onDelete: Cascade)
-  members       WatchPartyMember[]
-  messages      WatchPartyMessage[]
+  id           String              @id @default(cuid())
+  code         String              @unique
+  name         String
+  hostId       String
+  createdById  String?
+  animeId      String
+  episodeId    String
+  videoUrl     String              @default("")
+  isPlaying    Boolean             @default(false)
+  position     Float               @default(0)
+  serverTs     BigInt              @default(0)
+  playbackRate Float               @default(1)
+  capacity     Int                 @default(50)
+  expiresAt    DateTime
+  endedAt      DateTime?
+  createdAt    DateTime            @default(now())
+  host         User                @relation("PartyHost", fields: [hostId], references: [id], onDelete: Cascade)
+  createdBy    User?               @relation("PartyCreator", fields: [createdById], references: [id], onDelete: SetNull)
+  anime        Anime               @relation(fields: [animeId], references: [id], onDelete: Cascade)
+  members      WatchPartyMember[]
+  messages     WatchPartyMessage[]
 
   @@index([endedAt, expiresAt])
   @@index([createdById])
 }
 
 model WatchPartyMember {
-  id        String   @id @default(cuid())
-  partyId   String
-  userId    String
-  joinedAt  DateTime @default(now())
+  id         String     @id @default(cuid())
+  partyId    String
+  userId     String
+  joinedAt   DateTime   @default(now())
   lastSeenAt DateTime?
-  party     WatchParty @relation(fields: [partyId], references: [id], onDelete: Cascade)
-  user      User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  party      WatchParty @relation(fields: [partyId], references: [id], onDelete: Cascade)
+  user       User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+
   @@unique([partyId, userId])
   @@index([partyId, lastSeenAt])
   @@index([userId, joinedAt])
 }
 
 model WatchPartyMessage {
-  id        String   @id @default(cuid())
+  id        String     @id @default(cuid())
   partyId   String
   userId    String
   body      String
-  createdAt DateTime @default(now())
+  createdAt DateTime   @default(now())
   party     WatchParty @relation(fields: [partyId], references: [id], onDelete: Cascade)
   user      User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+
   @@index([partyId, createdAt])
 }
 
 model AnimeSet {
-  id          String @id @default(cuid())
-  code        String @unique
-  name        String
-  bonusCredits Int   @default(0)
-  items       AnimeSetItem[]
+  id           String         @id @default(cuid())
+  code         String         @unique
+  name         String
+  bonusCredits Int            @default(0)
+  items        AnimeSetItem[]
 }
 
 model AnimeSetItem {
-  id     String @id @default(cuid())
-  setId  String
+  id      String   @id @default(cuid())
+  setId   String
   animeId String
-  set    AnimeSet @relation(fields: [setId], references: [id], onDelete: Cascade)
-  anime  Anime    @relation(fields: [animeId], references: [id], onDelete: Cascade)
+  set     AnimeSet @relation(fields: [setId], references: [id], onDelete: Cascade)
+  anime   Anime    @relation(fields: [animeId], references: [id], onDelete: Cascade)
+
   @@unique([setId, animeId])
 }
 
@@ -475,73 +485,77 @@ model TelegramLinkToken {
 }
 
 model Anime {
-  id          String   @id @default(cuid())
-  slug        String   @unique
-  title       String
-  altTitle    String?
-  description String
-  coverImage  String
-  bannerImage String?
-  genres      String // comma separated: "Action,Fantasy"
-  year        Int
-  rating      Float    @default(8.0)
-  studio      String?
-  status      String   @default("COMPLETED") // ONGOING | COMPLETED | UPCOMING
-  type        String   @default("TV") // TV | MOVIE | OVA
-  isFree      Boolean  @default(false)
-  price       Int      @default(0) // in credits
-  trending    Int      @default(0) // sort weight
-  featured    Boolean  @default(false)
-  airDay      Int?     // 0=Sun..6=Sat broadcast day (schedule)
-  airTime     String?  // "18:30" local airing time (schedule)
-  releaseDate DateTime? // planned release date for upcoming animes
-  creatorId   String?
-  creator     User?    @relation("AnimeCreator", fields: [creatorId], references: [id], onDelete: SetNull)
-  canonicalId String?
-  canonical   Anime?   @relation("AnimeVersions", fields: [canonicalId], references: [id], onDelete: SetNull)
-  source      String   @default("OFFICIAL") // OFFICIAL | CREATOR
-  moderationStatus String @default("APPROVED") // PENDING | APPROVED | REJECTED | TAKEDOWN
-  hidden      Boolean  @default(false)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id               String    @id @default(cuid())
+  slug             String    @unique
+  title            String
+  altTitle         String?
+  description      String
+  coverImage       String
+  bannerImage      String?
+  genres           String // comma separated: "Action,Fantasy"
+  year             Int
+  rating           Float     @default(8.0)
+  studio           String?
+  status           String    @default("COMPLETED") // ONGOING | COMPLETED | UPCOMING
+  type             String    @default("TV") // TV | MOVIE | OVA
+  isFree           Boolean   @default(false)
+  price            Int       @default(0) // in credits
+  trending         Int       @default(0) // sort weight
+  featured         Boolean   @default(false)
+  airDay           Int? // 0=Sun..6=Sat broadcast day (schedule)
+  airTime          String? // "18:30" local airing time (schedule)
+  releaseDate      DateTime? // planned release date for upcoming animes
+  creatorId        String?
+  creator          User?     @relation("AnimeCreator", fields: [creatorId], references: [id], onDelete: SetNull)
+  dubTeamId        String?
+  dubTeam          DubTeam?  @relation("AnimeDubTeam", fields: [dubTeamId], references: [id], onDelete: SetNull)
+  canonicalId      String?
+  canonical        Anime?    @relation("AnimeVersions", fields: [canonicalId], references: [id], onDelete: SetNull)
+  source           String    @default("OFFICIAL") // OFFICIAL | CREATOR
+  moderationStatus String    @default("APPROVED") // PENDING | APPROVED | REJECTED | TAKEDOWN
+  hidden           Boolean   @default(false)
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  episodes             Episode[]
+  purchases            Purchase[]
+  favorites            FavoriteAnime[]
+  progress             WatchProgress[]
+  exchangeOffers       ExchangeOffer[]
+  postAnimes           Post[]
+  proposalAnimes       ExchangeProposal[]
+  dubJobs              DubJob[]
+  notifyList           AnimeNotify[]
+  gifts                Gift[]
+  watchParties         WatchParty[]
+  setItems             AnimeSetItem[]
+  ratings              AnimeRating[]
+  dubCredits           DubCredit[]
+  dubVerificationVotes DubVerificationVote[]
+  watchEvents          WatchEvent[]
+  versions             Anime[]                @relation("AnimeVersions")
+  catalogVersions      AnimeVersion[]
+  weeklyCandidates     WeeklyAnimeCandidate[]
+  weeklyVotes          WeeklyAnimeVote[]
 
   @@index([moderationStatus, hidden, createdAt])
   @@index([canonicalId])
   @@index([creatorId])
-
-  episodes    Episode[]
-  purchases   Purchase[]
-  favorites   FavoriteAnime[]
-  progress    WatchProgress[]
-  exchangeOffers ExchangeOffer[]
-  postAnimes  Post[]
-  proposalAnimes ExchangeProposal[]
-  dubJobs     DubJob[]
-  notifyList  AnimeNotify[]
-  gifts       Gift[]
-  watchParties WatchParty[]
-  setItems    AnimeSetItem[]
-  ratings     AnimeRating[]
-  dubCredits  DubCredit[]
-  watchEvents WatchEvent[]
-  versions         Anime[] @relation("AnimeVersions")
-  catalogVersions  AnimeVersion[]
-  weeklyCandidates WeeklyAnimeCandidate[]
-  weeklyVotes      WeeklyAnimeVote[]
+  @@index([dubTeamId])
 }
 
 /// Official yoki creator tarqatmasi. Narx va egalik shu qatorda.
 model AnimeVersion {
-  id         String   @id @default(cuid())
+  id         String      @id @default(cuid())
   animeId    String
-  kind       String   @default("official") // official | creator
+  kind       String      @default("official") // official | creator
   creatorId  String?
-  price      Int      @default(0)
-  status     String   @default("published") // draft | pending | published | rejected | takedown
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
-  anime      Anime    @relation(fields: [animeId], references: [id], onDelete: Cascade)
-  creator    User?    @relation("VersionCreator", fields: [creatorId], references: [id], onDelete: SetNull)
+  price      Int         @default(0)
+  status     String      @default("published") // draft | pending | published | rejected | takedown
+  createdAt  DateTime    @default(now())
+  updatedAt  DateTime    @updatedAt
+  anime      Anime       @relation(fields: [animeId], references: [id], onDelete: Cascade)
+  creator    User?       @relation("VersionCreator", fields: [creatorId], references: [id], onDelete: SetNull)
   episodes   Episode[]
   purchases  Purchase[]
   gifts      Gift[]
@@ -552,40 +566,40 @@ model AnimeVersion {
 }
 
 model Episode {
-  id                 String   @id @default(cuid())
-  animeId            String
-  versionId          String?
-  number             Int
-  title              String
-  description        String?
-  videoUrl           String
-  duration           Int      @default(0) // seconds
-  telegramFileId     String?
-  telegramMessageId  String?
-  streamId           String?
-  hlsKey             String?
-  createdAt          DateTime @default(now())
-  anime              Anime    @relation(fields: [animeId], references: [id], onDelete: Cascade)
-  version            AnimeVersion? @relation(fields: [versionId], references: [id], onDelete: SetNull)
+  id                String        @id @default(cuid())
+  animeId           String
+  versionId         String?
+  number            Int
+  title             String
+  description       String?
+  videoUrl          String
+  duration          Int           @default(0) // seconds
+  telegramFileId    String?
+  telegramMessageId String?
+  streamId          String?
+  hlsKey            String?
+  createdAt         DateTime      @default(now())
+  anime             Anime         @relation(fields: [animeId], references: [id], onDelete: Cascade)
+  version           AnimeVersion? @relation(fields: [versionId], references: [id], onDelete: SetNull)
 
   progress    WatchProgress[]
   watchEvents WatchEvent[]
   dubJobs     DubJob[]
 
-  @@index([versionId, number])
   @@unique([versionId, number])
+  @@index([versionId, number])
 }
 
 model Purchase {
-  id            String   @id @default(cuid())
+  id            String        @id @default(cuid())
   userId        String
   animeId       String
   versionId     String?
-  episodeNumber Int      @default(0) // 0 = entire version, 1..N = specific episode
-  pricePaid     Int      @default(0)
-  createdAt     DateTime @default(now())
-  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  anime         Anime    @relation(fields: [animeId], references: [id], onDelete: Cascade)
+  episodeNumber Int           @default(0) // 0 = entire version, 1..N = specific episode
+  pricePaid     Int           @default(0)
+  createdAt     DateTime      @default(now())
+  user          User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  anime         Anime         @relation(fields: [animeId], references: [id], onDelete: Cascade)
   version       AnimeVersion? @relation(fields: [versionId], references: [id], onDelete: SetNull)
 
   @@unique([userId, versionId, episodeNumber])
@@ -616,17 +630,17 @@ model FavoriteUser {
 }
 
 model WatchProgress {
-  id         String   @id @default(cuid())
-  userId     String
-  episodeId  String
-  animeId    String
-  position   Float    @default(0)
-  duration   Float    @default(0)
-  completed  Boolean  @default(false)
-  updatedAt  DateTime @updatedAt
-  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  episode    Episode  @relation(fields: [episodeId], references: [id], onDelete: Cascade)
-  anime      Anime    @relation(fields: [animeId], references: [id], onDelete: Cascade)
+  id        String   @id @default(cuid())
+  userId    String
+  episodeId String
+  animeId   String
+  position  Float    @default(0)
+  duration  Float    @default(0)
+  completed Boolean  @default(false)
+  updatedAt DateTime @updatedAt
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  episode   Episode  @relation(fields: [episodeId], references: [id], onDelete: Cascade)
+  anime     Anime    @relation(fields: [animeId], references: [id], onDelete: Cascade)
 
   @@unique([userId, episodeId])
 }
@@ -718,16 +732,16 @@ model PostLike {
 }
 
 model Comment {
-  id        String   @id @default(cuid())
+  id        String        @id @default(cuid())
   userId    String
   postId    String
   parentId  String?
   content   String
-  createdAt DateTime @default(now())
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  post      Post     @relation(fields: [postId], references: [id], onDelete: Cascade)
-  parent    Comment? @relation("CommentReplies", fields: [parentId], references: [id], onDelete: Cascade)
-  replies   Comment[] @relation("CommentReplies")
+  createdAt DateTime      @default(now())
+  user      User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  post      Post          @relation(fields: [postId], references: [id], onDelete: Cascade)
+  parent    Comment?      @relation("CommentReplies", fields: [parentId], references: [id], onDelete: Cascade)
+  replies   Comment[]     @relation("CommentReplies")
   likes     CommentLike[]
 
   @@index([postId, createdAt])
@@ -735,30 +749,30 @@ model Comment {
 }
 
 model ExchangeOffer {
-  id          String   @id @default(cuid())
-  userId      String
-  animeId     String
-  wantedNote  String?  // what they want in return
-  status      String   @default("OPEN") // OPEN | MATCHED | CLOSED | ARCHIVED
-  archived    Boolean  @default(true) // 4-qism: Exchange archived, not deleted
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  anime       Anime    @relation(fields: [animeId], references: [id], onDelete: Cascade)
-  proposals   ExchangeProposal[]
+  id         String             @id @default(cuid())
+  userId     String
+  animeId    String
+  wantedNote String? // what they want in return
+  status     String             @default("OPEN") // OPEN | MATCHED | CLOSED | ARCHIVED
+  archived   Boolean            @default(true) // 4-qism: Exchange archived, not deleted
+  createdAt  DateTime           @default(now())
+  updatedAt  DateTime           @updatedAt
+  user       User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  anime      Anime              @relation(fields: [animeId], references: [id], onDelete: Cascade)
+  proposals  ExchangeProposal[]
 }
 
 model ExchangeProposal {
-  id        String   @id @default(cuid())
-  offerId   String
+  id         String        @id @default(cuid())
+  offerId    String
   proposerId String
-  animeId   String   // anime the proposer gives
-  message   String?
-  status    String   @default("PENDING") // PENDING | ACCEPTED | DECLINED
-  createdAt DateTime @default(now())
-  offer     ExchangeOffer @relation(fields: [offerId], references: [id], onDelete: Cascade)
-  proposer  User     @relation("Proposer", fields: [proposerId], references: [id], onDelete: Cascade)
-  anime     Anime    @relation(fields: [animeId], references: [id], onDelete: Cascade)
+  animeId    String // anime the proposer gives
+  message    String?
+  status     String        @default("PENDING") // PENDING | ACCEPTED | DECLINED
+  createdAt  DateTime      @default(now())
+  offer      ExchangeOffer @relation(fields: [offerId], references: [id], onDelete: Cascade)
+  proposer   User          @relation("Proposer", fields: [proposerId], references: [id], onDelete: Cascade)
+  anime      Anime         @relation(fields: [animeId], references: [id], onDelete: Cascade)
 }
 
 // ---- AI Dubbing (Japanese -> Uzbek / Kazakh / Kirgiz) ----
@@ -767,8 +781,8 @@ model DubJob {
   userId     String
   animeId    String
   episodeId  String
-  targetLang String   // uz | kk | ky
-  voice      String   // voice profile id
+  targetLang String // uz | kk | ky
+  voice      String // voice profile id
   status     String   @default("COMPLETED") // QUEUED | PROCESSING | COMPLETED | FAILED
   pricePaid  Int      @default(0)
   createdAt  DateTime @default(now())
@@ -793,10 +807,16 @@ model DubTeam {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
-  owner   User?           @relation("DubTeamOwner", fields: [ownerId], references: [id], onDelete: SetNull)
-  members DubTeamMember[]
-  credits DubCredit[]
-  ratings DubTeamRating[]
+  clubId String? @unique
+
+  owner             User?                 @relation("DubTeamOwner", fields: [ownerId], references: [id], onDelete: SetNull)
+  club              Club?                 @relation("DubTeamClub", fields: [clubId], references: [id], onDelete: SetNull)
+  members           DubTeamMember[]
+  credits           DubCredit[]
+  ratings           DubTeamRating[]
+  animes            Anime[]               @relation("AnimeDubTeam")
+  invites           DubTeamInvite[]
+  verificationVotes DubVerificationVote[]
 
   @@index([ownerId])
   @@index([reputation])
@@ -811,8 +831,8 @@ model DubTeamMember {
   role      String   @default("voice") // voice | director | sound
   createdAt DateTime @default(now())
 
-  team      DubTeam       @relation(fields: [teamId], references: [id], onDelete: Cascade)
-  user      User?         @relation("DubTeamMemberUser", fields: [userId], references: [id], onDelete: SetNull)
+  team      DubTeam         @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  user      User?           @relation("DubTeamMemberUser", fields: [userId], references: [id], onDelete: SetNull)
   castRoles DubCastMember[]
 
   @@unique([teamId, name])
@@ -829,11 +849,12 @@ model DubCredit {
   speakerCount Int      @default(0)
   createdAt    DateTime @default(now())
 
-  team    DubTeam      @relation(fields: [teamId], references: [id], onDelete: Cascade)
-  anime   Anime        @relation(fields: [animeId], references: [id], onDelete: Cascade)
-  version AnimeVersion? @relation(fields: [versionId], references: [id], onDelete: SetNull)
-  cast    DubCastMember[]
-  ratings DubTeamRating[]
+  team              DubTeam               @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  anime             Anime                 @relation(fields: [animeId], references: [id], onDelete: Cascade)
+  version           AnimeVersion?         @relation(fields: [versionId], references: [id], onDelete: SetNull)
+  cast              DubCastMember[]
+  ratings           DubTeamRating[]
+  verificationVotes DubVerificationVote[]
 
   @@unique([teamId, animeId, language])
   @@index([animeId])
@@ -860,7 +881,7 @@ model DubTeamRating {
   teamId    String
   creditId  String
   userId    String
-  rating    Int      // 1..10
+  rating    Int // 1..10
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -873,21 +894,60 @@ model DubTeamRating {
   @@map("dub_team_ratings")
 }
 
+model DubTeamInvite {
+  id          String    @id @default(cuid())
+  teamId      String
+  userId      String
+  invitedById String
+  status      String    @default("pending") // pending | accepted | declined
+  createdAt   DateTime  @default(now())
+  respondedAt DateTime?
+
+  team      DubTeam @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  user      User    @relation("DubTeamInviteUser", fields: [userId], references: [id], onDelete: Cascade)
+  invitedBy User    @relation("DubTeamInviteSender", fields: [invitedById], references: [id], onDelete: Cascade)
+
+  @@unique([teamId, userId])
+  @@index([userId, status])
+  @@map("dub_team_invites")
+}
+
+/// Bot orqali berilgan "N ta ovoz bor" tasdiqlash javobi.
+model DubVerificationVote {
+  id           String   @id @default(cuid())
+  creditId     String
+  teamId       String
+  animeId      String
+  userId       String
+  speakerCount Int
+  agrees       Boolean
+  createdAt    DateTime @default(now())
+
+  credit DubCredit @relation(fields: [creditId], references: [id], onDelete: Cascade)
+  team   DubTeam   @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  anime  Anime     @relation(fields: [animeId], references: [id], onDelete: Cascade)
+  user   User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, creditId])
+  @@index([creditId])
+  @@map("dub_verification_votes")
+}
+
 // ---- Telegram Bot Purchases ----
 model Order {
-  id              String   @id @default(cuid())
-  site_user_id    String
-  anime_slug      String
-  amount          Int
-  status          String   @default("PENDING") // PENDING, PAID_PENDING_GRANT, COMPLETED, REFUNDED, FAILED
-  provider_tx_id  String?  @unique
-  provider        String   // "stars" (Telegram Stars)
-  retryCount      Int      @default(0)
-  nextRetryAt     DateTime?
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  id             String    @id @default(cuid())
+  site_user_id   String
+  anime_slug     String
+  amount         Int
+  status         String    @default("PENDING") // PENDING, PAID_PENDING_GRANT, COMPLETED, REFUNDED, FAILED
+  provider_tx_id String?   @unique
+  provider       String // "stars" (Telegram Stars)
+  retryCount     Int       @default(0)
+  nextRetryAt    DateTime?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
 
-  user            User     @relation(fields: [site_user_id], references: [id], onDelete: Cascade)
+  user User @relation(fields: [site_user_id], references: [id], onDelete: Cascade)
 }
 
 // "Tez kunda" — eslatma obunasi
@@ -916,19 +976,20 @@ model Club {
   avatarUrl   String?
   bannerUrl   String?
   isPublic    Boolean  @default(true)
-  level       Int      @default(1)  // 1-20
+  level       Int      @default(1) // 1-20
   xp          Int      @default(0)
   ownerId     String
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
-  owner       User           @relation("ClubOwner", fields: [ownerId], references: [id], onDelete: Cascade)
-  members     ClubMember[]
-  invites     ClubInvite[]
+  owner        User              @relation("ClubOwner", fields: [ownerId], references: [id], onDelete: Cascade)
+  members      ClubMember[]
+  invites      ClubInvite[]
   joinRequests ClubJoinRequest[]
-  xpEvents    ClubXpEvent[]
-  chatRoom    ChatRoom?      @relation("ClubRoom")
-  quests      ClubQuest[]
+  xpEvents     ClubXpEvent[]
+  chatRoom     ChatRoom?         @relation("ClubRoom")
+  quests       ClubQuest[]
+  dubTeam      DubTeam?          @relation("DubTeamClub")
 
   @@index([ownerId])
   @@index([xp])
@@ -950,14 +1011,14 @@ model ClubMember {
 }
 
 model ClubInvite {
-  id         String   @id @default(cuid())
-  clubId     String
-  code       String   @unique
-  createdBy  String
-  maxUses    Int      @default(10)
-  uses       Int      @default(0)
-  expiresAt  DateTime?
-  createdAt  DateTime @default(now())
+  id        String    @id @default(cuid())
+  clubId    String
+  code      String    @unique
+  createdBy String
+  maxUses   Int       @default(10)
+  uses      Int       @default(0)
+  expiresAt DateTime?
+  createdAt DateTime  @default(now())
 
   club Club @relation(fields: [clubId], references: [id], onDelete: Cascade)
 
@@ -982,7 +1043,7 @@ model ClubXpEvent {
   id        String   @id @default(cuid())
   clubId    String
   userId    String
-  type      String   // message | purchase | watch | daily
+  type      String // message | purchase | watch | daily
   xp        Int
   createdAt DateTime @default(now())
 
@@ -997,17 +1058,17 @@ model ClubXpEvent {
 
 model ChatRoom {
   id        String   @id @default(cuid())
-  type      String   // global | club | anime
-  refId     String?  // clubId yoki animeId
+  type      String // global | club | anime
+  refId     String? // clubId yoki animeId
   slowMode  Int      @default(0) // soniyalar, 0 = o'chiq
   createdAt DateTime @default(now())
 
-  clubId    String?  @unique
-  club      Club?    @relation("ClubRoom", fields: [clubId], references: [id], onDelete: Cascade)
+  clubId String? @unique
+  club   Club?   @relation("ClubRoom", fields: [clubId], references: [id], onDelete: Cascade)
 
-  messages  ChatMessage[]
-  bans      ChatBan[]
-  pins      PinnedMessage[]
+  messages ChatMessage[]
+  bans     ChatBan[]
+  pins     PinnedMessage[]
 
   @@unique([type, refId])
   @@index([type])
@@ -1017,12 +1078,12 @@ model ChatMessage {
   id            String    @id @default(cuid())
   roomId        String
   userId        String
-  body          String    // sanitized matn yoki JSON (poll, anime_card)
+  body          String // sanitized matn yoki JSON (poll, anime_card)
   type          String    @default("text") // text | anime_card | poll | system
   replyToId     String?
-  animeId       String?   // anime karta uchun
-  episodeNo     Int?      // spoiler tegi
-  attachmentUrl String?   // R2 rasm
+  animeId       String? // anime karta uchun
+  episodeNo     Int? // spoiler tegi
+  attachmentUrl String? // R2 rasm
   editedAt      DateTime?
   deletedAt     DateTime?
   createdAt     DateTime  @default(now())
@@ -1043,7 +1104,7 @@ model MessageReaction {
   id        String   @id @default(cuid())
   messageId String
   userId    String
-  emote     String   // emoji yoki custom emote kodi
+  emote     String // emoji yoki custom emote kodi
   createdAt DateTime @default(now())
 
   message ChatMessage @relation(fields: [messageId], references: [id], onDelete: Cascade)
@@ -1054,12 +1115,12 @@ model MessageReaction {
 }
 
 model Poll {
-  id        String   @id @default(cuid())
-  messageId String   @unique
+  id        String    @id @default(cuid())
+  messageId String    @unique
   question  String
-  options   String   // JSON array: ["A", "B", "C"]
+  options   String // JSON array: ["A", "B", "C"]
   endsAt    DateTime?
-  createdAt DateTime @default(now())
+  createdAt DateTime  @default(now())
 
   message ChatMessage @relation(fields: [messageId], references: [id], onDelete: Cascade)
   votes   PollVote[]
@@ -1093,7 +1154,7 @@ model PinnedMessage {
 
 model ChatBan {
   id        String    @id @default(cuid())
-  roomId    String?   // null = global ban
+  roomId    String? // null = global ban
   userId    String
   bannedBy  String
   reason    String?
@@ -1109,10 +1170,10 @@ model ChatBan {
 }
 
 model UserBlock {
-  id          String   @id @default(cuid())
-  blockerId   String
-  blockedId   String
-  createdAt   DateTime @default(now())
+  id        String   @id @default(cuid())
+  blockerId String
+  blockedId String
+  createdAt DateTime @default(now())
 
   blocker User @relation("Blocker", fields: [blockerId], references: [id], onDelete: Cascade)
   blocked User @relation("Blocked", fields: [blockedId], references: [id], onDelete: Cascade)
@@ -1125,19 +1186,19 @@ model UserBlock {
 // ─────────────────────────────────────────
 
 model Emote {
-  id          String @id @default(cuid())
-  code        String @unique // :kiluu_fire: kabi
+  id          String  @id @default(cuid())
+  code        String  @unique // :kiluu_fire: kabi
   imageUrl    String
-  unlockType  String @default("free") // free | level | achievement | purchase
+  unlockType  String  @default("free") // free | level | achievement | purchase
   unlockValue String? // level raqami yoki achievement id
 
   userEmotes UserEmote[]
 }
 
 model UserEmote {
-  id        String   @id @default(cuid())
-  userId    String
-  emoteId   String
+  id         String   @id @default(cuid())
+  userId     String
+  emoteId    String
   unlockedAt DateTime @default(now())
 
   user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -1160,31 +1221,31 @@ model LevelReward {
   id          String   @id @default(cuid())
   level       Int      @unique
   title       String
-  rewardType  String   // frame | banner | emote | credits | streak_freeze | title
+  rewardType  String // frame | banner | emote | credits | streak_freeze | title
   rewardValue String
   description String?
   createdAt   DateTime @default(now())
 }
 
 model DailyXpCap {
-  id        String   @id @default(cuid())
-  userId    String
-  date      String   // YYYY-MM-DD
-  source    String   // post | comment | like | chat
-  amount    Int      @default(0)
+  id     String @id @default(cuid())
+  userId String
+  date   String // YYYY-MM-DD
+  source String // post | comment | like | chat
+  amount Int    @default(0)
 
   @@unique([userId, date, source])
   @@index([userId, date])
 }
 
 model UserDailyClaim {
-  id          String   @id @default(cuid())
-  userId      String
-  claimDate   String   // YYYY-MM-DD
-  streakDay   Int
-  xpAwarded   Int      @default(0)
-  rewardJson  String   @default("{}")
-  createdAt   DateTime @default(now())
+  id         String   @id @default(cuid())
+  userId     String
+  claimDate  String // YYYY-MM-DD
+  streakDay  Int
+  xpAwarded  Int      @default(0)
+  rewardJson String   @default("{}")
+  createdAt  DateTime @default(now())
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
@@ -1193,23 +1254,23 @@ model UserDailyClaim {
 }
 
 model QuestTemplate {
-  id             String   @id @default(cuid())
+  id             String         @id @default(cuid())
   title          String
   titleUz        String
   description    String?
-  type           String   // daily | weekly | club | event
-  category       String   @default("general") // watch | social | explore | spend
-  eventType      String   // episode_watched | post_created | comment_created | like_received | chat_message_sent | gift_sent | anime_opened | club_message | daily_claim | ...
-  targetCount    Int      @default(1)
-  xpReward       Int      @default(20)
-  creditReward   Int      @default(0)
+  type           String // daily | weekly | club | event
+  category       String         @default("general") // watch | social | explore | spend
+  eventType      String // episode_watched | post_created | comment_created | like_received | chat_message_sent | gift_sent | anime_opened | club_message | daily_claim | ...
+  targetCount    Int            @default(1)
+  xpReward       Int            @default(20)
+  creditReward   Int            @default(0)
   cosmeticReward String?
-  difficulty     String   @default("easy") // easy | medium | hard
-  isActive       Boolean  @default(true)
-  sortOrder      Int      @default(0)
+  difficulty     String         @default("easy") // easy | medium | hard
+  isActive       Boolean        @default(true)
+  sortOrder      Int            @default(0)
   eventId        String?
   event          SeasonalEvent? @relation(fields: [eventId], references: [id], onDelete: SetNull)
-  createdAt      DateTime @default(now())
+  createdAt      DateTime       @default(now())
 
   userQuests UserQuest[]
 
@@ -1220,7 +1281,7 @@ model UserQuest {
   id          String    @id @default(cuid())
   userId      String
   templateId  String
-  periodKey   String    // e.g. "daily:2026-10-23", "weekly:2026-W43", "event:halloween-2026"
+  periodKey   String // e.g. "daily:2026-10-23", "weekly:2026-W43", "event:halloween-2026"
   progress    Int       @default(0)
   targetCount Int
   status      String    @default("active") // active | completed | claimed
@@ -1237,18 +1298,18 @@ model UserQuest {
 }
 
 model ClubQuest {
-  id              String   @id @default(cuid())
-  clubId          String
-  title           String
-  eventType       String
-  targetCount     Int
-  progress        Int      @default(0)
-  status          String   @default("active") // active | completed
-  periodKey       String
-  xpRewardClub    Int      @default(100)
-  xpRewardMember  Int      @default(50)
-  expiresAt       DateTime
-  createdAt       DateTime @default(now())
+  id             String   @id @default(cuid())
+  clubId         String
+  title          String
+  eventType      String
+  targetCount    Int
+  progress       Int      @default(0)
+  status         String   @default("active") // active | completed
+  periodKey      String
+  xpRewardClub   Int      @default(100)
+  xpRewardMember Int      @default(50)
+  expiresAt      DateTime
+  createdAt      DateTime @default(now())
 
   club          Club                    @relation(fields: [clubId], references: [id], onDelete: Cascade)
   contributions ClubQuestContribution[]
@@ -1258,11 +1319,11 @@ model ClubQuest {
 }
 
 model ClubQuestContribution {
-  id          String   @id @default(cuid())
+  id          String  @id @default(cuid())
   clubQuestId String
   userId      String
-  amount      Int      @default(0)
-  claimed     Boolean  @default(false)
+  amount      Int     @default(0)
+  claimed     Boolean @default(false)
 
   quest ClubQuest @relation(fields: [clubQuestId], references: [id], onDelete: Cascade)
   user  User      @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -1291,24 +1352,24 @@ model Referral {
 }
 
 model WeeklyAnimePoll {
-  id             String    @id @default(cuid())
-  weekKey        String    @unique // e.g. "2026-W43"
-  status         String    @default("active") // active | closed
-  winnerAnimeId  String?
-  startsAt       DateTime
-  endsAt         DateTime
-  createdAt      DateTime  @default(now())
+  id            String   @id @default(cuid())
+  weekKey       String   @unique // e.g. "2026-W43"
+  status        String   @default("active") // active | closed
+  winnerAnimeId String?
+  startsAt      DateTime
+  endsAt        DateTime
+  createdAt     DateTime @default(now())
 
   candidates WeeklyAnimeCandidate[]
   votes      WeeklyAnimeVote[]
 }
 
 model WeeklyAnimeCandidate {
-  id         String   @id @default(cuid())
+  id         String  @id @default(cuid())
   pollId     String
   animeId    String
-  votesCount Int      @default(0) // Poll tugaguncha sir saqlanadi
-  isManual   Boolean  @default(false)
+  votesCount Int     @default(0) // Poll tugaguncha sir saqlanadi
+  isManual   Boolean @default(false)
 
   poll  WeeklyAnimePoll @relation(fields: [pollId], references: [id], onDelete: Cascade)
   anime Anime           @relation(fields: [animeId], references: [id], onDelete: Cascade)
@@ -1332,18 +1393,18 @@ model WeeklyAnimeVote {
 }
 
 model SeasonalEvent {
-  id              String   @id @default(cuid())
-  slug            String   @unique
-  title           String
-  titleUz         String
-  description     String?
-  themeColor      String   @default("#f97316")
-  bannerUrl       String?
-  startsAt        DateTime
-  endsAt          DateTime
-  isNeverReturns  Boolean  @default(true)
-  configJson      String   @default("{}")
-  createdAt       DateTime @default(now())
+  id             String   @id @default(cuid())
+  slug           String   @unique
+  title          String
+  titleUz        String
+  description    String?
+  themeColor     String   @default("#f97316")
+  bannerUrl      String?
+  startsAt       DateTime
+  endsAt         DateTime
+  isNeverReturns Boolean  @default(true)
+  configJson     String   @default("{}")
+  createdAt      DateTime @default(now())
 
   quests QuestTemplate[]
 }

@@ -17,6 +17,7 @@ export async function POST(
       versionId: typeof body?.versionId === "string" ? body.versionId : null,
       language: body?.language,
       cast: Array.isArray(body?.cast) ? body.cast : [],
+      actorId: user?.id,
     });
     return NextResponse.json({ credit }, { status: 201 });
   } catch (error) {

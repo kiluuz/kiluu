@@ -1,8 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Loader2, Mic2, Plus, ShieldCheck, Trash2, Users, X } from "lucide-react";
+import { Check, Loader2, MessageSquare, Mic2, Plus, Search, ShieldCheck, Trash2, UserPlus, Users, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -32,6 +32,7 @@ interface TeamSummary {
   verified: boolean;
   status: string;
   animeCount: number;
+  linkedMemberCount: number;
   _count: { members: number; credits: number };
 }
 
@@ -39,7 +40,20 @@ interface TeamDetail extends Omit<TeamSummary, "_count" | "animeCount"> {
   title: { label: string; color: string };
   rating: number | null;
   ratingCount: number;
-  members: { id: string; name: string; role: string; userId: string | null }[];
+  chatRoomId: string | null;
+  clubId?: string | null;
+  invites: {
+    id: string;
+    createdAt: string;
+    user: { id: string; username: string; displayName: string | null; avatarUrl: string | null };
+  }[];
+  members: {
+    id: string;
+    name: string;
+    role: string;
+    userId: string | null;
+    user: { username: string; displayName: string | null; avatarUrl: string | null } | null;
+  }[];
   credits: {
     id: string;
     language: string;
@@ -63,7 +77,7 @@ async function api(path: string, init?: RequestInit) {
 }
 
 export function DubTeamPanel() {
-  const { user } = useAppStore();
+  const { user, navigate } = useAppStore();
   const queryClient = useQueryClient();
 
   const [teamName, setTeamName] = useState("");
@@ -73,6 +87,14 @@ export function DubTeamPanel() {
   const [memberName, setMemberName] = useState("");
   const [memberRole, setMemberRole] = useState<DubRole>("voice");
   const [addingMember, setAddingMember] = useState(false);
+
+  const [userSearch, setUserSearch] = useState("");
+  const [userResults, setUserResults] = useState<
+    { id: string; username: string; displayName: string | null; avatarUrl: string | null }[]
+  >([]);
+  const [searchingUsers, setSearchingUsers] = useState(false);
+  const [invitingUserId, setInvitingUserId] = useState<string | null>(null);
+  const searchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const [creditOpen, setCreditOpen] = useState(false);
   const [creditAnimeId, setCreditAnimeId] = useState("");
@@ -108,13 +130,21 @@ export function DubTeamPanel() {
   const detail = detailQuery.data ?? null;
 
   const catalogQuery = useQuery({
-    queryKey: ["dub-catalog-animes"],
+    queryKey: ["dub-credit-catalog", user?.id ?? "anonymous"],
     queryFn: async () => {
-      const data = await api("/api/animes");
-      return ((data.animes as { id: string; title: string; year?: number }[] | undefined) ?? []).map((anime) => ({
-        id: anime.id,
-        title: anime.year ? `${anime.title} (${anime.year})` : anime.title,
-      }));
+      const [publicData, ownData] = await Promise.all([
+        api("/api/animes"),
+        api("/api/creator").catch(() => ({ animes: [] })),
+      ]);
+      const options = new Map<string, string>();
+      for (const anime of (publicData.animes as { id: string; title: string; year?: number }[] | undefined) ?? []) {
+        options.set(anime.id, anime.year ? `${anime.title} (${anime.year})` : anime.title);
+      }
+      for (const anime of (ownData.animes as { id: string; title: string; year?: number; moderationStatus?: string }[] | undefined) ?? []) {
+        const status = anime.moderationStatus && anime.moderationStatus !== "APPROVED" ? " — moderatsiyada" : "";
+        options.set(anime.id, `${anime.year ? `${anime.title} (${anime.year})` : anime.title}${status}`);
+      }
+      return [...options].map(([id, title]) => ({ id, title }));
     },
     enabled: creditOpen,
     staleTime: 5 * 60_000,
@@ -122,6 +152,37 @@ export function DubTeamPanel() {
   });
 
   const catalogAnimes = catalogQuery.data ?? [];
+
+  useEffect(() => {
+    if (searchTimer.current) clearTimeout(searchTimer.current);
+    const query = userSearch.trim();
+    if (query.length < 2) {
+      searchTimer.current = setTimeout(() => {
+        setUserResults([]);
+        setSearchingUsers(false);
+      }, 0);
+    } else {
+      searchTimer.current = setTimeout(async () => {
+        setSearchingUsers(true);
+        try {
+          const response = await fetch(`/api/users/search?q=${encodeURIComponent(query)}`);
+          const data = await response.json().catch(() => ({}));
+          setUserResults(
+            Array.isArray(data.users)
+              ? (data.users as { id: string; username: string; displayName: string | null; avatarUrl: string | null }[]).slice(0, 8)
+              : []
+          );
+        } catch {
+          setUserResults([]);
+        } finally {
+          setSearchingUsers(false);
+        }
+      }, 300);
+    }
+    return () => {
+      if (searchTimer.current) clearTimeout(searchTimer.current);
+    };
+  }, [userSearch]);
 
   function refresh() {
     void queryClient.invalidateQueries({ queryKey: ["dub-teams"] });
@@ -169,6 +230,34 @@ export function DubTeamPanel() {
     } finally {
       setAddingMember(false);
     }
+  }
+
+  async function inviteUser(userId: string) {
+    if (!team) return;
+    setInvitingUserId(userId);
+    try {
+      await api(`/api/dub-teams/${team.id}/members`, {
+        method: "POST",
+        body: JSON.stringify({ userId }),
+      });
+      toast.success("Taklif yuborildi — foydalanuvchi qabul qilishini kuting");
+      setUserSearch("");
+      setUserResults([]);
+      refresh();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Taklif yuborilmadi");
+    } finally {
+      setInvitingUserId(null);
+    }
+  }
+
+  function openTeamChat() {
+    const clubId = detail?.clubId;
+    if (!clubId) {
+      toast.error("Jamoa chatiga avval kamida bitta a'zoni taklif qiling");
+      return;
+    }
+    navigate("community", { filters: { club: clubId } });
   }
 
   async function removeMember(memberId: string) {
@@ -239,6 +328,7 @@ export function DubTeamPanel() {
   if (!user || user.role !== "CREATOR") return null;
 
   const title = dubTeamTitle(detail?.reputation ?? team?.reputation ?? 0, detail?.verified ?? team?.verified ?? false);
+  const linkedCount = detail?.linkedMemberCount ?? team?.linkedMemberCount ?? 0;
 
   return (
     <section className="glass rounded-2xl p-5 sm:p-6 mb-7 border border-primary/20">
@@ -330,6 +420,27 @@ export function DubTeamPanel() {
                   : `${team._count.members} a’zo · ${team._count.credits} ta dub · baholar hali yo‘q`}
               </p>
             </div>
+            <div className="flex flex-wrap items-center gap-2 mt-3">
+              <Button type="button" size="sm" variant="secondary" onClick={openTeamChat} className="rounded-full font-bold">
+                <MessageSquare className="w-3.5 h-3.5" /> Jamoa chat
+              </Button>
+              <span
+                className={
+                  linkedCount >= 3
+                    ? "inline-flex items-center gap-1 text-[11px] font-bold text-emerald-500"
+                    : "inline-flex items-center gap-1 text-[11px] font-bold text-amber-600 dark:text-amber-400"
+                }
+              >
+                {linkedCount >= 3 ? <Check className="w-3.5 h-3.5" /> : <Users className="w-3.5 h-3.5" />}
+                Sayt a’zolari: {linkedCount} / 3
+              </span>
+            </div>
+            {linkedCount < 3 && (
+              <p className="text-[11px] text-amber-600 dark:text-amber-400 mt-2">
+                Anime chiqarish va dub e’loni qo‘shish uchun jamoada kamida 3 ta Kiluu foydalanuvchisi bo‘lishi kerak.
+                Quyida ism bo‘yicha qidirib, taklif yuboring.
+              </p>
+            )}
           </div>
 
           <div>
@@ -347,6 +458,11 @@ export function DubTeamPanel() {
                     className="inline-flex items-center gap-1.5 rounded-full border bg-muted/40 px-3 py-1 text-xs"
                   >
                     <span className="font-semibold">{member.name}</span>
+                    {member.userId && (
+                      <span className="inline-flex items-center gap-0.5 text-[10px] font-bold text-emerald-500">
+                        <Check className="w-3 h-3" /> sayt
+                      </span>
+                    )}
                     <span className="text-muted-foreground">
                       {DUB_ROLE_LABELS[member.role as DubRole] ?? member.role}
                     </span>
@@ -362,6 +478,88 @@ export function DubTeamPanel() {
                 ))
               )}
             </div>
+
+            {(detail?.invites ?? []).length > 0 && (
+              <div className="mb-3 rounded-xl border border-amber-500/25 bg-amber-500/5 p-2.5">
+                <p className="text-[11px] font-bold text-amber-600 dark:text-amber-400 mb-1.5">
+                  Javob kutilayotgan takliflar
+                </p>
+                <div className="flex flex-wrap gap-1.5">
+                  {detail?.invites.map((invite) => (
+                    <span key={invite.id} className="inline-flex items-center gap-1 rounded-full border bg-card px-2.5 py-1 text-[11px]">
+                      <span className="font-semibold">{invite.user.displayName || invite.user.username}</span>
+                      <span className="text-muted-foreground">taklif yuborilgan</span>
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            <div className="rounded-xl border bg-muted/20 p-3 mb-3 space-y-2">
+              <p className="text-xs font-bold flex items-center gap-1.5">
+                <UserPlus className="w-3.5 h-3.5 text-primary" /> Saytdan a’zo taklif qilish
+              </p>
+              <div className="relative">
+                <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+                <Input
+                  value={userSearch}
+                  onChange={(event) => setUserSearch(event.target.value)}
+                  placeholder="Kiluu username yoki ism bo‘yicha qidiring..."
+                  className="h-9 rounded-xl pl-8"
+                  maxLength={80}
+                />
+              </div>
+              {userSearch.trim().length >= 2 && (
+                <div className="max-h-44 overflow-y-auto fancy-scroll space-y-1">
+                  {searchingUsers ? (
+                    <p className="text-[11px] text-muted-foreground flex items-center gap-1.5 px-1 py-1.5">
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" /> Qidirilmoqda...
+                    </p>
+                  ) : userResults.length === 0 ? (
+                    <p className="text-[11px] text-muted-foreground px-1 py-1.5">Foydalanuvchi topilmadi</p>
+                  ) : (
+                    userResults.map((candidate) => {
+                      const alreadyMember = (detail?.members ?? []).some((member) => member.userId === candidate.id);
+                      const alreadyInvited = (detail?.invites ?? []).some((invite) => invite.user.id === candidate.id);
+                      return (
+                        <div key={candidate.id} className="flex items-center gap-2 rounded-lg border bg-card px-2.5 py-1.5">
+                          <div className="w-6 h-6 rounded-full overflow-hidden bg-muted shrink-0">
+                            <SmartImage src={candidate.avatarUrl ?? undefined} alt="" className="w-full h-full object-cover" />
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <p className="text-[11px] font-semibold truncate">
+                              {candidate.displayName || candidate.username}
+                            </p>
+                            <p className="text-[10px] text-muted-foreground truncate">@{candidate.username}</p>
+                          </div>
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant={alreadyMember || alreadyInvited ? "ghost" : "secondary"}
+                            disabled={alreadyMember || alreadyInvited || invitingUserId === candidate.id}
+                            onClick={() => inviteUser(candidate.id)}
+                            className="h-7 rounded-full text-[11px] font-bold shrink-0"
+                          >
+                            {invitingUserId === candidate.id ? (
+                              <Loader2 className="w-3 h-3 animate-spin" />
+                            ) : alreadyMember ? (
+                              "A’zo"
+                            ) : alreadyInvited ? (
+                              "Taklif qilingan"
+                            ) : (
+                              <>
+                                <UserPlus className="w-3 h-3" /> Taklif
+                              </>
+                            )}
+                          </Button>
+                        </div>
+                      );
+                    })
+                  )}
+                </div>
+              )}
+            </div>
+
             <div className="flex flex-col sm:flex-row gap-2">
               <Input
                 value={memberName}
@@ -514,8 +712,9 @@ export function DubTeamPanel() {
             </div>
 
             <p className="text-[11px] text-muted-foreground -mt-1">
-              Ro‘yxatda faqat tasdiqlangan va ommaviy katalogdagi animelar chiqadi. Moderatsiyadagi
-              anime tasdiqlangach qo‘shiladi.
+              Ro‘yxatda ommaviy katalogdagi animelar va sizning moderatsiyadagi animelaringiz chiqadi.
+              Speakerlar soni chiqarilishdan oldin shu yerda belgilanadi — bot tomoshabinlarga shu raqamni
+              tasdiqlash savolini beradi.
             </p>
 
             <div className="space-y-2">
