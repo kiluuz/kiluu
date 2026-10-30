@@ -308,7 +308,7 @@ export function StudioView() {
         )}
       </section>
 
-      <DubTeamPanel animes={animes} />
+      <DubTeamPanel />
 
       {/* My animes */}
       {loading ? (

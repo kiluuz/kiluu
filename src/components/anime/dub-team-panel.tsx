@@ -52,10 +52,6 @@ interface TeamDetail extends Omit<TeamSummary, "_count" | "animeCount"> {
   }[];
 }
 
-interface DubTeamPanelProps {
-  animes: { id: string; title: string }[];
-}
-
 async function api(path: string, init?: RequestInit) {
   const response = await fetch(path, {
     ...init,
@@ -66,7 +62,7 @@ async function api(path: string, init?: RequestInit) {
   return data as Record<string, unknown>;
 }
 
-export function DubTeamPanel({ animes }: DubTeamPanelProps) {
+export function DubTeamPanel() {
   const { user } = useAppStore();
   const queryClient = useQueryClient();
 
@@ -110,6 +106,22 @@ export function DubTeamPanel({ animes }: DubTeamPanelProps) {
   });
 
   const detail = detailQuery.data ?? null;
+
+  const catalogQuery = useQuery({
+    queryKey: ["dub-catalog-animes"],
+    queryFn: async () => {
+      const data = await api("/api/animes");
+      return ((data.animes as { id: string; title: string; year?: number }[] | undefined) ?? []).map((anime) => ({
+        id: anime.id,
+        title: anime.year ? `${anime.title} (${anime.year})` : anime.title,
+      }));
+    },
+    enabled: creditOpen,
+    staleTime: 5 * 60_000,
+    retry: false,
+  });
+
+  const catalogAnimes = catalogQuery.data ?? [];
 
   function refresh() {
     void queryClient.invalidateQueries({ queryKey: ["dub-teams"] });
@@ -463,12 +475,20 @@ export function DubTeamPanel({ animes }: DubTeamPanelProps) {
             <div className="grid sm:grid-cols-2 gap-3">
               <div className="space-y-1.5">
                 <Label className="text-xs font-semibold">Anime *</Label>
-                <Select value={creditAnimeId} onValueChange={setCreditAnimeId}>
+                <Select value={creditAnimeId} onValueChange={setCreditAnimeId} disabled={catalogQuery.isPending}>
                   <SelectTrigger className="h-10 rounded-xl">
-                    <SelectValue placeholder="Anime tanlang" />
+                    <SelectValue
+                      placeholder={
+                        catalogQuery.isPending
+                          ? "Anime ro‘yxati yuklanmoqda..."
+                          : catalogAnimes.length === 0
+                            ? "Katalogda anime yo‘q"
+                            : "Anime tanlang"
+                      }
+                    />
                   </SelectTrigger>
                   <SelectContent>
-                    {animes.map((anime) => (
+                    {catalogAnimes.map((anime) => (
                       <SelectItem key={anime.id} value={anime.id}>
                         {anime.title}
                       </SelectItem>
@@ -492,6 +512,11 @@ export function DubTeamPanel({ animes }: DubTeamPanelProps) {
                 </Select>
               </div>
             </div>
+
+            <p className="text-[11px] text-muted-foreground -mt-1">
+              Ro‘yxatda faqat tasdiqlangan va ommaviy katalogdagi animelar chiqadi. Moderatsiyadagi
+              anime tasdiqlangach qo‘shiladi.
+            </p>
 
             <div className="space-y-2">
               <div className="flex items-center justify-between">
