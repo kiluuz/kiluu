@@ -353,6 +353,7 @@
   "auth.googleRate": "Too many attempts. Try again in a minute.",
   "auth.googleDisabled": "This account has been disabled.",
   "auth.createAccount": "Create account",
+  "auth.displayName": "Display name",
   "auth.email": "Email",
   "auth.password": "Password",
   "auth.newHere": "New here? You get",

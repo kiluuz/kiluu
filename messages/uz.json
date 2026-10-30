@@ -353,6 +353,7 @@
   "auth.googleRate": "Juda ko’p urinish. Bir daqiqadan so’ng qayta urinib ko’ring.",
   "auth.googleDisabled": "Bu akkaunt o’chirilgan.",
   "auth.createAccount": "Hisob yaratish",
+  "auth.displayName": "Ko’rsatiladigan ism",
   "auth.email": "Email",
   "auth.password": "Parol",
   "auth.newHere": "Yangi foydalanuvchimisiz? Sizga",

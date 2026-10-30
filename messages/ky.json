@@ -353,6 +353,7 @@
   "auth.googleRate": "Аракеттер өтө көп. Бир мүнөттөн кийин кайталаңыз.",
   "auth.googleDisabled": "Бул аккаунт өчүрүлгөн.",
   "auth.createAccount": "Аккаунт түзүү",
+  "auth.displayName": "Көрсөтүлүүчү ат",
   "auth.email": "Электрондук почта",
   "auth.password": "Сырсөз",
   "auth.newHere": "Жаңысызбы? Сизге",

@@ -353,6 +353,7 @@
   "auth.googleRate": "Әрекет тым көп. Бір минуттан кейін қайталаңыз.",
   "auth.googleDisabled": "Бұл аккаунт өшірілген.",
   "auth.createAccount": "Аккаунт жасау",
+  "auth.displayName": "Көрсетілетін аты",
   "auth.email": "Электрондық пошта",
   "auth.password": "Құпиясөз",
   "auth.newHere": "Жаңадан келдіңіз бе? Сізге",

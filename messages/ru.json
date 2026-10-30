@@ -353,6 +353,7 @@
   "auth.googleRate": "Слишком много попыток. Повторите через минуту.",
   "auth.googleDisabled": "Этот аккаунт отключён.",
   "auth.createAccount": "Создать аккаунт",
+  "auth.displayName": "Отображаемое имя",
   "auth.email": "Электронная почта",
   "auth.password": "Пароль",
   "auth.newHere": "Впервые здесь? Получите",
