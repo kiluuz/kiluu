@@ -57,35 +57,52 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    const body = await req.json();
+    const body = await req.json().catch(() => ({}));
     const {
       title, altTitle, description, coverImage, bannerImage,
       genres, year, studio, status, type, isFree, price, releaseDate,
     } = body;
 
-    if (!title || typeof title !== "string" || title.trim().length < 2) {
-      return NextResponse.json({ error: "Title is required (min 2 chars)" }, { status: 400 });
+    if (!title || typeof title !== "string" || title.trim().length < 2 || title.trim().length > 120) {
+      return NextResponse.json({ error: "Title must be 2-120 characters" }, { status: 400 });
     }
-    if (!description || typeof description !== "string" || description.trim().length < 20) {
-      return NextResponse.json({ error: "Description is required (min 20 chars)" }, { status: 400 });
+    if (!description || typeof description !== "string" || description.trim().length < 20 || description.trim().length > 5000) {
+      return NextResponse.json({ error: "Description must be 20-5000 characters" }, { status: 400 });
     }
-    const coverOk =
-      typeof coverImage === "string" &&
-      (coverImage.startsWith("/uploads/") || /^https?:\/\//.test(coverImage));
-    if (!coverOk) {
+    const isSafeImage = (value: unknown): value is string =>
+      typeof value === "string" && (value.startsWith("/uploads/") || /^https?:\/\//.test(value));
+    if (!isSafeImage(coverImage)) {
       return NextResponse.json({ error: "Upload a cover image" }, { status: 400 });
     }
-    if (!genres || !Array.isArray(genres) || genres.length === 0) {
+    if (bannerImage !== undefined && bannerImage !== null && bannerImage !== "" && !isSafeImage(bannerImage)) {
+      return NextResponse.json({ error: "Invalid banner image URL" }, { status: 400 });
+    }
+    const cleanGenres = Array.isArray(genres)
+      ? genres.filter((genre: unknown): genre is string => typeof genre === "string" && genre.trim().length > 0 && genre.length <= 30).slice(0, 10)
+      : [];
+    if (cleanGenres.length === 0) {
       return NextResponse.json({ error: "Pick at least one genre" }, { status: 400 });
     }
-    const parsedYear = parseInt(year) || new Date().getFullYear();
-    const isFreeBool = Boolean(isFree);
-    const priceInt = isFreeBool ? 0 : Math.max(0, Math.min(10000, parseInt(price) || 0));
+    const currentYear = new Date().getFullYear();
+    const parsedYear = Number.parseInt(String(year), 10);
+    const safeYear = Number.isFinite(parsedYear) && parsedYear >= 1900 && parsedYear <= currentYear + 5
+      ? parsedYear
+      : currentYear;
+    const isFreeBool = isFree === true;
+    const priceInt = isFreeBool ? 0 : Math.max(0, Math.min(10000, Number.parseInt(String(price), 10) || 0));
     if (!isFreeBool && priceInt < APP_CONFIG.minAnimePrice) {
       return NextResponse.json({ error: `Paid animes must cost at least ${APP_CONFIG.minAnimePrice} credits` }, { status: 400 });
     }
+    const releaseDateValue =
+      status === "UPCOMING" && typeof releaseDate === "string" && releaseDate
+        ? new Date(releaseDate)
+        : null;
+    if (releaseDateValue && Number.isNaN(releaseDateValue.getTime())) {
+      return NextResponse.json({ error: "Invalid release date" }, { status: 400 });
+    }
 
     let slug = slugify(title);
+    if (!slug) slug = `anime-${Date.now().toString(36)}`;
     const slugExists = await db.anime.findUnique({ where: { slug } });
     if (slugExists) slug = `${slug}-${Date.now().toString(36)}`;
 
@@ -94,13 +111,13 @@ export async function POST(req: NextRequest) {
         data: {
           slug,
           title: title.trim(),
-          altTitle: altTitle || null,
+          altTitle: typeof altTitle === "string" && altTitle.trim() ? altTitle.trim().slice(0, 120) : null,
           description: description.trim(),
           coverImage,
-          bannerImage: bannerImage || coverImage,
-          genres: genres.join(","),
-          year: parsedYear,
-          studio: studio || null,
+          bannerImage: isSafeImage(bannerImage) ? bannerImage : coverImage,
+          genres: cleanGenres.join(","),
+          year: safeYear,
+          studio: typeof studio === "string" && studio.trim() ? studio.trim().slice(0, 120) : null,
           status: ["ONGOING", "COMPLETED", "UPCOMING"].includes(status) ? status : "ONGOING",
           type: ["TV", "MOVIE", "OVA"].includes(type) ? type : "TV",
           isFree: isFreeBool,
@@ -110,7 +127,7 @@ export async function POST(req: NextRequest) {
           moderationStatus: "PENDING",
           hidden: true,
           trending: 0,
-          releaseDate: status === "UPCOMING" && releaseDate ? new Date(releaseDate) : null,
+          releaseDate: releaseDateValue,
         },
       });
       await tx.animeVersion.create({

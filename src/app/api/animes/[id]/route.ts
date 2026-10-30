@@ -221,16 +221,51 @@ export async function PATCH(
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
-  const body = await req.json();
-  const data: Record<string, unknown> = {};
-
-  if (body.releaseDate !== undefined) {
-    data.releaseDate = body.releaseDate ? new Date(body.releaseDate) : null;
+  const body = await req.json().catch(() => ({}));
+  const existing = await db.anime.findFirst({
+    where: { OR: [{ id }, { slug: id }] },
+    select: { id: true, slug: true, creatorId: true },
+  });
+  if (!existing) {
+    return NextResponse.json({ error: "Anime not found" }, { status: 404 });
   }
-  if (typeof body.status === "string") data.status = body.status;
-  if (typeof body.featured === "boolean") data.featured = body.featured;
+  const admin = isAdminUser(user);
+  if (!admin && existing.creatorId !== user.id) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
 
-  const anime = await db.anime.update({ where: { id }, data });
+  const data: Record<string, unknown> = {};
+  if (body.releaseDate !== undefined) {
+    if (body.releaseDate === null || body.releaseDate === "") {
+      data.releaseDate = null;
+    } else {
+      const parsed = new Date(body.releaseDate);
+      if (Number.isNaN(parsed.getTime())) {
+        return NextResponse.json({ error: "Invalid release date" }, { status: 400 });
+      }
+      data.releaseDate = parsed;
+    }
+  }
+  if (body.status !== undefined) {
+    if (!["ONGOING", "COMPLETED", "UPCOMING"].includes(body.status)) {
+      return NextResponse.json({ error: "Invalid status" }, { status: 400 });
+    }
+    data.status = body.status;
+  }
+  if (body.featured !== undefined) {
+    if (!admin) {
+      return NextResponse.json({ error: "Only admins can feature animes" }, { status: 403 });
+    }
+    if (typeof body.featured !== "boolean") {
+      return NextResponse.json({ error: "Invalid featured flag" }, { status: 400 });
+    }
+    data.featured = body.featured;
+  }
+  if (Object.keys(data).length === 0) {
+    return NextResponse.json({ error: "No fields to update" }, { status: 400 });
+  }
+
+  const anime = await db.anime.update({ where: { id: existing.id }, data });
 
   // If anime is now live, trigger notifications
   if (body.triggerNotify) {

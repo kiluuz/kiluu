@@ -3,6 +3,7 @@ import { db } from "@/lib/db";
 import { getCurrentUser } from "@/lib/auth";
 import { purchaseAnimeAtomic } from "@/lib/economy";
 import { officialVersionId } from "@/lib/owns";
+import { getBotAnime } from "@/lib/bot-api";
 import { rateLimit } from "@/lib/rate-limit";
 import { rateKey } from "@/lib/client-ip";
 import { randomBytes } from "crypto";
@@ -35,12 +36,27 @@ export async function POST(
     return NextResponse.json({ error: "Version not for sale" }, { status: 400 });
   }
 
-  const price = episodeNumber > 0
-    ? (typeof body.episodePrice === "number" ? body.episodePrice : version.price)
-    : version.price;
+  // Episode prices live in the bot catalog; never trust the client-supplied value.
+  let price = version.price;
+  if (episodeNumber > 0) {
+    const botAnime = await getBotAnime(anime.slug, 4_000).catch(() => null);
+    const episodePrices = (botAnime?.episode_prices ?? {}) as Record<string, unknown>;
+    const perEpisode = Number(episodePrices[String(episodeNumber)]);
+    const basePrice = Number(botAnime?.price);
+    const resolved =
+      Number.isFinite(perEpisode) && perEpisode > 0
+        ? perEpisode
+        : Number.isFinite(basePrice) && basePrice > 0
+          ? basePrice
+          : version.price;
+    price = Math.round(resolved);
+  }
 
   if (anime.isFree || version.price === 0) {
     return NextResponse.json({ error: "This version is free" }, { status: 400 });
+  }
+  if (!Number.isInteger(price) || price <= 0 || price > 100_000) {
+    return NextResponse.json({ error: "This episode is not for sale" }, { status: 400 });
   }
 
   try {
@@ -71,6 +87,9 @@ export async function POST(
     }
     if (code === "PRICE_MISMATCH") {
       return NextResponse.json({ error: "Price changed, refresh" }, { status: 409 });
+    }
+    if (code === "INVALID_PRICE") {
+      return NextResponse.json({ error: "Invalid price" }, { status: 400 });
     }
     log.error("Anime credit purchase failed", {
       anime: id,

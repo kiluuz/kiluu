@@ -64,9 +64,10 @@ export async function getBotCatalog(onlyActive = true) {
   );
 }
 
-export async function getBotAnime(slug: string) {
+export async function getBotAnime(slug: string, timeoutMs = 60_000) {
   return fetchBotApi(`/api/animes/${slug}`, {
     cache: "no-store",
+    signal: AbortSignal.timeout(timeoutMs),
   });
 }
 

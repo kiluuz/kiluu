@@ -26,6 +26,9 @@ export async function purchaseAnimeAtomic(opts: {
   idempotencyKey: string;
   skipOwnershipCheck?: boolean;
 }) {
+  if (!Number.isInteger(opts.price) || opts.price < 0) {
+    throw Object.assign(new Error("INVALID_PRICE"), { code: "INVALID_PRICE" });
+  }
   let creatorToEvaluate: string | null = null;
   const result = await db.$transaction(async (tx) => {
     const versionId = opts.versionId || (await officialVersionId(opts.animeId, tx));

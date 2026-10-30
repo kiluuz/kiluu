@@ -95,16 +95,16 @@ export function StudioView() {
   const [epDuration, setEpDuration] = useState("600");
   const [epSaving, setEpSaving] = useState(false);
 
-  const fetchCreatorAnimes = useCallback(async (): Promise<CreatorAnime[]> => {
+  const fetchCreatorAnimes = useCallback(async (): Promise<{ animes: CreatorAnime[]; earnings: number }> => {
     const response = await fetch("/api/creator");
     if (!response.ok) throw new Error(`Studio request failed (${response.status})`);
-    const data: { animes?: CreatorAnime[] } = await response.json();
-    return data.animes ?? [];
+    const data: { animes?: CreatorAnime[]; earnings?: number } = await response.json();
+    return { animes: data.animes ?? [], earnings: data.earnings ?? 0 };
   }, []);
   const creatorAnimeQueryKey = ["creator-animes", user?.id ?? "anonymous"] as const;
 
   const {
-    data: animes = [],
+    data: studioData,
     isPending: loading,
     error: studioError,
   } = useQuery({
@@ -115,6 +115,8 @@ export function StudioView() {
     gcTime: 30 * 60_000,
     refetchOnWindowFocus: false,
   });
+  const animes = studioData?.animes ?? [];
+  const earnings = studioData?.earnings ?? 0;
 
   useEffect(() => {
     if (studioError) {
@@ -269,7 +271,7 @@ export function StudioView() {
         <div className="glass rounded-2xl p-4 sm:p-5">
           <Trophy className="w-5 h-5 text-amber-400 mb-2" />
           <p className="text-2xl font-black tabular-nums">
-            {formatCredits(animes.reduce((a, x) => a + x.purchaseCount * (x.price || 0), 0))}
+            {formatCredits(earnings)}
           </p>
           <p className="text-xs text-muted-foreground">Credits earned</p>
         </div>
