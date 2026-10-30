@@ -17,7 +17,8 @@ import { CreditPurchaseModal, LinkTelegramModal } from "../bot-ui";
 import { ChatPanel } from "../chat/chat-panel";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
-import { DUB_LANGUAGE_LABELS, dubTeamTitle } from "@/lib/dub-team-shared";
+import { dubErrorText, dubTeamTitle } from "@/lib/dub-team-shared";
+import { useI18n } from "@/components/i18n-provider";
 
 interface DubCreditItem {
   id: string;
@@ -65,6 +66,7 @@ function formatDetailCountdown(ms: number): string {
 
 export function DetailView() {
   const { view, user, setAuthOpen, navigate, updateUser } = useAppStore();
+  const { t } = useI18n();
   const [activeDetailTab, setActiveDetailTab] = useState<"episodes" | "chat">("episodes");
   const queryClient = useQueryClient();
   const animeId = view.animeId!;
@@ -183,11 +185,11 @@ export function DetailView() {
         body: JSON.stringify({ rating }),
       });
       const result = await response.json();
-      if (!response.ok) throw new Error(result.error || "Could not save dub rating");
+      if (!response.ok) throw new Error(dubErrorText(t, result.code, result.error || t("dub.ratingFailed")));
       await queryClient.invalidateQueries({ queryKey: detailKey });
-      toast.success("Dub bahosi saqlandi");
+      toast.success(t("dub.ratingSaved"));
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Could not save dub rating");
+      toast.error(error instanceof Error ? error.message : t("dub.ratingFailed"));
     } finally {
       setDubRatingBusyId(null);
     }
@@ -546,7 +548,8 @@ export function DetailView() {
                 <div className="text-left">
                   <p className="text-sm font-bold leading-tight">{anime.dubTeam.name}</p>
                   <p className="text-[11px] text-muted-foreground">
-                    Dub jamoasi · {anime.dubTeam.memberCount} a'zo · obro‘ {anime.dubTeam.reputation}/100
+                    {t("dub.membersCount", { count: anime.dubTeam.memberCount })} ·{" "}
+                    {t("dub.reputationScore", { value: anime.dubTeam.reputation })}
                   </p>
                 </div>
                 <span
@@ -557,7 +560,7 @@ export function DetailView() {
                     backgroundColor: `${anime.dubTeam.title.color}14`,
                   }}
                 >
-                  {anime.dubTeam.title.label}
+                  {t(`dub.title.${anime.dubTeam.title.key}`)}
                 </span>
                 {anime.dubTeam.verified && (
                   <ShieldCheck className="w-4 h-4 text-emerald-500 shrink-0" />
@@ -923,11 +926,9 @@ export function DetailView() {
                 <Separator className="my-7" />
                 <div className="flex items-center gap-2 mb-1">
                   <Mic2 className="w-5 h-5 text-primary" />
-                  <h2 className="text-lg font-bold">Dub jamoasi</h2>
+                  <h2 className="text-lg font-bold">{t("dub.detailTeam")}</h2>
                 </div>
-                <p className="text-xs text-muted-foreground mb-4">
-                  Ovoz bergan jamoa, speakerlar va tomoshabinlar bahosi — bu anime gift kartochkasining rare darajasiga ta’sir qiladi.
-                </p>
+                <p className="text-xs text-muted-foreground mb-4">{t("dub.detailHint")}</p>
                 <div className="space-y-3">
                   {dubCredits.map((credit) => {
                     const title = dubTeamTitle(credit.team.reputation, credit.team.verified);
@@ -939,26 +940,35 @@ export function DetailView() {
                             className="text-[10px] font-bold rounded-full px-2 py-0.5 border"
                             style={{ color: title.color, borderColor: `${title.color}55`, backgroundColor: `${title.color}14` }}
                           >
-                            {title.label}
+                            {t(`dub.title.${title.key}`)}
                           </span>
                           {credit.team.verified && (
                             <span className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-500">
-                              <ShieldCheck className="w-3.5 h-3.5" /> Tasdiqlangan
+                              <ShieldCheck className="w-3.5 h-3.5" /> {t("dub.verified")}
                             </span>
                           )}
                         </div>
                         <p className="text-[11px] text-muted-foreground mt-1">
-                          {DUB_LANGUAGE_LABELS[credit.language] ?? credit.language} · {credit.speakerCount} speaker ·{" "}
-                          {credit.team._count.members} a’zo · obro‘ {credit.team.reputation}/100
-                          {credit.ratingCount > 0 ? ` · ${credit.rating} / 10 (${credit.ratingCount} baho)` : ""}
+                          {t("dub.creditLine", {
+                            language: t(`dub.lang.${credit.language}`),
+                            speakers: credit.speakerCount,
+                            members: credit.team._count.members,
+                            reputation: credit.team.reputation,
+                          })}
+                          {credit.ratingCount > 0
+                            ? t("dub.creditRating", { rating: credit.rating ?? "—", count: credit.ratingCount })
+                            : ""}
                         </p>
                         {(credit.verification.confirmed > 0 || credit.verification.rejected > 0) && (
                           <p className="text-[11px] mt-1 flex items-center gap-1.5">
-                            <ShieldCheck className="w-3.5 h-3.5 text-emerald-500" />
-                            <span className="text-emerald-500 font-semibold">{credit.verification.confirmed} tasdiq</span>
-                            <span className="text-muted-foreground">·</span>
-                            <span className="text-muted-foreground">{credit.verification.rejected} rad</span>
-                            <span className="text-muted-foreground">(bot tekshiruvi: {credit.speakerCount} speaker)</span>
+                            <ShieldCheck className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
+                            <span className="text-muted-foreground">
+                              {t("dub.verification", {
+                                speakers: credit.speakerCount,
+                                confirmed: credit.verification.confirmed,
+                                rejected: credit.verification.rejected,
+                              })}
+                            </span>
                           </p>
                         )}
                         <div className="flex flex-wrap gap-1.5 mt-3">
@@ -971,7 +981,7 @@ export function DetailView() {
                         </div>
                         <div className="border-t mt-3 pt-3">
                           <p className="text-[11px] font-semibold mb-1.5">
-                            {credit.myRating ? `Sizning bahoyingiz: ${credit.myRating}/10` : "Bu dubni baholang"}
+                            {credit.myRating ? t("dub.myDubRating", { rating: credit.myRating }) : t("dub.rateDub")}
                           </p>
                           <div className="grid grid-cols-10 gap-1">
                             {Array.from({ length: 10 }, (_, index) => index + 1).map((value) => (
@@ -980,7 +990,7 @@ export function DetailView() {
                                 type="button"
                                 disabled={dubRatingBusyId === credit.id}
                                 onClick={() => void rateDub(credit.id, value)}
-                                aria-label={`Rate dub ${value} out of 10`}
+                                aria-label={`${value}/10`}
                                 aria-pressed={credit.myRating === value}
                                 className={cn(
                                   "h-7 rounded-md border text-[10px] font-bold transition-colors disabled:opacity-50",
@@ -1046,8 +1056,8 @@ export function DetailView() {
               <div className="border-t pt-3">
                 <p className="text-xs font-semibold mb-2">
                   {anime.myRating
-                    ? `Sizning bahoyingiz: ${(anime.myRating / 2).toFixed(1)} / 5`
-                    : "Animega yulduzcha bering"}
+                    ? t("dub.myRatingLabel", { rating: (anime.myRating / 2).toFixed(1) })
+                    : t("dub.rateLabel")}
                 </p>
                 <div className="flex items-center gap-1">
                   {Array.from({ length: 5 }, (_, index) => index + 1).map((star) => {
@@ -1077,11 +1087,11 @@ export function DetailView() {
                     );
                   })}
                   {anime.ratingCount > 0 && (
-                    <span className="text-[11px] text-muted-foreground ml-1">{anime.ratingCount} baho</span>
+                    <span className="text-[11px] text-muted-foreground ml-1">{t("dub.ratingsCount", { count: anime.ratingCount })}</span>
                   )}
                 </div>
                 <p className="text-[10px] text-muted-foreground mt-1.5">
-                  Botda bergan yulduzchalaringiz shu yerda avtomatik ko‘rinadi.
+                  {t("dub.botStarsHint")}
                 </p>
               </div>
             </div>

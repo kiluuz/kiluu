@@ -607,6 +607,7 @@ function StatChip({ icon, label, value, suffix, accent, accentHex }: { icon: Rea
    ================================================================ */
 function IdentityColumn({ profile }: { profile: PublicProfile }) {
   const openProfile = useOpenProfile();
+  const { t } = useI18n();
   const mutuals = profile.favoriteUsers.slice(0, 5);
   const genres = profile.showcase?.genres ?? [];
   const joinDate = new Date(profile.createdAt).toLocaleDateString("en-US", { month: "long", year: "numeric" });
@@ -650,8 +651,20 @@ function IdentityColumn({ profile }: { profile: PublicProfile }) {
         {profile.dubTeam && (
           <div className="flex items-center gap-2.5 text-sm">
             <Mic2 className="w-4 h-4 text-muted-foreground shrink-0" />
-            <span className="text-muted-foreground">Dubbing jamoasi</span>
-            <span className="ml-auto font-semibold text-right">{profile.dubTeam.name}</span>
+            <span className="text-muted-foreground">{t("dub.profileTeam")}</span>
+            <span className="ml-auto font-semibold text-right flex items-center gap-1.5">
+              {profile.dubTeam.name}
+              <span
+                className="text-[10px] font-bold rounded-full px-2 py-0.5 border"
+                style={{
+                  color: profile.dubTeam.title.color,
+                  borderColor: `${profile.dubTeam.title.color}55`,
+                  backgroundColor: `${profile.dubTeam.title.color}14`,
+                }}
+              >
+                {t(`dub.title.${profile.dubTeam.title.key}`)}
+              </span>
+            </span>
           </div>
         )}
         <SocialLinksRow links={profile.socialLinks ?? {}} />

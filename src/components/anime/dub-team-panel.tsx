@@ -7,20 +7,21 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Progress } from "@/components/ui/progress";
-import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useAppStore } from "./store";
+import { useI18n } from "@/components/i18n-provider";
 import { SmartImage } from "./ui-bits";
 import { toast } from "sonner";
 import {
-  DUB_LANGUAGES,
-  DUB_LANGUAGE_LABELS,
   DUB_ROLES,
-  DUB_ROLE_LABELS,
+  dubErrorText,
   dubTeamTitle,
   type DubRole,
+  type DubTitleKey,
 } from "@/lib/dub-team-shared";
+
+const MIN_SITE_MEMBERS = 3;
 
 interface TeamSummary {
   id: string;
@@ -37,7 +38,7 @@ interface TeamSummary {
 }
 
 interface TeamDetail extends Omit<TeamSummary, "_count" | "animeCount"> {
-  title: { label: string; color: string };
+  title: { key: DubTitleKey; color: string };
   rating: number | null;
   ratingCount: number;
   chatRoomId: string | null;
@@ -66,18 +67,29 @@ interface TeamDetail extends Omit<TeamSummary, "_count" | "animeCount"> {
   }[];
 }
 
+class DubApiError extends Error {
+  readonly code: unknown;
+  constructor(message: string, code: unknown) {
+    super(message);
+    this.code = code;
+  }
+}
+
 async function api(path: string, init?: RequestInit) {
   const response = await fetch(path, {
     ...init,
     headers: { "Content-Type": "application/json", ...(init?.headers ?? {}) },
   });
   const data = await response.json().catch(() => ({}));
-  if (!response.ok) throw new Error(typeof data?.error === "string" ? data.error : `Request failed (${response.status})`);
+  if (!response.ok) {
+    throw new DubApiError(typeof data?.error === "string" ? data.error : `Request failed (${response.status})`, data?.code);
+  }
   return data as Record<string, unknown>;
 }
 
 export function DubTeamPanel() {
   const { user, navigate } = useAppStore();
+  const { t } = useI18n();
   const queryClient = useQueryClient();
 
   const [teamName, setTeamName] = useState("");
@@ -96,12 +108,8 @@ export function DubTeamPanel() {
   const [invitingUserId, setInvitingUserId] = useState<string | null>(null);
   const searchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const [creditOpen, setCreditOpen] = useState(false);
-  const [creditAnimeId, setCreditAnimeId] = useState("");
-  const [creditLanguage, setCreditLanguage] = useState<string>("uz");
-  const [castRows, setCastRows] = useState<{ name: string; character: string }[]>([{ name: "", character: "" }]);
-  const [savingCredit, setSavingCredit] = useState(false);
   const [removingCreditId, setRemovingCreditId] = useState<string | null>(null);
+  const [confirmCreditId, setConfirmCreditId] = useState<string | null>(null);
 
   const mineQuery = useQuery({
     queryKey: ["dub-teams", "mine", user?.id ?? "anonymous"],
@@ -128,30 +136,6 @@ export function DubTeamPanel() {
   });
 
   const detail = detailQuery.data ?? null;
-
-  const catalogQuery = useQuery({
-    queryKey: ["dub-credit-catalog", user?.id ?? "anonymous"],
-    queryFn: async () => {
-      const [publicData, ownData] = await Promise.all([
-        api("/api/animes"),
-        api("/api/creator").catch(() => ({ animes: [] })),
-      ]);
-      const options = new Map<string, string>();
-      for (const anime of (publicData.animes as { id: string; title: string; year?: number }[] | undefined) ?? []) {
-        options.set(anime.id, anime.year ? `${anime.title} (${anime.year})` : anime.title);
-      }
-      for (const anime of (ownData.animes as { id: string; title: string; year?: number; moderationStatus?: string }[] | undefined) ?? []) {
-        const status = anime.moderationStatus && anime.moderationStatus !== "APPROVED" ? " — moderatsiyada" : "";
-        options.set(anime.id, `${anime.year ? `${anime.title} (${anime.year})` : anime.title}${status}`);
-      }
-      return [...options].map(([id, title]) => ({ id, title }));
-    },
-    enabled: creditOpen,
-    staleTime: 5 * 60_000,
-    retry: false,
-  });
-
-  const catalogAnimes = catalogQuery.data ?? [];
 
   useEffect(() => {
     if (searchTimer.current) clearTimeout(searchTimer.current);
@@ -184,13 +168,25 @@ export function DubTeamPanel() {
     };
   }, [userSearch]);
 
+  if (!user || user.role !== "CREATOR") return null;
+
   function refresh() {
     void queryClient.invalidateQueries({ queryKey: ["dub-teams"] });
   }
 
+  function fail(error: unknown, fallback: string) {
+    toast.error(
+      error instanceof DubApiError
+        ? dubErrorText(t, error.code, error.message)
+        : error instanceof Error
+          ? error.message
+          : fallback
+    );
+  }
+
   async function createTeam() {
     if (teamName.trim().length < 2) {
-      toast.error("Jamoa nomi kamida 2 belgidan iborat bo‘lsin");
+      toast.error(t("dub.error.INVALID_NAME"));
       return;
     }
     setCreating(true);
@@ -201,10 +197,10 @@ export function DubTeamPanel() {
       });
       setTeamName("");
       setTeamAbout("");
-      toast.success("Dub jamoasi yaratildi");
+      toast.success(t("dub.teamCreated"));
       refresh();
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Jamoa yaratilmadi");
+      fail(error, t("dub.teamCreateFailed"));
     } finally {
       setCreating(false);
     }
@@ -213,7 +209,7 @@ export function DubTeamPanel() {
   async function addMember() {
     if (!team) return;
     if (memberName.trim().length < 2) {
-      toast.error("A’zo nomini kiriting");
+      toast.error(t("dub.error.INVALID_NAME"));
       return;
     }
     setAddingMember(true);
@@ -223,10 +219,10 @@ export function DubTeamPanel() {
         body: JSON.stringify({ name: memberName.trim(), role: memberRole }),
       });
       setMemberName("");
-      toast.success("A’zo qo‘shildi");
+      toast.success(t("dub.memberAdded"));
       refresh();
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "A’zo qo‘shilmadi");
+      fail(error, t("dub.memberAddFailed"));
     } finally {
       setAddingMember(false);
     }
@@ -240,12 +236,12 @@ export function DubTeamPanel() {
         method: "POST",
         body: JSON.stringify({ userId }),
       });
-      toast.success("Taklif yuborildi — foydalanuvchi qabul qilishini kuting");
+      toast.success(t("dub.inviteSent"));
       setUserSearch("");
       setUserResults([]);
       refresh();
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Taklif yuborilmadi");
+      fail(error, t("dub.inviteFailed"));
     } finally {
       setInvitingUserId(null);
     }
@@ -254,7 +250,7 @@ export function DubTeamPanel() {
   function openTeamChat() {
     const clubId = detail?.clubId;
     if (!clubId) {
-      toast.error("Jamoa chatiga avval kamida bitta a'zoni taklif qiling");
+      toast.error(t("dub.chatNeedMember"));
       return;
     }
     navigate("community", { filters: { club: clubId } });
@@ -264,50 +260,10 @@ export function DubTeamPanel() {
     if (!team) return;
     try {
       await api(`/api/dub-teams/${team.id}/members?memberId=${encodeURIComponent(memberId)}`, { method: "DELETE" });
-      toast.success("A’zo olib tashlandi");
+      toast.success(t("dub.memberRemoved"));
       refresh();
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "A’zo olib tashlanmadi");
-    }
-  }
-
-  function openCreditDialog() {
-    setCreditAnimeId("");
-    setCreditLanguage("uz");
-    setCastRows([{ name: "", character: "" }]);
-    setCreditOpen(true);
-  }
-
-  function updateCastRow(index: number, patch: Partial<{ name: string; character: string }>) {
-    setCastRows((rows) => rows.map((row, i) => (i === index ? { ...row, ...patch } : row)));
-  }
-
-  async function saveCredit() {
-    if (!team) return;
-    if (!creditAnimeId) {
-      toast.error("Anime tanlang");
-      return;
-    }
-    const cast = castRows
-      .map((row) => ({ name: row.name.trim(), character: row.character.trim() }))
-      .filter((row) => row.name && row.character);
-    if (cast.length === 0) {
-      toast.error("Kamida bitta speaker va personaj kiriting");
-      return;
-    }
-    setSavingCredit(true);
-    try {
-      await api(`/api/dub-teams/${team.id}/credits`, {
-        method: "POST",
-        body: JSON.stringify({ animeId: creditAnimeId, language: creditLanguage, cast }),
-      });
-      toast.success("Dub biriktirildi");
-      setCreditOpen(false);
-      refresh();
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Dub biriktirilmadi");
-    } finally {
-      setSavingCredit(false);
+      fail(error, t("dub.memberRemoveFailed"));
     }
   }
 
@@ -316,19 +272,19 @@ export function DubTeamPanel() {
     setRemovingCreditId(creditId);
     try {
       await api(`/api/dub-teams/${team.id}/credits?creditId=${encodeURIComponent(creditId)}`, { method: "DELETE" });
-      toast.success("Dub olib tashlandi");
+      toast.success(t("dub.creditRemoved"));
+      setConfirmCreditId(null);
       refresh();
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Dub olib tashlanmadi");
+      fail(error, t("dub.creditRemoveFailed"));
     } finally {
       setRemovingCreditId(null);
     }
   }
 
-  if (!user || user.role !== "CREATOR") return null;
-
   const title = dubTeamTitle(detail?.reputation ?? team?.reputation ?? 0, detail?.verified ?? team?.verified ?? false);
   const linkedCount = detail?.linkedMemberCount ?? team?.linkedMemberCount ?? 0;
+  const removeCreditTarget = (detail?.credits ?? []).find((credit) => credit.id === confirmCreditId) ?? null;
 
   return (
     <section className="glass rounded-2xl p-5 sm:p-6 mb-7 border border-primary/20">
@@ -337,43 +293,40 @@ export function DubTeamPanel() {
           <Mic2 className="w-5 h-5 text-primary" />
         </div>
         <div>
-          <h2 className="font-bold">Dub jamoasi — Cast & Reputation</h2>
-          <p className="text-sm text-muted-foreground mt-1">
-            Jamoa a’zolarini qo‘shing va qaysi animega qaysi speaker ovoz berganini biriktiring. Speaker
-            soni va jamoa obro‘si gift kartochkalarining rare darajasiga ta’sir qiladi.
-          </p>
+          <h2 className="font-bold">{t("dub.panelTitle")}</h2>
+          <p className="text-sm text-muted-foreground mt-1">{t("dub.panelDesc")}</p>
         </div>
       </div>
 
       {mineQuery.isPending ? (
         <div className="flex items-center justify-center py-8 text-muted-foreground">
-          <Loader2 className="w-5 h-5 animate-spin mr-2" /> Loading dub team...
+          <Loader2 className="w-5 h-5 animate-spin mr-2" /> {t("dub.loading")}
         </div>
       ) : mineQuery.isError ? (
         <p className="rounded-xl border border-amber-500/25 bg-amber-500/5 p-4 text-sm text-amber-600 dark:text-amber-400">
-          Dub jamoasi ma’lumotlari hozircha mavjud emas. Database migratsiyasi qo‘llanilgach qayta urinib ko‘ring.
+          {t("dub.loadError")}
         </p>
       ) : !team ? (
         <div className="rounded-xl border border-dashed p-4 space-y-3">
-          <p className="font-semibold text-sm">Hali jamoangiz yo‘q</p>
+          <p className="font-semibold text-sm">{t("dub.noTeamTitle")}</p>
           <div className="grid sm:grid-cols-2 gap-3">
             <div className="space-y-1.5">
-              <Label className="text-xs font-semibold">Jamoa nomi *</Label>
+              <Label className="text-xs font-semibold">{t("dub.teamNameLabel")}</Label>
               <Input
                 value={teamName}
                 onChange={(event) => setTeamName(event.target.value)}
                 maxLength={60}
-                placeholder="Masalan: Anor Dub Studio"
+                placeholder={t("dub.teamNamePlaceholder")}
                 className="h-10 rounded-xl"
               />
             </div>
             <div className="space-y-1.5">
-              <Label className="text-xs font-semibold">Tavsif</Label>
+              <Label className="text-xs font-semibold">{t("dub.teamAboutLabel")}</Label>
               <Input
                 value={teamAbout}
                 onChange={(event) => setTeamAbout(event.target.value)}
                 maxLength={200}
-                placeholder="Qisqa tavsif"
+                placeholder={t("dub.teamAboutPlaceholder")}
                 className="h-10 rounded-xl"
               />
             </div>
@@ -385,7 +338,7 @@ export function DubTeamPanel() {
             className="rounded-xl brand-gradient text-white font-bold"
           >
             {creating ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
-            Jamoa yaratish
+            {t("dub.createTeam")}
           </Button>
         </div>
       ) : (
@@ -397,11 +350,11 @@ export function DubTeamPanel() {
                 className="text-[11px] font-bold rounded-full px-2.5 py-0.5 border"
                 style={{ color: title.color, borderColor: `${title.color}55`, backgroundColor: `${title.color}14` }}
               >
-                {title.label}
+                {t(`dub.title.${title.key}`)}
               </span>
               {(detail?.verified ?? team.verified) && (
                 <span className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-500">
-                  <ShieldCheck className="w-3.5 h-3.5" /> Tasdiqlangan
+                  <ShieldCheck className="w-3.5 h-3.5" /> {t("dub.verified")}
                 </span>
               )}
             </div>
@@ -410,35 +363,34 @@ export function DubTeamPanel() {
             )}
             <div className="mt-3">
               <div className="flex items-center justify-between text-xs mb-1.5">
-                <span className="text-muted-foreground">Jamoa obro‘si</span>
+                <span className="text-muted-foreground">{t("dub.reputation")}</span>
                 <span className="font-bold tabular-nums">{detail?.reputation ?? team.reputation} / 100</span>
               </div>
               <Progress value={detail?.reputation ?? team.reputation} className="h-2" />
               <p className="text-[11px] text-muted-foreground mt-2">
                 {detail && detail.ratingCount > 0
-                  ? `Tomoshabin bahosi: ${detail.rating ?? "—"} / 10 (${detail.ratingCount} ta baho) · ${detail.credits.length} ta dub`
-                  : `${team._count.members} a’zo · ${team._count.credits} ta dub · baholar hali yo‘q`}
+                  ? t("dub.audienceRating", { rating: detail.rating ?? "—", count: detail.ratingCount, credits: detail.credits.length })
+                  : t("dub.stats", { members: team._count.members, credits: team._count.credits })}
               </p>
             </div>
             <div className="flex flex-wrap items-center gap-2 mt-3">
               <Button type="button" size="sm" variant="secondary" onClick={openTeamChat} className="rounded-full font-bold">
-                <MessageSquare className="w-3.5 h-3.5" /> Jamoa chat
+                <MessageSquare className="w-3.5 h-3.5" /> {t("dub.teamChat")}
               </Button>
               <span
                 className={
-                  linkedCount >= 3
+                  linkedCount >= MIN_SITE_MEMBERS
                     ? "inline-flex items-center gap-1 text-[11px] font-bold text-emerald-500"
                     : "inline-flex items-center gap-1 text-[11px] font-bold text-amber-600 dark:text-amber-400"
                 }
               >
-                {linkedCount >= 3 ? <Check className="w-3.5 h-3.5" /> : <Users className="w-3.5 h-3.5" />}
-                Sayt a’zolari: {linkedCount} / 3
+                {linkedCount >= MIN_SITE_MEMBERS ? <Check className="w-3.5 h-3.5" /> : <Users className="w-3.5 h-3.5" />}
+                {t("dub.siteMembers", { count: linkedCount, min: MIN_SITE_MEMBERS })}
               </span>
             </div>
-            {linkedCount < 3 && (
+            {linkedCount < MIN_SITE_MEMBERS && (
               <p className="text-[11px] text-amber-600 dark:text-amber-400 mt-2">
-                Anime chiqarish va dub e’loni qo‘shish uchun jamoada kamida 3 ta Kiluu foydalanuvchisi bo‘lishi kerak.
-                Quyida ism bo‘yicha qidirib, taklif yuboring.
+                {t("dub.teamGateHint", { min: MIN_SITE_MEMBERS })}
               </p>
             )}
           </div>
@@ -446,11 +398,11 @@ export function DubTeamPanel() {
           <div>
             <div className="flex items-center gap-2 mb-2">
               <Users className="w-4 h-4 text-primary" />
-              <p className="font-bold text-sm">Jamoa a’zolari</p>
+              <p className="font-bold text-sm">{t("dub.membersTitle")}</p>
             </div>
             <div className="flex flex-wrap gap-2 mb-3">
               {(detail?.members ?? []).length === 0 ? (
-                <p className="text-xs text-muted-foreground">Hali a’zo qo‘shilmagan</p>
+                <p className="text-xs text-muted-foreground">{t("dub.noMembers")}</p>
               ) : (
                 detail?.members.map((member) => (
                   <span
@@ -460,16 +412,16 @@ export function DubTeamPanel() {
                     <span className="font-semibold">{member.name}</span>
                     {member.userId && (
                       <span className="inline-flex items-center gap-0.5 text-[10px] font-bold text-emerald-500">
-                        <Check className="w-3 h-3" /> sayt
+                        <Check className="w-3 h-3" /> {t("dub.linkedTag")}
                       </span>
                     )}
                     <span className="text-muted-foreground">
-                      {DUB_ROLE_LABELS[member.role as DubRole] ?? member.role}
+                      {(DUB_ROLES as readonly string[]).includes(member.role) ? t(`dub.role.${member.role}`) : member.role}
                     </span>
                     <button
                       type="button"
                       onClick={() => removeMember(member.id)}
-                      aria-label={`Remove ${member.name}`}
+                      aria-label={t("dub.removeMember", { name: member.name })}
                       className="text-muted-foreground hover:text-destructive"
                     >
                       <X className="w-3.5 h-3.5" />
@@ -482,13 +434,13 @@ export function DubTeamPanel() {
             {(detail?.invites ?? []).length > 0 && (
               <div className="mb-3 rounded-xl border border-amber-500/25 bg-amber-500/5 p-2.5">
                 <p className="text-[11px] font-bold text-amber-600 dark:text-amber-400 mb-1.5">
-                  Javob kutilayotgan takliflar
+                  {t("dub.invitesPending")}
                 </p>
                 <div className="flex flex-wrap gap-1.5">
                   {detail?.invites.map((invite) => (
                     <span key={invite.id} className="inline-flex items-center gap-1 rounded-full border bg-card px-2.5 py-1 text-[11px]">
                       <span className="font-semibold">{invite.user.displayName || invite.user.username}</span>
-                      <span className="text-muted-foreground">taklif yuborilgan</span>
+                      <span className="text-muted-foreground">{t("dub.inviteSentLabel")}</span>
                     </span>
                   ))}
                 </div>
@@ -497,14 +449,14 @@ export function DubTeamPanel() {
 
             <div className="rounded-xl border bg-muted/20 p-3 mb-3 space-y-2">
               <p className="text-xs font-bold flex items-center gap-1.5">
-                <UserPlus className="w-3.5 h-3.5 text-primary" /> Saytdan a’zo taklif qilish
+                <UserPlus className="w-3.5 h-3.5 text-primary" /> {t("dub.inviteTitle")}
               </p>
               <div className="relative">
                 <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
                 <Input
                   value={userSearch}
                   onChange={(event) => setUserSearch(event.target.value)}
-                  placeholder="Kiluu username yoki ism bo‘yicha qidiring..."
+                  placeholder={t("dub.searchPlaceholder")}
                   className="h-9 rounded-xl pl-8"
                   maxLength={80}
                 />
@@ -513,10 +465,10 @@ export function DubTeamPanel() {
                 <div className="max-h-44 overflow-y-auto fancy-scroll space-y-1">
                   {searchingUsers ? (
                     <p className="text-[11px] text-muted-foreground flex items-center gap-1.5 px-1 py-1.5">
-                      <Loader2 className="w-3.5 h-3.5 animate-spin" /> Qidirilmoqda...
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" /> {t("dub.searching")}
                     </p>
                   ) : userResults.length === 0 ? (
-                    <p className="text-[11px] text-muted-foreground px-1 py-1.5">Foydalanuvchi topilmadi</p>
+                    <p className="text-[11px] text-muted-foreground px-1 py-1.5">{t("dub.searchEmpty")}</p>
                   ) : (
                     userResults.map((candidate) => {
                       const alreadyMember = (detail?.members ?? []).some((member) => member.userId === candidate.id);
@@ -543,12 +495,12 @@ export function DubTeamPanel() {
                             {invitingUserId === candidate.id ? (
                               <Loader2 className="w-3 h-3 animate-spin" />
                             ) : alreadyMember ? (
-                              "A’zo"
+                              t("dub.member")
                             ) : alreadyInvited ? (
-                              "Taklif qilingan"
+                              t("dub.invited")
                             ) : (
                               <>
-                                <UserPlus className="w-3 h-3" /> Taklif
+                                <UserPlus className="w-3 h-3" /> {t("dub.invite")}
                               </>
                             )}
                           </Button>
@@ -565,7 +517,7 @@ export function DubTeamPanel() {
                 value={memberName}
                 onChange={(event) => setMemberName(event.target.value)}
                 maxLength={60}
-                placeholder="Ovoz aktyori ismi"
+                placeholder={t("dub.memberNamePlaceholder")}
                 className="h-9 rounded-xl sm:max-w-[220px]"
               />
               <Select value={memberRole} onValueChange={(value) => setMemberRole(value as DubRole)}>
@@ -575,7 +527,7 @@ export function DubTeamPanel() {
                 <SelectContent>
                   {DUB_ROLES.map((role) => (
                     <SelectItem key={role} value={role}>
-                      {DUB_ROLE_LABELS[role]}
+                      {t(`dub.role.${role}`)}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -589,37 +541,22 @@ export function DubTeamPanel() {
                 className="rounded-xl font-bold"
               >
                 {addingMember ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Plus className="w-3.5 h-3.5" />}
-                A’zo qo‘shish
+                {t("dub.addMember")}
               </Button>
             </div>
           </div>
 
           <div>
-            <div className="flex items-center justify-between gap-2 mb-2">
-              <div className="flex items-center gap-2">
-                <Mic2 className="w-4 h-4 text-primary" />
-                <p className="font-bold text-sm">Dub biriktirilgan animelar</p>
-              </div>
-              <Button
-                type="button"
-                size="sm"
-                onClick={openCreditDialog}
-                className="rounded-full brand-gradient text-white font-bold"
-              >
-                <Plus className="w-3.5 h-3.5" /> Dub qo‘shish
-              </Button>
+            <div className="flex items-center gap-2 mb-2">
+              <Mic2 className="w-4 h-4 text-primary" />
+              <p className="font-bold text-sm">{t("dub.creditsTitle")}</p>
             </div>
             {(detail?.credits ?? []).length === 0 ? (
-              <p className="text-xs text-muted-foreground">
-                Hali dub biriktirilmagan. Har bir anime uchun speakerlar va personajlarni kiriting.
-              </p>
+              <p className="text-xs text-muted-foreground">{t("dub.noCredits")}</p>
             ) : (
               <div className="space-y-2">
                 {detail?.credits.map((credit) => (
-                  <div
-                    key={credit.id}
-                    className="flex items-start gap-3 rounded-xl border bg-card/40 p-3"
-                  >
+                  <div key={credit.id} className="flex items-start gap-3 rounded-xl border bg-card/40 p-3">
                     <div className="w-10 aspect-[2/3] rounded-md overflow-hidden shrink-0 bg-muted">
                       <SmartImage
                         src={credit.anime.coverImage ?? undefined}
@@ -630,8 +567,15 @@ export function DubTeamPanel() {
                     <div className="flex-1 min-w-0">
                       <p className="font-semibold text-sm truncate">{credit.anime.title}</p>
                       <p className="text-[11px] text-muted-foreground">
-                        {DUB_LANGUAGE_LABELS[credit.language] ?? credit.language} · {credit.speakerCount} speaker
-                        {credit.ratingCount > 0 ? ` · ${credit.rating} / 10 (${credit.ratingCount})` : ""}
+                        {t("dub.creditLine", {
+                          language: t(`dub.lang.${credit.language}`),
+                          speakers: credit.speakerCount,
+                          members: linkedCount,
+                          reputation: detail?.reputation ?? team.reputation,
+                        })}
+                        {credit.ratingCount > 0
+                          ? t("dub.creditRating", { rating: credit.rating ?? "—", count: credit.ratingCount })
+                          : ""}
                       </p>
                       <p className="text-[11px] text-muted-foreground mt-1 line-clamp-2">
                         {credit.cast.map((row) => `${row.speakerName} — ${row.character}`).join(", ")}
@@ -641,9 +585,9 @@ export function DubTeamPanel() {
                       type="button"
                       size="icon"
                       variant="ghost"
-                      onClick={() => removeCredit(credit.id)}
+                      onClick={() => setConfirmCreditId(credit.id)}
                       disabled={removingCreditId === credit.id}
-                      aria-label={`Remove dub for ${credit.anime.title}`}
+                      aria-label={t("dub.removeCredit", { title: credit.anime.title })}
                       className="shrink-0 text-muted-foreground hover:text-destructive"
                     >
                       {removingCreditId === credit.id ? (
@@ -660,138 +604,28 @@ export function DubTeamPanel() {
         </div>
       )}
 
-      <Dialog open={creditOpen} onOpenChange={(open) => !savingCredit && setCreditOpen(open)}>
-        <DialogContent className="sm:max-w-[560px] rounded-2xl max-h-[90vh] overflow-y-auto fancy-scroll">
+      <Dialog
+        open={Boolean(removeCreditTarget)}
+        onOpenChange={(open) => !removingCreditId && !open && setConfirmCreditId(null)}
+      >
+        <DialogContent className="sm:max-w-[420px] rounded-2xl">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
-              <Mic2 className="w-5 h-5 text-primary" /> Dub biriktirish
+              <Trash2 className="w-5 h-5 text-destructive" /> {t("studio.deleteConfirmTitle")}
             </DialogTitle>
-            <DialogDescription>Anime, til va speakerlarni tanlang</DialogDescription>
+            <DialogDescription>{t("dub.removeCredit", { title: removeCreditTarget?.anime.title ?? "" })}</DialogDescription>
           </DialogHeader>
-
-          <div className="space-y-4 pt-1">
-            <div className="grid sm:grid-cols-2 gap-3">
-              <div className="space-y-1.5">
-                <Label className="text-xs font-semibold">Anime *</Label>
-                <Select value={creditAnimeId} onValueChange={setCreditAnimeId} disabled={catalogQuery.isPending}>
-                  <SelectTrigger className="h-10 rounded-xl">
-                    <SelectValue
-                      placeholder={
-                        catalogQuery.isPending
-                          ? "Anime ro‘yxati yuklanmoqda..."
-                          : catalogAnimes.length === 0
-                            ? "Katalogda anime yo‘q"
-                            : "Anime tanlang"
-                      }
-                    />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {catalogAnimes.map((anime) => (
-                      <SelectItem key={anime.id} value={anime.id}>
-                        {anime.title}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-1.5">
-                <Label className="text-xs font-semibold">Til</Label>
-                <Select value={creditLanguage} onValueChange={setCreditLanguage}>
-                  <SelectTrigger className="h-10 rounded-xl">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {DUB_LANGUAGES.map((language) => (
-                      <SelectItem key={language} value={language}>
-                        {DUB_LANGUAGE_LABELS[language]}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-
-            <p className="text-[11px] text-muted-foreground -mt-1">
-              Ro‘yxatda ommaviy katalogdagi animelar va sizning moderatsiyadagi animelaringiz chiqadi.
-              Speakerlar soni chiqarilishdan oldin shu yerda belgilanadi — bot tomoshabinlarga shu raqamni
-              tasdiqlash savolini beradi.
-            </p>
-
-            <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <Label className="text-xs font-semibold">Speakerlar va personajlar *</Label>
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="outline"
-                  onClick={() => setCastRows((rows) => [...rows, { name: "", character: "" }])}
-                  className="h-7 rounded-full text-[11px]"
-                >
-                  <Plus className="w-3 h-3" /> Speaker
-                </Button>
-              </div>
-              {(detail?.members ?? []).length > 0 && (
-                <p className="text-[11px] text-muted-foreground">
-                  Jamoadan tez tanlash:{" "}
-                  {detail?.members.map((member) => (
-                    <button
-                      key={member.id}
-                      type="button"
-                      className="underline decoration-dotted mr-1.5 hover:text-foreground"
-                      onClick={() =>
-                        setCastRows((rows) => {
-                          const empty = rows.findIndex((row) => !row.name && !row.character);
-                          if (empty >= 0) {
-                            return rows.map((row, i) => (i === empty ? { ...row, name: member.name } : row));
-                          }
-                          return [...rows, { name: member.name, character: "" }];
-                        })
-                      }
-                    >
-                      {member.name}
-                    </button>
-                  ))}
-                </p>
-              )}
-              {castRows.map((row, index) => (
-                <div key={index} className="flex gap-2">
-                  <Input
-                    value={row.name}
-                    onChange={(event) => updateCastRow(index, { name: event.target.value })}
-                    maxLength={60}
-                    placeholder="Speaker ismi"
-                    className="h-9 rounded-xl flex-1"
-                  />
-                  <Input
-                    value={row.character}
-                    onChange={(event) => updateCastRow(index, { character: event.target.value })}
-                    maxLength={60}
-                    placeholder="Personaj"
-                    className="h-9 rounded-xl flex-1"
-                  />
-                  <Button
-                    type="button"
-                    size="icon"
-                    variant="ghost"
-                    onClick={() => setCastRows((rows) => (rows.length > 1 ? rows.filter((_, i) => i !== index) : rows))}
-                    disabled={castRows.length === 1}
-                    aria-label="Remove speaker row"
-                    className="shrink-0 text-muted-foreground hover:text-destructive"
-                  >
-                    <X className="w-4 h-4" />
-                  </Button>
-                </div>
-              ))}
-            </div>
-
+          <div className="flex gap-2 pt-1">
+            <Button variant="outline" className="flex-1 rounded-xl h-10" disabled={removingCreditId !== null} onClick={() => setConfirmCreditId(null)}>
+              {t("studio.deleteConfirmCancel")}
+            </Button>
             <Button
-              type="button"
-              onClick={saveCredit}
-              disabled={savingCredit}
-              className="w-full rounded-xl brand-gradient text-white font-bold"
+              className="flex-1 rounded-xl h-10 bg-destructive text-white font-bold hover:bg-destructive/90"
+              disabled={removingCreditId !== null}
+              onClick={() => confirmCreditId && removeCredit(confirmCreditId)}
             >
-              {savingCredit ? <Loader2 className="w-4 h-4 animate-spin" /> : <Mic2 className="w-4 h-4" />}
-              Saqlash
+              {removingCreditId ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
+              {t("studio.deleteConfirmOk")}
             </Button>
           </div>
         </DialogContent>

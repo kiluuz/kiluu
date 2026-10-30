@@ -3,7 +3,14 @@ import { db } from "@/lib/db";
 import { getCurrentUser } from "@/lib/auth";
 import { isCreator } from "@/lib/rbac";
 import { APP_CONFIG } from "@/lib/config";
-import { assertPublishTeam, dubErrorInfo } from "@/lib/dub-teams";
+import {
+  assertPublishTeam,
+  createDubCreditRow,
+  dubErrorInfo,
+  prepareDubCast,
+  recomputeTeamReputation,
+  type DubCastInput,
+} from "@/lib/dub-teams";
 
 export async function GET() {
   const user = await getCurrentUser();
@@ -19,6 +26,7 @@ export async function GET() {
       _count: { select: { episodes: true, purchases: true, favorites: true } },
       catalogVersions: { select: { id: true, status: true, price: true, kind: true } },
       dubTeam: { select: { id: true, name: true, reputation: true, verified: true, _count: { select: { members: true } } } },
+      dubCredits: { select: { language: true, speakerCount: true } },
     },
   });
 
@@ -49,6 +57,7 @@ export async function GET() {
       dubTeam: a.dubTeam
         ? { id: a.dubTeam.id, name: a.dubTeam.name, memberCount: a.dubTeam._count.members, reputation: a.dubTeam.reputation, verified: a.dubTeam.verified }
         : null,
+      dubCredits: a.dubCredits,
       createdAt: a.createdAt,
     })),
   });
@@ -65,7 +74,8 @@ export async function POST(req: NextRequest) {
     const body = await req.json().catch(() => ({}));
     const {
       title, altTitle, description, coverImage, bannerImage,
-      genres, year, studio, status, type, isFree, price, releaseDate, dubTeamId,
+      genres, year, studio, status, type, isFree, price, releaseDate,
+      dubTeamId, dubLanguage, dubCast,
     } = body;
 
     let publishTeam: Awaited<ReturnType<typeof assertPublishTeam>>;
@@ -114,6 +124,23 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Invalid release date" }, { status: 400 });
     }
 
+    // Dub e'loni shu bir qadamda biriktiriladi: til + speaker/personaj juftliklari.
+    const teamMembers = await db.dubTeamMember.findMany({
+      where: { teamId: publishTeam.team.id },
+      select: { id: true, name: true },
+    });
+    let preparedCast: ReturnType<typeof prepareDubCast>;
+    try {
+      preparedCast = prepareDubCast(
+        Array.isArray(dubCast) ? (dubCast as DubCastInput[]) : [],
+        dubLanguage,
+        teamMembers
+      );
+    } catch (error) {
+      const info = dubErrorInfo(error);
+      return NextResponse.json({ error: info.message, code: info.code }, { status: info.status });
+    }
+
     let slug = slugify(title);
     if (!slug) slug = `anime-${Date.now().toString(36)}`;
     const slugExists = await db.anime.findUnique({ where: { slug } });
@@ -144,7 +171,7 @@ export async function POST(req: NextRequest) {
           releaseDate: releaseDateValue,
         },
       });
-      await tx.animeVersion.create({
+      const version = await tx.animeVersion.create({
         data: {
           animeId: created.id,
           kind: "creator",
@@ -153,11 +180,24 @@ export async function POST(req: NextRequest) {
           status: "pending",
         },
       });
+      await createDubCreditRow(tx, {
+        teamId: publishTeam.team.id,
+        animeId: created.id,
+        versionId: version.id,
+        prepared: preparedCast,
+      });
       return created;
     });
 
+    await recomputeTeamReputation(publishTeam.team.id);
+
     return NextResponse.json(
-      { anime, pending: true, dubTeam: { id: publishTeam.team.id, name: publishTeam.team.name, memberCount: publishTeam.linkedMemberCount } },
+      {
+        anime,
+        pending: true,
+        dubTeam: { id: publishTeam.team.id, name: publishTeam.team.name, memberCount: publishTeam.linkedMemberCount },
+        dubCredit: { language: preparedCast.language, speakerCount: preparedCast.speakerCount },
+      },
       { status: 201 }
     );
   } catch (e) {

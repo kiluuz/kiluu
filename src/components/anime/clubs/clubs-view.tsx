@@ -32,6 +32,7 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { useAppStore, useOpenProfile } from "../store";
+import { useI18n } from "@/components/i18n-provider";
 import { FramedAvatar, SmartImage } from "../ui-bits";
 import { ChatPanel } from "../chat/chat-panel";
 import { toast } from "sonner";
@@ -74,6 +75,7 @@ interface ClubMemberItem {
 export function ClubsView({ initialClubId }: { initialClubId?: string }) {
   const { user, setAuthOpen } = useAppStore();
   const openProfile = useOpenProfile();
+  const { t } = useI18n();
 
   const [clubs, setClubs] = useState<ClubItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -97,7 +99,11 @@ export function ClubsView({ initialClubId }: { initialClubId?: string }) {
 
   // Dub jamoasi takliflari
   const [dubInvites, setDubInvites] = useState<
-    { id: string; team: { id: string; name: string; avatarUrl?: string | null } }[]
+    {
+      id: string;
+      team: { id: string; name: string; avatarUrl?: string | null };
+      invitedBy?: { username: string; displayName: string | null } | null;
+    }[]
   >([]);
   const [inviteBusyId, setInviteBusyId] = useState<string | null>(null);
 
@@ -130,13 +136,13 @@ export function ClubsView({ initialClubId }: { initialClubId?: string }) {
         body: JSON.stringify({ accept }),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Taklifga javob berilmadi");
+      if (!res.ok) throw new Error(data.error || t("dub.inviteFailed"));
       setDubInvites((current) => current.filter((invite) => invite.id !== inviteId));
       if (accept) {
-        toast.success("Taklif qabul qilindi — jamoa chatiga qo'shildingiz");
+        toast.success(t("dub.inviteAccepted"));
         fetchClubs();
       } else {
-        toast.info("Taklif rad etildi");
+        toast.info(t("dub.inviteDeclined"));
       }
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Xatolik");
@@ -772,10 +778,11 @@ export function ClubsView({ initialClubId }: { initialClubId?: string }) {
               </div>
               <div className="min-w-0 flex-1">
                 <p className="text-sm font-bold truncate">
-                  {invite.team.name} sizni dub jamoasiga taklif qildi
+                  {t("dub.inviteBannerTeam", { team: invite.team.name })}
                 </p>
                 <p className="text-[11px] text-muted-foreground">
-                  Qabul qilsangiz jamoa a'zosi bo'lasiz va yopiq jamoa chatiga qo'shilasiz.
+                  {t("dub.inviteBannerHint")}
+                  {invite.invitedBy ? ` · ${t("dub.inviteBannerBy", { name: invite.invitedBy.displayName || invite.invitedBy.username })}` : ""}
                 </p>
               </div>
               <div className="flex items-center gap-2 shrink-0">
@@ -786,7 +793,7 @@ export function ClubsView({ initialClubId }: { initialClubId?: string }) {
                   className="rounded-full font-bold"
                 >
                   {inviteBusyId === invite.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}
-                  Qabul qilish
+                  {t("dub.inviteAccept")}
                 </Button>
                 <Button
                   size="sm"
@@ -795,7 +802,7 @@ export function ClubsView({ initialClubId }: { initialClubId?: string }) {
                   disabled={inviteBusyId === invite.id}
                   className="rounded-full"
                 >
-                  <X className="w-3.5 h-3.5" /> Rad etish
+                  <X className="w-3.5 h-3.5" /> {t("dub.inviteDecline")}
                 </Button>
               </div>
             </div>

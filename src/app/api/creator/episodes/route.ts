@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { getCurrentUser } from "@/lib/auth";
 import { isCreator } from "@/lib/rbac";
+import { releaseAnimeOnFirstEpisode } from "@/lib/creator-release";
 
 export async function POST(req: NextRequest) {
   const user = await getCurrentUser();
@@ -66,6 +67,8 @@ export async function POST(req: NextRequest) {
         hlsKey,
       },
     });
+
+    await releaseAnimeOnFirstEpisode(animeId);
 
     return NextResponse.json({ episode, hlsKey }, { status: 201 });
   } catch (e) {

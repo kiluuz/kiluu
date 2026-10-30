@@ -237,10 +237,16 @@ test("publish guard requires three linked members owned by the creator", async (
 });
 
 test("awards team titles by reputation and verification", () => {
-  assert.equal(shared.dubTeamTitle(0).label, "Yangi jamoa");
-  assert.equal(shared.dubTeamTitle(25).label, "Bronza jamoa");
-  assert.equal(shared.dubTeamTitle(50).label, "Kumush jamoa");
-  assert.equal(shared.dubTeamTitle(75).label, "Oltin jamoa");
-  assert.equal(shared.dubTeamTitle(85).label, "Oltin jamoa");
-  assert.equal(shared.dubTeamTitle(85, true).label, "Afsonaviy jamoa");
+  assert.equal(shared.dubTeamTitle(0).key, "new");
+  assert.equal(shared.dubTeamTitle(24).key, "new");
+  assert.equal(shared.dubTeamTitle(25).key, "bronze");
+  assert.equal(shared.dubTeamTitle(50).key, "silver");
+  assert.equal(shared.dubTeamTitle(75).key, "gold");
+  assert.equal(shared.dubTeamTitle(85).key, "gold");
+  assert.equal(shared.dubTeamTitle(85, true).key, "mythic");
+});
+
+test("dub languages match the locales the product supports", () => {
+  assert.deepEqual(shared.DUB_LANGUAGES, ["uz", "en", "ru", "kk", "ky"]);
+  assert.deepEqual(shared.DUB_ERROR_CODES.includes("TEAM_LEADER_ONLY"), true);
 });

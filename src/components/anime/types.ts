@@ -1,3 +1,5 @@
+import type { DubTitleKey } from "@/lib/dub-team-shared";
+
 export type Role = "CREATOR" | "VIEWER" | "ADMIN";
 
 export interface SocialLinks {
@@ -150,7 +152,7 @@ export interface AnimeDetail extends AnimeSummary {
     avatarUrl: string | null;
     reputation: number;
     verified: boolean;
-    title: { label: string; color: string };
+    title: { key: DubTitleKey; color: string };
     memberCount: number;
   } | null;
 }
@@ -366,7 +368,7 @@ export interface PublicProfile {
     verified: boolean;
     memberCount: number;
     role: string;
-    title: { label: string; color: string };
+    title: { key: DubTitleKey; color: string };
   } | null;
   isFollowing: boolean;
   canFollow: boolean;

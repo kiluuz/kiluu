@@ -348,6 +348,63 @@ export async function assertPublishTeam(teamId: unknown, userId: string) {
   return { team, linkedMemberCount };
 }
 
+export interface PreparedDubCast {
+  language: string;
+  rows: { memberId: string | null; speakerName: string; character: string }[];
+  speakerCount: number;
+}
+
+/**
+ * Speaker qatorlarini tozalaydi: ham ism, ham personaj kerak.
+ * speakerCount — noyob ismlar soni, bot tomoshabinlarga shu raqamni tasdiqlashni so‘raydi.
+ */
+export function prepareDubCast(
+  cast: DubCastInput[],
+  language: unknown,
+  members: { id: string; name: string }[] = []
+): PreparedDubCast {
+  const safeLanguage =
+    typeof language === "string" && (DUB_LANGUAGES as readonly string[]).includes(language) ? language : "uz";
+  const entries = Array.isArray(cast) ? cast.slice(0, 60) : [];
+  if (entries.length === 0) throw fail("INVALID_CAST", "Kamida bitta speaker qo‘shing");
+  const memberById = new Map(members.map((member) => [member.id, member]));
+  const rows = entries.map((entry) => {
+    const character = cleanText(entry.character, 60);
+    const member = entry.memberId ? memberById.get(entry.memberId) : undefined;
+    const name = cleanText(entry.name, 60) || member?.name || "";
+    if (!name || !character) throw fail("INVALID_CAST", "Speaker va personaj nomini to‘ldiring");
+    return { memberId: member?.id ?? null, speakerName: name, character };
+  });
+  return {
+    language: safeLanguage,
+    rows,
+    speakerCount: new Set(rows.map((row) => row.speakerName.toLowerCase())).size,
+  };
+}
+
+/** DubCredit va uning speaker qatorlarini yaratadi (publish tranzaksiyasi ichida ham ishlaydi). */
+export async function createDubCreditRow(
+  client: Db,
+  opts: { teamId: string; animeId: string; versionId?: string | null; prepared: PreparedDubCast }
+) {
+  const existing = await client.dubCredit.findFirst({
+    where: { teamId: opts.teamId, animeId: opts.animeId, language: opts.prepared.language },
+    select: { id: true },
+  });
+  if (existing) throw fail("DUPLICATE_CREDIT", "Bu anime uchun shu tilda dub allaqachon biriktirilgan");
+  return client.dubCredit.create({
+    data: {
+      teamId: opts.teamId,
+      animeId: opts.animeId,
+      versionId: opts.versionId || null,
+      language: opts.prepared.language,
+      speakerCount: opts.prepared.speakerCount,
+      cast: { create: opts.prepared.rows },
+    },
+    include: { cast: true },
+  });
+}
+
 export async function addDubCredit(opts: {
   teamId: string;
   animeId: string;
@@ -379,43 +436,13 @@ export async function addDubCredit(opts: {
     );
   }
 
-  const language = typeof opts.language === "string" && (DUB_LANGUAGES as readonly string[]).includes(opts.language)
-    ? opts.language
-    : "uz";
-
-  const cast = Array.isArray(opts.cast) ? opts.cast.slice(0, 60) : [];
-  if (cast.length === 0) throw fail("INVALID_CAST", "Kamida bitta speaker qo‘shing");
   const members = await db.dubTeamMember.findMany({ where: { teamId: opts.teamId }, select: { id: true, name: true } });
-  const memberById = new Map(members.map((member) => [member.id, member]));
-
-  const rows = cast.map((entry) => {
-    const character = cleanText(entry.character, 60);
-    const member = entry.memberId ? memberById.get(entry.memberId) : undefined;
-    const name = cleanText(entry.name, 60) || member?.name || "";
-    if (!name || !character) throw fail("INVALID_CAST", "Speaker va personaj nomini to‘ldiring");
-    return { memberId: member?.id ?? null, speakerName: name, character };
-  });
-  const speakerCount = new Set(rows.map((row) => row.speakerName.toLowerCase())).size;
-
-  const existing = await db.dubCredit.findFirst({
-    where: { teamId: opts.teamId, animeId: opts.animeId, language },
-    select: { id: true },
-  });
-  if (existing) throw fail("DUPLICATE_CREDIT", "Bu anime uchun shu tilda dub allaqachon biriktirilgan");
-
-  const credit = await db.$transaction(async (tx) => {
-    const created = await tx.dubCredit.create({
-      data: {
-        teamId: opts.teamId,
-        animeId: opts.animeId,
-        versionId: opts.versionId || null,
-        language,
-        speakerCount,
-        cast: { create: rows },
-      },
-      include: { cast: true },
-    });
-    return created;
+  const prepared = prepareDubCast(opts.cast, opts.language, members);
+  const credit = await createDubCreditRow(db, {
+    teamId: opts.teamId,
+    animeId: anime.id,
+    versionId: opts.versionId,
+    prepared,
   });
   await recomputeTeamReputation(opts.teamId);
   return credit;

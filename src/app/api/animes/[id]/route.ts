@@ -323,6 +323,20 @@ export async function DELETE(
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
+  // Anime kartochkasini faqat uni chiqargan dub jamoasi sardori (yoki admin) o‘chiradi.
+  if (anime.dubTeamId && !isAdminUser(user)) {
+    const team = await db.dubTeam.findUnique({
+      where: { id: anime.dubTeamId },
+      select: { ownerId: true },
+    });
+    if (team?.ownerId && team.ownerId !== user.id) {
+      return NextResponse.json(
+        { error: "Only the dub team leader can delete this anime", code: "TEAM_LEADER_ONLY" },
+        { status: 403 }
+      );
+    }
+  }
+
   await db.anime.delete({ where: { id: anime.id } });
 
   // Sync deletion with bot if configured

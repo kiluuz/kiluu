@@ -4,6 +4,7 @@ import { z } from "zod";
 import { db } from "@/lib/db";
 import { botRequestAuthorized } from "@/lib/bot-secret";
 import { canonicalRole } from "@/lib/rbac";
+import { releaseAnimeOnFirstEpisode } from "@/lib/creator-release";
 
 const Identity = z.object({
   site_user_id: z.string().min(1).max(64),
@@ -153,8 +154,8 @@ export async function POST(req: NextRequest) {
             price: input.is_free ? 0 : input.price,
             creatorId: user.id,
             source: "CREATOR",
-            moderationStatus: "APPROVED",
-            hidden: false,
+            moderationStatus: "PENDING",
+            hidden: true,
           },
           select: { id: true, slug: true, title: true },
         });
@@ -164,7 +165,7 @@ export async function POST(req: NextRequest) {
             kind: "creator",
             creatorId: user.id,
             price: input.is_free ? 0 : input.price,
-            status: "published",
+            status: "pending",
           },
         });
         return created;
@@ -226,7 +227,8 @@ export async function POST(req: NextRequest) {
         },
         select: { id: true, number: true, title: true },
       });
-      return NextResponse.json({ episode }, { status: 201 });
+      const released = await releaseAnimeOnFirstEpisode(anime.id);
+      return NextResponse.json({ episode, released: released || undefined }, { status: 201 });
     } catch (error) {
       if (error && typeof error === "object" && "code" in error && error.code === "P2002") {
         return NextResponse.json({ error: "This episode number already exists" }, { status: 409 });
