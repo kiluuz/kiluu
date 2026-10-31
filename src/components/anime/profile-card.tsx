@@ -22,12 +22,10 @@ export function ProfilePopupCard({
   profile,
   onFollowChange,
   onClose,
-  compact,
 }: {
   profile: PublicProfile;
   onFollowChange?: (following: boolean) => void;
   onClose?: () => void;
-  compact?: boolean;
 }) {
   const navigate = useAppStore((s) => s.navigate);
   const [following, setFollowing] = useState(profile.isFollowing);
@@ -76,7 +74,7 @@ export function ProfilePopupCard({
   return (
     <div
       className={cn(
-        "relative w-full max-w-[420px] overflow-visible rounded-3xl border bg-card text-card-foreground shadow-2xl",
+        "relative w-full max-w-[420px] sm:max-w-[480px] lg:max-w-[560px] overflow-visible rounded-3xl border bg-card text-card-foreground shadow-2xl",
         "border-[color-mix(in_srgb,var(--user-accent)_35%,transparent)]"
       )}
       style={userAccentVars(profile.accentColor, profile.accentTo)}
@@ -87,17 +85,17 @@ export function ProfilePopupCard({
       {onClose && (
         <button
           onClick={onClose}
-          className="absolute top-2.5 right-2.5 z-20 w-8 h-8 rounded-full bg-black/35 backdrop-blur-sm text-white flex items-center justify-center hover:bg-black/55 transition focus-ring-accent"
+          className="absolute top-2.5 right-2.5 lg:top-3.5 lg:right-3.5 z-20 w-8 h-8 lg:w-9 lg:h-9 rounded-full bg-black/35 backdrop-blur-sm text-white flex items-center justify-center hover:bg-black/55 transition focus-ring-accent"
           aria-label="Close profile card"
         >
-          <X className="w-4 h-4" />
+          <X className="w-4 h-4 lg:w-[18px] lg:h-[18px]" />
         </button>
       )}
 
       {/* Banner — 5:2 compact crop of the user banner */}
       <div
         className={cn(
-          "relative h-[152px] overflow-hidden grain",
+          "relative h-[152px] lg:h-[196px] overflow-hidden grain",
           "bg-gradient-to-br from-[color-mix(in_srgb,var(--user-accent)_45%,var(--card))] to-[color-mix(in_srgb,var(--user-accent-to)_30%,var(--card))]"
         )}
       >
@@ -116,7 +114,7 @@ export function ProfilePopupCard({
       </div>
 
       {/* Avatar + identity */}
-      <div className="px-6 pb-6">
+      <div className="px-6 pb-6 lg:px-7 lg:pb-7">
         <div className="flex items-end justify-between -mt-14 relative z-10">
           <div className="rounded-full bg-card p-1 shadow-xl">
             <FramedAvatar user={profile} size={88} />
@@ -133,7 +131,7 @@ export function ProfilePopupCard({
 
         <div className="mt-4 min-w-0" style={{ "--profile-name-frame-inset": `${nameFrameContentInset(profile, 34)}px` } as React.CSSProperties}>
           <div className="flex items-center gap-1.5 flex-wrap">
-            <h3 className="m-0 flex min-w-0 items-center font-display text-lg font-bold leading-none">
+            <h3 className="m-0 flex min-w-0 items-center font-display text-lg lg:text-[22px] font-bold leading-none">
               <NameWithFrame user={profile} height={34} avatarSize={88} />
             </h3>
             {profile.isVerified && <BadgeCheck className="w-4 h-4 text-[var(--user-accent)] shrink-0" />}
@@ -146,7 +144,7 @@ export function ProfilePopupCard({
               </span>
             )}
           </div>
-          <p className="profile-name-frame-follow text-xs text-muted-foreground">
+          <p className="profile-name-frame-follow text-xs lg:text-[13px] text-muted-foreground">
             @{profile.username}{profile.pronouns ? ` · ${profile.pronouns}` : ""}
             {profile.role !== "CREATOR" && profile.stats.level !== undefined && <span className="ml-1.5 rounded bg-secondary px-1.5 py-0.5 font-bold">Lv.{profile.stats.level}</span>}
           </p>
@@ -154,34 +152,34 @@ export function ProfilePopupCard({
           {/* status line */}
           <div className="profile-name-frame-follow mt-2 min-h-[24px]">
             {watching ? (
-              <span className="inline-flex items-center gap-1.5 text-[11px] font-medium bg-accent rounded-full px-2.5 py-1 max-w-full">
+              <span className="inline-flex items-center gap-1.5 text-[11px] lg:text-[12px] font-medium bg-accent rounded-full px-2.5 py-1 max-w-full">
                 <Equalizer className="h-2.5" />
                 <span className="text-muted-foreground">Watching</span>
-                <span className="font-semibold text-[var(--user-accent)] truncate max-w-[140px]">{watching.anime.title}</span>
+                <span className="font-semibold text-[var(--user-accent)] truncate max-w-[140px] lg:max-w-[240px]">{watching.anime.title}</span>
                 <span className="text-muted-foreground">· Ep {watching.episode.number}</span>
               </span>
             ) : (profile.statusEmoji || profile.statusText) ? (
-              <span className="inline-flex items-center gap-1.5 text-[11px] font-medium bg-accent rounded-full px-2.5 py-1 max-w-full">
+              <span className="inline-flex items-center gap-1.5 text-[11px] lg:text-[12px] font-medium bg-accent rounded-full px-2.5 py-1 max-w-full">
                 {profile.statusEmoji && <span>{profile.statusEmoji}</span>}
-                {profile.statusText && <span className="text-muted-foreground truncate max-w-[200px]">{profile.statusText}</span>}
+                {profile.statusText && <span className="text-muted-foreground truncate max-w-[200px] lg:max-w-[340px]">{profile.statusText}</span>}
               </span>
             ) : null}
           </div>
 
           {profile.tagline && (
-            <p className="text-[12px] font-medium text-foreground/75 mt-1.5 line-clamp-1">{profile.tagline}</p>
+            <p className="text-[12px] lg:text-[13px] font-medium text-foreground/75 mt-1.5 line-clamp-1">{profile.tagline}</p>
           )}
         </div>
 
         {/* Bio snippet */}
         {profile.bio && (
-          <p className="text-sm text-foreground/80 mt-2.5 line-clamp-3 whitespace-pre-wrap break-words">
+          <p className="text-sm lg:text-[15px] text-foreground/80 mt-2.5 line-clamp-3 whitespace-pre-wrap break-words">
             {profile.bio}
           </p>
         )}
 
         {/* Member since + socials */}
-        <div className="mt-3 flex items-center gap-2 text-[11px] text-muted-foreground flex-wrap">
+        <div className="mt-3 flex items-center gap-2 text-[11px] lg:text-[12px] text-muted-foreground flex-wrap">
           <CalendarDays className="w-3.5 h-3.5" />
           <span>Member since {joinDate}</span>
           {Object.keys(profile.socialLinks ?? {}).filter((k) => profile.socialLinks?.[k]).length > 0 && (
@@ -189,13 +187,13 @@ export function ProfilePopupCard({
           )}
         </div>
 
-        {/* Top 3 anime */}
-        {!compact && top3Animes.length > 0 && (
-          <div className="mt-4">
-            <p className="text-[10px] font-black uppercase tracking-wider text-muted-foreground mb-2 flex items-center gap-1">
+        {/* Top 3 anime — desktop only, the mobile popup keeps its old shape */}
+        {top3Animes.length > 0 && (
+          <div className="mt-5 hidden lg:block">
+            <p className="text-[10px] lg:text-[11px] font-black uppercase tracking-wider text-muted-foreground mb-2 flex items-center gap-1">
               <Trophy className="w-3 h-3 text-[var(--user-accent)]" /> Top Anime
             </p>
-            <div className="grid grid-cols-3 gap-2">
+            <div className="grid grid-cols-3 gap-2 lg:gap-2.5">
               {top3Animes.map((a, i) => (
                 <button
                   key={a.id}
@@ -212,10 +210,10 @@ export function ProfilePopupCard({
             </div>
           </div>
         )}
-        {/* 3 achievements */}
-        {!compact && topAch.length > 0 && (
-          <div className="mt-3.5">
-            <p className="text-[10px] font-black uppercase tracking-wider text-muted-foreground mb-1.5 flex items-center gap-1">
+        {/* 3 achievements — desktop only */}
+        {topAch.length > 0 && (
+          <div className="mt-5 hidden lg:block">
+            <p className="text-[10px] lg:text-[11px] font-black uppercase tracking-wider text-muted-foreground mb-1.5 flex items-center gap-1">
               <Heart className="w-3 h-3 text-[var(--user-accent)]" /> Achievements
             </p>
             <div className="flex gap-2">
@@ -223,13 +221,13 @@ export function ProfilePopupCard({
                 <div
                   key={a.def.id}
                   className={cn(
-                    "flex-1 rounded-xl border px-2 py-1.5 text-center rarity-glow rarity-" + a.def.rarity,
+                    "flex-1 rounded-xl border px-2 py-1.5 lg:px-3 lg:py-2 text-center rarity-glow rarity-" + a.def.rarity,
                     "border-[color-mix(in_srgb,var(--rarity)_30%,transparent)] bg-[color-mix(in_srgb,var(--rarity)_10%,transparent)]"
                   )}
                   title={`${a.def.name} — ${a.def.desc}`}
                 >
-                  <span className="text-base leading-none">{a.def.emoji}</span>
-                  <p className="text-[9px] font-bold truncate mt-0.5">{a.def.name}</p>
+                  <span className="text-base lg:text-lg leading-none">{a.def.emoji}</span>
+                  <p className="text-[9px] lg:text-[10px] font-bold truncate mt-0.5">{a.def.name}</p>
                 </div>
               ))}
             </div>
@@ -237,26 +235,26 @@ export function ProfilePopupCard({
         )}
 
         {/* Stats mini-row */}
-        <div className="mt-4 grid grid-cols-3 gap-2 text-center">
+        <div className="mt-4 lg:mt-5 grid grid-cols-3 gap-2 lg:gap-3 text-center">
           {[
             { label: profile.role === "CREATOR" ? "Created" : "Owned", value: profile.stats.purchaseCount },
             { label: "Followers", value: profile.stats.followers },
             { label: "Posts", value: profile.stats.postCount },
           ].filter((s) => s.value !== null).map((s) => (
-          <div key={s.label} className="rounded-xl bg-accent/60 py-2">
-              <p className="stat-numeral text-sm leading-none">{s.value?.toLocaleString()}</p>
-              <p className="text-[9px] uppercase tracking-wider text-muted-foreground font-semibold mt-0.5">{s.label}</p>
+          <div key={s.label} className="rounded-xl bg-accent/60 py-2 lg:py-3">
+              <p className="stat-numeral text-sm lg:text-base leading-none">{s.value?.toLocaleString()}</p>
+              <p className="text-[9px] lg:text-[10px] uppercase tracking-wider text-muted-foreground font-semibold mt-0.5">{s.label}</p>
             </div>
           ))}
         </div>
 
         {/* Actions */}
-        <div className="mt-4 flex items-center gap-2">
+        <div className="mt-4 lg:mt-5 flex items-center gap-2 lg:gap-2.5">
           {!profile.isMe ? (
             <>
               {(profile.canFollow || following) && <Button
                 size="sm"
-                className="flex-1 h-9 rounded-full font-semibold"
+                className="flex-1 h-9 lg:h-10 rounded-full font-semibold"
                 style={following
                   ? { background: "var(--card)", border: "1px solid var(--border)", color: "var(--foreground)" }
                   : { background: "linear-gradient(120deg, var(--user-accent), var(--user-accent-to))", color: textOn(profile.accentColor) }}
@@ -270,7 +268,7 @@ export function ProfilePopupCard({
           ) : (
             <Button
               size="sm"
-              className="flex-1 h-9 rounded-full brand-gradient text-white font-semibold"
+              className="flex-1 h-9 lg:h-10 rounded-full brand-gradient text-white font-semibold"
               onClick={() => { onClose?.(); navigate("user-profile", { username: profile.username }); }}
             >
               View My Profile
@@ -279,7 +277,7 @@ export function ProfilePopupCard({
           <Button
             size="sm"
             variant="outline"
-            className="h-9 rounded-full flex-1"
+            className="h-9 lg:h-10 rounded-full flex-1"
             onClick={() => { onClose?.(); navigate("user-profile", { username: profile.username }); }}
           >
             View Full Profile
@@ -368,7 +366,7 @@ export function ProfileModal() {
       <div className="absolute inset-0 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200" aria-hidden />
       <div
         ref={cardRef}
-        className="relative w-[min(420px,calc(100vw-1.5rem))] sm:w-[420px] animate-in zoom-in-95 fade-in duration-200 max-h-[92dvh] overflow-y-auto no-scrollbar rounded-3xl shadow-2xl"
+        className="relative w-[min(420px,calc(100vw-1.5rem))] sm:w-[min(480px,calc(100vw-2rem))] lg:w-[min(560px,calc(100vw-3rem))] animate-in zoom-in-95 fade-in duration-200 max-h-[92dvh] overflow-y-auto no-scrollbar rounded-3xl shadow-2xl"
         onClick={(e) => e.stopPropagation()}
       >
         {profileQuery.isPending ? (
@@ -378,9 +376,9 @@ export function ProfileModal() {
             <div className="h-3.5 w-24 rounded-lg skeleton" />
           </div>
         ) : profile ? (
-          <ProfilePopupCard profile={profile} onClose={closeProfileCard} compact />
+          <ProfilePopupCard profile={profile} onClose={closeProfileCard} />
         ) : (
-          <div className="w-[min(420px,calc(100vw-1.5rem))] rounded-3xl border bg-card p-6 text-center text-sm text-muted-foreground">
+          <div className="w-full rounded-3xl border bg-card p-6 text-center text-sm text-muted-foreground">
             Couldn’t load profile. Close and try again.
           </div>
         )}
