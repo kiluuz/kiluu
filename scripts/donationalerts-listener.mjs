@@ -14,6 +14,7 @@
  *   DA_SYNC_INTERVAL_MS           default 300000 (5 min)
  */
 import { createHmac } from "node:crypto";
+import { createServer } from "node:http";
 
 const APP_URL = (process.env.KILUU_APP_URL || "").replace(/\/+$/, "");
 const SECRET = process.env.DONATIONALERTS_INGEST_SECRET || "";
@@ -244,6 +245,22 @@ function shutdown(signal) {
 
 process.on("SIGTERM", () => shutdown("SIGTERM"));
 process.on("SIGINT", () => shutdown("SIGINT"));
+
+// Free web hosts (Render/Koyeb) require a bound port; the health endpoint also
+// lets an uptime pinger keep a free instance from sleeping.
+if (process.env.PORT) {
+  const port = Number(process.env.PORT);
+  createServer((req, res) => {
+    res.writeHead(200, { "content-type": "application/json" });
+    res.end(
+      JSON.stringify({
+        ok: true,
+        uptime: Math.round(process.uptime()),
+        socket: socket ? socket.readyState : null,
+      })
+    );
+  }).listen(port, () => log("health server listening", { port }));
+}
 
 log("listener starting", { app: APP_URL });
 connect();
