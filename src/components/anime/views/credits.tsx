@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import {
   Zap, Gift, History, Loader2, Sparkles, Copy, ExternalLink,
-  Clock, CheckCircle2, ShieldCheck, AlertTriangle,
+  Clock, CheckCircle2, ShieldCheck, AlertTriangle, Wrench,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
@@ -24,6 +24,7 @@ export interface CreditsData {
     provider: string;
     currency: string;
     donationUrl: string;
+    maintenance?: boolean;
     display?: { currencies: DisplayCurrency[]; rates: Record<DisplayCurrency, number> };
   };
 }
@@ -42,6 +43,7 @@ export interface DonationIntent {
 
 const ERROR_KEYS: Record<string, string> = {
   PAYMENTS_UNAVAILABLE: "credits.daUnavailable",
+  PAYMENTS_MAINTENANCE: "credits.daMaintenance",
   TOO_MANY_PENDING: "credits.daTooMany",
   INVALID_PACKAGE: "credits.daError",
   TOO_MANY_REQUESTS: "credits.daRate",
@@ -151,6 +153,7 @@ export function TopUpSection({
   }
 
   const rates = data?.payment?.display?.rates;
+  const maintenance = Boolean(data?.payment?.maintenance);
   const priceOf = (base: number) =>
     formatDisplayPrice(convertPrice(base, priceCurrency, rates), priceCurrency);
   const approxOf = (minor: number, currency: string) => {
@@ -191,45 +194,57 @@ export function TopUpSection({
         <FramesShop />
       ) : (
         <div className="space-y-6">
-          <div className="grid grid-cols-2 lg:grid-cols-5 gap-3 sm:gap-4">
-            {(data?.packages || []).map((pkg) => (
-              <button
-                key={pkg.id}
-                disabled={creatingId === pkg.id}
-                onClick={() => startTopUp(pkg)}
-                className={cn(
-                  "relative rounded-3xl border p-5 text-left transition-all hover:-translate-y-1.5 disabled:opacity-70",
-                  pkg.popular
-                    ? "border-primary bg-gradient-to-b from-primary/15 to-transparent shadow-xl shadow-primary/15"
-                    : "bg-card hover:border-primary/50"
-                )}
-              >
-                {pkg.popular && (
-                  <span className="absolute -top-2.5 left-1/2 -translate-x-1/2 brand-gradient text-white text-[9px] font-black uppercase tracking-wider px-3 py-1 rounded-full whitespace-nowrap">
-                    {t("credits.popular")}
-                  </span>
-                )}
-                <div className="flex items-center gap-1.5 mb-2">
-                  <Zap className={cn("w-5 h-5", pkg.popular ? "text-primary" : "text-amber-400")} />
-                  <span className="text-2xl font-black tabular-nums">{formatCredits(pkg.credits)}</span>
-                </div>
-                {pkg.bonus > 0 && (
-                  <p className="text-[10px] font-bold text-emerald-500 bg-emerald-500/10 border border-emerald-500/25 rounded-full px-2 py-0.5 inline-flex items-center gap-1 mb-2">
-                    <Gift className="w-3 h-3" /> +{formatCredits(pkg.bonus)} {t("credits.bonus")}
-                  </p>
-                )}
-                <p className="text-xs text-muted-foreground mt-1">{t("credits.total")} {formatCredits(pkg.credits + pkg.bonus)}</p>
-                <p className="text-lg font-black mt-2 flex items-center gap-1.5">
-                  {creatingId === pkg.id ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
-                  {pkg.priceDa && pkg.priceDa > 0 ? priceOf(pkg.priceDa) : "—"}
-                </p>
-              </button>
-            ))}
-          </div>
-          <p className="text-[11px] text-muted-foreground flex items-center gap-1.5">
-            <ShieldCheck className="w-3.5 h-3.5 text-emerald-500" />
-            {t("credits.daSecured")}
-          </p>
+          {maintenance ? (
+            <div className="rounded-3xl border border-amber-500/30 bg-amber-500/10 p-6 sm:p-8 text-center space-y-3">
+              <div className="w-14 h-14 mx-auto rounded-full bg-amber-500/15 flex items-center justify-center">
+                <Wrench className="w-7 h-7 text-amber-500" />
+              </div>
+              <h3 className="text-lg font-black">{t("credits.maintenanceTitle")}</h3>
+              <p className="text-sm text-muted-foreground max-w-md mx-auto">{t("credits.maintenanceBody")}</p>
+            </div>
+          ) : (
+            <>
+              <div className="grid grid-cols-2 lg:grid-cols-5 gap-3 sm:gap-4">
+                {(data?.packages || []).map((pkg) => (
+                  <button
+                    key={pkg.id}
+                    disabled={creatingId === pkg.id}
+                    onClick={() => startTopUp(pkg)}
+                    className={cn(
+                      "relative rounded-3xl border p-5 text-left transition-all hover:-translate-y-1.5 disabled:opacity-70",
+                      pkg.popular
+                        ? "border-primary bg-gradient-to-b from-primary/15 to-transparent shadow-xl shadow-primary/15"
+                        : "bg-card hover:border-primary/50"
+                    )}
+                  >
+                    {pkg.popular && (
+                      <span className="absolute -top-2.5 left-1/2 -translate-x-1/2 brand-gradient text-white text-[9px] font-black uppercase tracking-wider px-3 py-1 rounded-full whitespace-nowrap">
+                        {t("credits.popular")}
+                      </span>
+                    )}
+                    <div className="flex items-center gap-1.5 mb-2">
+                      <Zap className={cn("w-5 h-5", pkg.popular ? "text-primary" : "text-amber-400")} />
+                      <span className="text-2xl font-black tabular-nums">{formatCredits(pkg.credits)}</span>
+                    </div>
+                    {pkg.bonus > 0 && (
+                      <p className="text-[10px] font-bold text-emerald-500 bg-emerald-500/10 border border-emerald-500/25 rounded-full px-2 py-0.5 inline-flex items-center gap-1 mb-2">
+                        <Gift className="w-3 h-3" /> +{formatCredits(pkg.bonus)} {t("credits.bonus")}
+                      </p>
+                    )}
+                    <p className="text-xs text-muted-foreground mt-1">{t("credits.total")} {formatCredits(pkg.credits + pkg.bonus)}</p>
+                    <p className="text-lg font-black mt-2 flex items-center gap-1.5">
+                      {creatingId === pkg.id ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
+                      {pkg.priceDa && pkg.priceDa > 0 ? priceOf(pkg.priceDa) : "—"}
+                    </p>
+                  </button>
+                ))}
+              </div>
+              <p className="text-[11px] text-muted-foreground flex items-center gap-1.5">
+                <ShieldCheck className="w-3.5 h-3.5 text-emerald-500" />
+                {t("credits.daSecured")}
+              </p>
+            </>
+          )}
 
           <div>
             <h3 className="font-bold flex items-center gap-2 mb-4">

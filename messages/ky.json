@@ -790,5 +790,8 @@
   "payouts.method.odengi": "O!Деньги",
   "payouts.method.mbank": "MBANK",
   "payouts.method.elsom": "Элсом",
-  "payouts.method.optima": "Optima Bank"
+  "payouts.method.optima": "Optima Bank",
+  "credits.maintenanceTitle": "Төлөмдөр техникалык тейлөөдө",
+  "credits.maintenanceBody": "Толуктоо убактылуу өчүрүлгөн: Payme төлөм системасы туташтырылууда. Жакында кайра иштейт — кредиттериңиз жана тарыхыңыз сакталат.",
+  "credits.daMaintenance": "Төлөмдөр азыр техникалык тейлөөдө. Жакында кайра күйгүзүлөт."
 }

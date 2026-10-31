@@ -7,10 +7,14 @@ import { rateLimit } from "@/lib/rate-limit";
 import { rateKey } from "@/lib/client-ip";
 import { log } from "@/lib/logger";
 import { ensureRuntimeSeed } from "@/lib/seed-runtime";
+import { paymentsMaintenance } from "@/lib/payment-status";
 
 export async function POST(req: NextRequest) {
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (paymentsMaintenance()) {
+    return NextResponse.json({ error: "PAYMENTS_MAINTENANCE" }, { status: 503 });
+  }
   if (!rateLimit(rateKey(req, "stars-inv") + user.id, 8, 60_000)) {
     return NextResponse.json({ error: "Too many attempts" }, { status: 429 });
   }

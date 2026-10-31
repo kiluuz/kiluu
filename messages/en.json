@@ -790,5 +790,8 @@
   "payouts.method.odengi": "O!Деньги",
   "payouts.method.mbank": "MBANK",
   "payouts.method.elsom": "Элсом",
-  "payouts.method.optima": "Optima Bank"
+  "payouts.method.optima": "Optima Bank",
+  "credits.maintenanceTitle": "Payments under maintenance",
+  "credits.maintenanceBody": "Top-ups are paused while we connect the Payme payment system. They will be back soon — your credits and history stay intact.",
+  "credits.daMaintenance": "Payments are under maintenance right now. They will be back soon."
 }

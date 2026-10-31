@@ -4,6 +4,7 @@ import { getCurrentUser } from "@/lib/auth";
 import { ensureRuntimeSeed } from "@/lib/seed-runtime";
 import { daCurrency, daDonationUrl } from "@/lib/donationalerts";
 import { DISPLAY_CURRENCIES, displayRates } from "@/lib/display-currency";
+import { paymentsMaintenance } from "@/lib/payment-status";
 
 export async function GET() {
   await ensureRuntimeSeed();
@@ -47,6 +48,7 @@ export async function GET() {
       provider: "donationalerts",
       currency: daCurrency(),
       donationUrl: daDonationUrl(),
+      maintenance: paymentsMaintenance(),
       display: { currencies: DISPLAY_CURRENCIES, rates: displayRates() },
     },
     balance: user?.credits ?? 0,

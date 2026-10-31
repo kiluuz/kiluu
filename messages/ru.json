@@ -790,5 +790,8 @@
   "payouts.method.odengi": "O!Деньги",
   "payouts.method.mbank": "MBANK",
   "payouts.method.elsom": "Элсом",
-  "payouts.method.optima": "Optima Bank"
+  "payouts.method.optima": "Optima Bank",
+  "credits.maintenanceTitle": "Платежи на техническом обслуживании",
+  "credits.maintenanceBody": "Пополнение временно отключено: мы подключаем платёжную систему Payme. Скоро всё заработает — кредиты и история сохранятся.",
+  "credits.daMaintenance": "Платежи сейчас на техническом обслуживании. Скоро всё заработает."
 }

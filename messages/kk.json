@@ -790,5 +790,8 @@
   "payouts.method.odengi": "O!Деньги",
   "payouts.method.mbank": "MBANK",
   "payouts.method.elsom": "Элсом",
-  "payouts.method.optima": "Optima Bank"
+  "payouts.method.optima": "Optima Bank",
+  "credits.maintenanceTitle": "Төлемдер техникалық қызмет көрсетуде",
+  "credits.maintenanceBody": "Толықтыру уақытша өшірілген: Payme төлем жүйесі қосылуда. Жақында қайта іске қосылады — кредиттеріңіз мен тарихыңыз сақталады.",
+  "credits.daMaintenance": "Төлемдер қазір техникалық қызмет көрсетуде. Жақында қайта қосылады."
 }

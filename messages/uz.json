@@ -790,5 +790,8 @@
   "payouts.method.odengi": "O!Деньги",
   "payouts.method.mbank": "MBANK",
   "payouts.method.elsom": "Элсом",
-  "payouts.method.optima": "Optima Bank"
+  "payouts.method.optima": "Optima Bank",
+  "credits.maintenanceTitle": "To‘lov tizimi texnik tuzatishda",
+  "credits.maintenanceBody": "Hozircha hisobni to‘ldirish o‘chirilgan: Payme to‘lov tizimi ulanmoqda. Tez orada qayta ishga tushadi — kreditlaringiz va tarixingiz saqlanadi.",
+  "credits.daMaintenance": "To‘lov hozirda texnik tuzatishda. Tez orada qayta yoqiladi."
 }
