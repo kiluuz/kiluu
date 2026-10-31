@@ -1,7 +1,7 @@
 import { describe, test } from "node:test";
 import assert from "node:assert/strict";
 import { randomBytes } from "node:crypto";
-import { maskPayoutDetails, payoutAmountMinor, payoutMinMinor, payoutRate, revealPayoutDetails, PAYOUT_METHODS } from "./payouts";
+import { maskPayoutDetails, payoutAmountMinor, payoutDisplayAmount, payoutMinMinor, payoutRate, revealPayoutDetails, PAYOUT_METHODS } from "./payouts";
 import { sealJson } from "./sealed";
 
 function withEnv<T>(values: Record<string, string | undefined>, fn: () => T): T {
@@ -42,7 +42,26 @@ describe("payout math", () => {
   });
 
   test("ships the expected payout methods", () => {
-    assert.deepEqual([...PAYOUT_METHODS], ["uzcard", "humo", "payme", "click", "bank", "other"]);
+    assert.deepEqual(
+      [...PAYOUT_METHODS],
+      [
+        "uzcard", "humo", "payme", "click",
+        "kaspi", "halyk", "freedom",
+        "odengi", "mbank", "elsom", "optima",
+        "bank", "other",
+      ]
+    );
+  });
+
+  test("snapshots the payout in the chosen display currency", () => {
+    withEnv({ DA_PRICE_RATE_UZS: "150", DA_PRICE_RATE_KZT: "6", DA_PRICE_RATE_KGS: "1.1", DA_PRICE_RATE_USD: "0.011" }, () => {
+      assert.deepEqual(payoutDisplayAmount(30_000, "UZS"), { currency: "UZS", amountMinor: 4_500_000 });
+      assert.deepEqual(payoutDisplayAmount(30_000, "KZT"), { currency: "KZT", amountMinor: 180_000 });
+      assert.deepEqual(payoutDisplayAmount(30_000, "KGS"), { currency: "KGS", amountMinor: 33_000 });
+      assert.deepEqual(payoutDisplayAmount(30_000, "USD"), { currency: "USD", amountMinor: 330 });
+      assert.deepEqual(payoutDisplayAmount(30_000, "RUB"), { currency: "RUB", amountMinor: 30_000 });
+      assert.deepEqual(payoutDisplayAmount(30_000, "EUR"), { currency: "RUB", amountMinor: 30_000 });
+    });
   });
 });
 

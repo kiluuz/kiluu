@@ -778,5 +778,17 @@
   "adminPay.error.exchange": "Не удалось обменять токен — проверьте client credentials",
   "adminPay.error.generic": "Что-то пошло не так",
   "credits.priceCurrency": "Валюта цен",
-  "credits.priceApprox": "Ориентировочно, по курсу"
+  "credits.priceApprox": "Ориентировочно, по курсу",
+  "payouts.topUpTitle": "Пополнение баланса",
+  "payouts.topUpHint": "Деньги автоматически превращаются в кредиты после зачисления.",
+  "payouts.rateLine": "1 000 кредитов ≈ {amount}",
+  "payouts.localFixed": "Сумма фиксируется при отправке заявки.",
+  "payouts.error.currency": "Выберите корректную валюту выплаты.",
+  "payouts.method.kaspi": "Kaspi Gold",
+  "payouts.method.halyk": "Halyk Bank",
+  "payouts.method.freedom": "Freedom Bank",
+  "payouts.method.odengi": "O!Деньги",
+  "payouts.method.mbank": "MBANK",
+  "payouts.method.elsom": "Элсом",
+  "payouts.method.optima": "Optima Bank"
 }

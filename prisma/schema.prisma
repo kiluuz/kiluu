@@ -281,7 +281,9 @@ model PayoutRequest {
   credits       Int
   amountMinor   Int       @map("amount_minor")
   currency      String    @default("RUB")
-  method        String // uzcard | humo | payme | click | bank | other
+  localCurrency String    @default("RUB") @map("local_currency")
+  localAmountMinor Int    @default(0) @map("local_amount_minor")
+  method        String // uzcard | humo | payme | click | kaspi | halyk | freedom | odengi | mbank | elsom | optima | bank | other
   details       String // sealed JSON
   status        String    @default("pending") // pending | paid | rejected | cancelled
   adminNote     String?   @map("admin_note")

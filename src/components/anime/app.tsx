@@ -18,7 +18,6 @@ import { WatchView } from "./views/watch";
 import { LibraryView } from "./views/library";
 import { CommunityView } from "./views/community";
 import { WatchTogetherView } from "./views/watch-together";
-import { CreditsView } from "./views/credits";
 import { GiftsView } from "./views/gifts";
 import { ProfileFullView } from "./profile";
 import { StudioView } from "./views/studio";
@@ -39,7 +38,7 @@ const VIEW_LOADING_COPY: Record<string, { title: string; caption: string }> = {
   community: { title: "Community", caption: "Gathering the conversation" },
   "watch-together": { title: "Watch Together", caption: "Joining the viewing room" },
   library: { title: "Library", caption: "Opening your collection" },
-  credits: { title: "Get Credits", caption: "Loading your wallet" },
+  credits: { title: "Payouts", caption: "Loading your wallet" },
   gifts: { title: "Gifts", caption: "Finding your gifts" },
   "user-profile": { title: "Profile", caption: "Loading profile details" },
   detail: { title: "Anime", caption: "Preparing the anime page" },
@@ -258,14 +257,13 @@ export default function AnimeApp() {
           {view.name === "library" && <LibraryView />}
           {view.name === "community" && <CommunityView />}
           {view.name === "watch-together" && <WatchTogetherView />}
-          {view.name === "credits" && <CreditsView />}
           {view.name === "gifts" && <GiftsView />}
           {view.name === "user-profile" && view.username && <ProfileFullView username={view.username} />}
           {view.name === "studio" && <StudioView />}
           {view.name === "settings" && <SettingsView />}
           {view.name === "bot-admin" && <BotAdminView />}
           {view.name === "admin-users" && <AdminUsersView />}
-          {view.name === "payouts" && <PayoutsView />}
+          {(view.name === "payouts" || view.name === "credits") && <PayoutsView />}
           {view.name === "admin-payments" && <AdminPaymentsView />}
         </Suspense>
         {navigationLoading && (

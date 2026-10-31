@@ -1,7 +1,7 @@
 "use client";
 
 import {
-  Home, Compass, Users, Clock, Gift, Wallet, Video, AudioLines,
+  Home, Compass, Users, Clock, Gift, Video, AudioLines,
   CalendarDays, Clapperboard, Settings2, UsersRound, Banknote, CreditCard, type LucideIcon,
 } from "lucide-react";
 import { useAppStore } from "./store";
@@ -48,9 +48,7 @@ export const NAV_ITEMS: readonly NavItemDef[] = [
   { id: "watch-together", label: "Watch Together",shortLabel: "Together", icon: Video,        group: "browse" },
   { id: "library",        label: "My Library",    shortLabel: "Library",  icon: Clock,        group: "my" },
   { id: "gifts",          label: "Gifts",         shortLabel: "Gifts",    icon: Gift,         group: "my" },
-  { id: "credits",        label: "Get Credits",   shortLabel: "Credits",  icon: Wallet,       group: "my" },
-  { id: "payouts",        label: "Payouts",       shortLabel: "Payouts",  icon: Banknote,     group: "my", creatorOnly: true,
-    lockHint: "Payouts are available to Creator accounts only." },
+  { id: "payouts",        label: "Payouts",       shortLabel: "Payouts",  icon: Banknote,     group: "my" },
   { id: "studio",         label: "Creator Studio",shortLabel: "Studio",   icon: Clapperboard, group: "creator", creatorOnly: true,
     lockHint: "You picked the Viewer path at sign-up — Creator Studio is for Creator accounts." },
   { id: "bot-admin",      label: "Bot Admin",      shortLabel: "Admin",    icon: Settings2,    group: "creator", adminOnly: true,
@@ -104,7 +102,7 @@ export function useResolvedNav(): ResolvedNavItem[] {
   const owned = user?.ownedCount ?? 0;
 
   return visibleItems(isCreator, !user, isAdmin).map((def) => {
-    const active = view.name === def.id;
+    const active = view.name === def.id || (def.id === "payouts" && view.name === "credits");
     const locked =
       (!!def.creatorOnly && !!user && !isCreator) ||
       (!!def.adminOnly && !!user && !isAdmin);

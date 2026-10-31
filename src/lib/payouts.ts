@@ -1,9 +1,23 @@
 import { db } from "@/lib/db";
 import { openJson, sealJson } from "@/lib/sealed";
 import { daCurrency } from "@/lib/donationalerts";
+import {
+  DISPLAY_CURRENCIES,
+  convertPrice,
+  displayRates,
+  type DisplayCurrency,
+} from "@/lib/display-currency";
 
-export const PAYOUT_METHODS = ["uzcard", "humo", "payme", "click", "bank", "other"] as const;
+export const PAYOUT_METHODS = [
+  "uzcard", "humo", "payme", "click",
+  "kaspi", "halyk", "freedom",
+  "odengi", "mbank", "elsom", "optima",
+  "bank", "other",
+] as const;
 export type PayoutMethod = (typeof PAYOUT_METHODS)[number];
+
+/** Keeps local-currency snapshots inside the int32 range used by the DB. */
+export const MAX_PAYOUT_CREDITS = 100_000;
 
 export class PayoutError extends Error {
   readonly code: string;
@@ -31,12 +45,29 @@ export function payoutAmountMinor(credits: number): number {
   return Math.round(credits * payoutRate() * 100);
 }
 
+function isDisplayCurrency(value: string): value is DisplayCurrency {
+  return (DISPLAY_CURRENCIES as readonly string[]).includes(value);
+}
+
+/** Snapshot of the payout in the currency the creator picked, in minor units. */
+export function payoutDisplayAmount(
+  amountMinor: number,
+  currency: string
+): { currency: string; amountMinor: number } {
+  if (!isDisplayCurrency(currency)) {
+    return { currency: "RUB", amountMinor };
+  }
+  const localMajor = convertPrice(amountMinor / 100, currency, displayRates());
+  return { currency, amountMinor: Math.round(localMajor * 100) };
+}
+
 export function payoutPublicConfig() {
   return {
     rate: payoutRate(),
     minMinor: payoutMinMinor(),
     currency: daCurrency(),
     methods: PAYOUT_METHODS,
+    display: { currencies: DISPLAY_CURRENCIES, rates: displayRates() },
   };
 }
 
@@ -64,6 +95,8 @@ export interface PayoutView {
   credits: number;
   amountMinor: number;
   currency: string;
+  localCurrency: string;
+  localAmountMinor: number;
   method: string;
   detailsMasked: string;
   status: string;
@@ -77,6 +110,8 @@ function payoutView(row: {
   credits: number;
   amountMinor: number;
   currency: string;
+  localCurrency: string;
+  localAmountMinor: number;
   method: string;
   details: string;
   status: string;
@@ -89,6 +124,8 @@ function payoutView(row: {
     credits: row.credits,
     amountMinor: row.amountMinor,
     currency: row.currency,
+    localCurrency: row.localCurrency,
+    localAmountMinor: row.localAmountMinor,
     method: row.method,
     detailsMasked: maskPayoutDetails(row.details),
     status: row.status,
@@ -103,9 +140,10 @@ export async function createPayoutRequest(opts: {
   credits: number;
   method: string;
   details: string;
+  displayCurrency?: string;
 }) {
   const credits = opts.credits;
-  if (!Number.isInteger(credits) || credits < 1 || credits > 1_000_000) {
+  if (!Number.isInteger(credits) || credits < 1 || credits > MAX_PAYOUT_CREDITS) {
     throw new PayoutError("BAD_CREDITS", "Invalid credit amount", 400);
   }
   if (!PAYOUT_METHODS.includes(opts.method as PayoutMethod)) {
@@ -119,6 +157,11 @@ export async function createPayoutRequest(opts: {
   if (amountMinor < payoutMinMinor()) {
     throw new PayoutError("BELOW_MIN", "Amount is below the minimum payout", 400);
   }
+  const displayCurrency = opts.displayCurrency || "RUB";
+  if (displayCurrency !== "RUB" && !isDisplayCurrency(displayCurrency)) {
+    throw new PayoutError("BAD_CURRENCY", "Unsupported payout currency", 400);
+  }
+  const local = payoutDisplayAmount(amountMinor, displayCurrency);
   const pendingCount = await db.payoutRequest.count({ where: { userId: opts.userId, status: "pending" } });
   if (pendingCount >= 2) {
     throw new PayoutError("TOO_MANY_PENDING", "You already have two pending payout requests", 429);
@@ -131,6 +174,8 @@ export async function createPayoutRequest(opts: {
         credits,
         amountMinor,
         currency: daCurrency(),
+        localCurrency: local.currency,
+        localAmountMinor: local.amountMinor,
         method: opts.method,
         details: sealDetails(account),
       },

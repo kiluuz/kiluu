@@ -778,5 +778,17 @@
   "adminPay.error.exchange": "Token almashinuvi xato — client kalitlarini tekshiring",
   "adminPay.error.generic": "Xatolik yuz berdi",
   "credits.priceCurrency": "Narx valyutasi",
-  "credits.priceApprox": "Kurs bo‘yicha taxminiy"
+  "credits.priceApprox": "Kurs bo‘yicha taxminiy",
+  "payouts.topUpTitle": "Hisobni to‘ldirish",
+  "payouts.topUpHint": "Pul hisobingizga tushishi bilan avtomatik creditga aylanadi.",
+  "payouts.rateLine": "1 000 credit ≈ {amount}",
+  "payouts.localFixed": "Summa so‘rov yuborilganda qat’iy belgilanadi.",
+  "payouts.error.currency": "Valyutani tanlang.",
+  "payouts.method.kaspi": "Kaspi Gold",
+  "payouts.method.halyk": "Halyk Bank",
+  "payouts.method.freedom": "Freedom Bank",
+  "payouts.method.odengi": "O!Деньги",
+  "payouts.method.mbank": "MBANK",
+  "payouts.method.elsom": "Элсом",
+  "payouts.method.optima": "Optima Bank"
 }

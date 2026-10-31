@@ -12,6 +12,7 @@ import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { useI18n } from "@/components/i18n-provider";
 import { formatCredits, timeAgo } from "../ui-bits";
+import { DISPLAY_CURRENCIES, formatDisplayPrice, type DisplayCurrency } from "@/lib/display-currency";
 
 interface DaStatus {
   configured: {
@@ -48,6 +49,8 @@ interface AdminPayout {
   credits: number;
   amountMinor: number;
   currency: string;
+  localCurrency: string;
+  localAmountMinor: number;
   method: string;
   details: string;
   detailsMasked: string;
@@ -70,6 +73,13 @@ const PAYOUT_TABS = ["pending", "paid", "rejected", "cancelled", "all"] as const
 
 function formatMoney(minor: number, currency: string) {
   return `${(minor / 100).toLocaleString("ru-RU", { maximumFractionDigits: 2 })} ${currency}`;
+}
+
+function formatLocalMoney(minor: number, currency: string) {
+  if ((DISPLAY_CURRENCIES as readonly string[]).includes(currency)) {
+    return formatDisplayPrice(minor / 100, currency as DisplayCurrency);
+  }
+  return formatMoney(minor, currency);
 }
 
 function statusClass(status: string) {
@@ -384,7 +394,9 @@ export function AdminPaymentsView() {
                       <span className="text-[11px] text-muted-foreground font-normal ml-2">{payout.user.email}</span>
                     </p>
                     <p className="text-xs">
-                      <strong>{formatCredits(payout.credits)}</strong> {t("credits.credits")} → <strong>{formatMoney(payout.amountMinor, payout.currency)}</strong>
+                      <strong>{formatCredits(payout.credits)}</strong> {t("credits.credits")} →{" "}
+                      <strong>{formatLocalMoney(payout.localAmountMinor > 0 ? payout.localAmountMinor : payout.amountMinor, payout.localAmountMinor > 0 ? payout.localCurrency : payout.currency)}</strong>
+                      <span className="text-muted-foreground ml-2">({formatMoney(payout.amountMinor, payout.currency)})</span>
                       <span className="text-muted-foreground ml-2">{t(`payouts.method.${payout.method}`)}</span>
                     </p>
                     <p className="text-[11px] font-mono break-all text-muted-foreground">{payout.details}</p>

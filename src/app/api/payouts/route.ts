@@ -36,7 +36,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "TOO_MANY_REQUESTS" }, { status: 429 });
   }
   const body = (await req.json().catch(() => null)) as
-    | { credits?: unknown; method?: unknown; details?: unknown }
+    | { credits?: unknown; method?: unknown; details?: unknown; currency?: unknown }
     | null;
   if (!body || typeof body.method !== "string" || typeof body.details !== "string") {
     return NextResponse.json({ error: "BAD_REQUEST" }, { status: 400 });
@@ -48,6 +48,7 @@ export async function POST(req: NextRequest) {
       credits,
       method: body.method,
       details: body.details,
+      displayCurrency: typeof body.currency === "string" ? body.currency : undefined,
     });
     return NextResponse.json({ ok: true, request });
   } catch (error) {

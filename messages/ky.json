@@ -778,5 +778,17 @@
   "adminPay.error.exchange": "Токен алмашуу катасы — client ачкычтарын текшериңиз",
   "adminPay.error.generic": "Ката кетти",
   "credits.priceCurrency": "Баға валютасы",
-  "credits.priceApprox": "Курс боюнча болжолдуу"
+  "credits.priceApprox": "Курс боюнча болжолдуу",
+  "payouts.topUpTitle": "Балансты толуктоо",
+  "payouts.topUpHint": "Акча баланска түшкөндө автоматтык түрдө кредитке айланат.",
+  "payouts.rateLine": "1 000 кредит ≈ {amount}",
+  "payouts.localFixed": "Сумма өтүнмө жөнөтүлгөндө бекитилет.",
+  "payouts.error.currency": "Төлөм валютасын туура тандаңыз.",
+  "payouts.method.kaspi": "Kaspi Gold",
+  "payouts.method.halyk": "Halyk Bank",
+  "payouts.method.freedom": "Freedom Bank",
+  "payouts.method.odengi": "O!Деньги",
+  "payouts.method.mbank": "MBANK",
+  "payouts.method.elsom": "Элсом",
+  "payouts.method.optima": "Optima Bank"
 }

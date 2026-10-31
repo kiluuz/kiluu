@@ -778,5 +778,17 @@
   "adminPay.error.exchange": "Token exchange failed — check client credentials",
   "adminPay.error.generic": "Something went wrong",
   "credits.priceCurrency": "Price currency",
-  "credits.priceApprox": "Approximate, by rate"
+  "credits.priceApprox": "Approximate, by rate",
+  "payouts.topUpTitle": "Top up balance",
+  "payouts.topUpHint": "Money you add is converted into credits automatically.",
+  "payouts.rateLine": "1,000 credits ≈ {amount}",
+  "payouts.localFixed": "The amount is locked when you submit the request.",
+  "payouts.error.currency": "Choose a valid payout currency.",
+  "payouts.method.kaspi": "Kaspi Gold",
+  "payouts.method.halyk": "Halyk Bank",
+  "payouts.method.freedom": "Freedom Bank",
+  "payouts.method.odengi": "O!Деньги",
+  "payouts.method.mbank": "MBANK",
+  "payouts.method.elsom": "Элсом",
+  "payouts.method.optima": "Optima Bank"
 }

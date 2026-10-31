@@ -14,14 +14,9 @@ import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { useI18n } from "@/components/i18n-provider";
 import { FramesShop } from "../frame-shop";
-import {
-  DISPLAY_CURRENCIES,
-  convertPrice,
-  formatDisplayPrice,
-  type DisplayCurrency,
-} from "@/lib/display-currency";
+import { convertPrice, formatDisplayPrice, type DisplayCurrency } from "@/lib/display-currency";
 
-interface CreditsData {
+export interface CreditsData {
   packages: CreditPackage[];
   balance: number;
   transactions: CreditTx[];
@@ -33,7 +28,7 @@ interface CreditsData {
   };
 }
 
-interface DonationIntent {
+export interface DonationIntent {
   id: string;
   code: string;
   amountMinor: number;
@@ -52,16 +47,6 @@ const ERROR_KEYS: Record<string, string> = {
   TOO_MANY_REQUESTS: "credits.daRate",
 };
 
-const PRICE_CURRENCY_KEY = "kiluu.priceCurrency";
-
-const LOCALE_CURRENCY: Record<string, DisplayCurrency> = {
-  uz: "UZS",
-  kk: "KZT",
-  ky: "KGS",
-  en: "USD",
-  ru: "UZS",
-};
-
 function formatMoney(minor: number, currency: string) {
   return `${(minor / 100).toLocaleString("ru-RU", { maximumFractionDigits: 2 })} ${currency}`;
 }
@@ -75,69 +60,26 @@ function minutesLeft(expiresAt: string, now: number) {
   return `${mm}:${ss}`;
 }
 
-export function CreditsView() {
-  const { user, setUser, setAuthOpen } = useAppStore();
-  const { t, locale } = useI18n();
-  const [loadedData, setLoadedData] = useState<{ userId: string | null; value: CreditsData } | null>(null);
-  const data = loadedData?.userId === (user?.id ?? null) ? loadedData.value : null;
+export function TopUpSection({
+  data,
+  priceCurrency,
+  onCompleted,
+}: {
+  data: CreditsData | null;
+  priceCurrency: DisplayCurrency;
+  onCompleted: () => Promise<void> | void;
+}) {
+  const { user, setAuthOpen } = useAppStore();
+  const { t } = useI18n();
   const [activeTab, setActiveTab] = useState<"credits" | "frames">("credits");
   const [topUp, setTopUp] = useState<{ pkg: CreditPackage; intent: DonationIntent } | null>(null);
   const [creatingId, setCreatingId] = useState<string | null>(null);
   const [now, setNow] = useState(() => Date.now());
-  const [priceCurrency, setPriceCurrency] = useState<DisplayCurrency>(() => LOCALE_CURRENCY[locale] ?? "UZS");
-
-  useEffect(() => {
-    let restoreTimer: number | undefined;
-    try {
-      const saved = window.localStorage.getItem(PRICE_CURRENCY_KEY);
-      if (saved && (DISPLAY_CURRENCIES as readonly string[]).includes(saved)) {
-        restoreTimer = window.setTimeout(() => setPriceCurrency(saved as DisplayCurrency), 0);
-      }
-    } catch {
-      /* locale default is enough */
-    }
-    return () => {
-      if (restoreTimer !== undefined) window.clearTimeout(restoreTimer);
-    };
-  }, []);
-
-  function pickCurrency(code: DisplayCurrency) {
-    setPriceCurrency(code);
-    try {
-      window.localStorage.setItem(PRICE_CURRENCY_KEY, code);
-    } catch {
-      /* ignore storage failures */
-    }
-  }
-
-  const rates = data?.payment?.display?.rates;
-  const priceOf = (base: number) =>
-    formatDisplayPrice(convertPrice(base, priceCurrency, rates), priceCurrency);
-  const approxOf = (minor: number, currency: string) => {
-    if (currency !== (data?.payment?.currency ?? "RUB")) return null;
-    return priceOf(minor / 100);
-  };
-
-  useEffect(() => {
-    let active = true;
-    const load = async () => {
-      try {
-        const response = await fetch("/api/credits", { cache: "no-store" });
-        const result = await response.json();
-        if (!response.ok) throw new Error(result.error || t("credits.loadError"));
-        if (active) setLoadedData({ userId: user?.id ?? null, value: result });
-      } catch (error) {
-        if (active) toast.error(error instanceof Error ? error.message : t("credits.loadError"));
-      }
-    };
-    void load();
-    return () => { active = false; };
-  }, [user?.id]);
 
   const intentStatus = topUp?.intent.status;
 
   useEffect(() => {
-    if (!intentStatus || intentStatus !== "pending") return;
+    if (intentStatus !== "pending") return;
     const id = setInterval(() => setNow(Date.now()), 15_000);
     return () => clearInterval(id);
   }, [intentStatus, topUp?.intent.id]);
@@ -157,17 +99,7 @@ export function CreditsView() {
         if (fresh.status === "completed") {
           const granted = fresh.creditsGranted ?? fresh.credits;
           toast.success(t("credits.daSuccess", { count: formatCredits(granted) }));
-          const [me, credits] = await Promise.all([
-            fetch("/api/auth/me", { cache: "no-store" }),
-            fetch("/api/credits", { cache: "no-store" }),
-          ]);
-          const payload = await me.json().catch(() => null);
-          const creditsPayload = await credits.json().catch(() => null);
-          if (!active) return;
-          if (payload?.user) setUser(payload.user);
-          if (credits.ok && creditsPayload) {
-            setLoadedData({ userId: payload?.user?.id ?? null, value: creditsPayload });
-          }
+          await onCompleted();
         }
       } catch {
         /* transient network error — keep polling */
@@ -180,7 +112,7 @@ export function CreditsView() {
       active = false;
       clearInterval(id);
     };
-  }, [topUp?.intent.id, intentStatus, setUser, t]);
+  }, [topUp?.intent.id, intentStatus, onCompleted, t]);
 
   async function startTopUp(pkg: CreditPackage) {
     if (!user) {
@@ -218,120 +150,121 @@ export function CreditsView() {
     }
   }
 
+  const rates = data?.payment?.display?.rates;
+  const priceOf = (base: number) =>
+    formatDisplayPrice(convertPrice(base, priceCurrency, rates), priceCurrency);
+  const approxOf = (minor: number, currency: string) => {
+    if (currency !== (data?.payment?.currency ?? "RUB")) return null;
+    return priceOf(minor / 100);
+  };
+
   return (
-    <div className="max-w-[1100px] mx-auto px-4 sm:px-8 py-6 pb-10">
-      <h1 className="sr-only">{t("nav.credits")}</h1>
-      <div className="mb-6 flex gap-2">
-        <Button variant={activeTab === "credits" ? "default" : "outline"} className="rounded-full" onClick={() => setActiveTab("credits")}>
-          {t("credits.credits")}
-        </Button>
-        <Button variant={activeTab === "frames" ? "default" : "outline"} className="rounded-full" onClick={() => setActiveTab("frames")}>
-          Frames
-        </Button>
-      </div>
-      {activeTab === "frames" ? <FramesShop /> : (
-      <>
-      <div className="mb-8 flex justify-end">
-        <div className="text-right rounded-2xl border bg-card/60 px-5 py-3">
-            <p className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">{t("credits.balance")}</p>
-            <p className="text-4xl sm:text-5xl font-black bg-gradient-to-r from-amber-400 to-amber-600 bg-clip-text text-transparent tabular-nums">
-              {formatCredits(user?.credits ?? 0)}
-            </p>
-            <p className="text-xs text-muted-foreground">{t("credits.credits")}</p>
+    <section className="glass rounded-3xl p-5 sm:p-6">
+      <div className="flex flex-wrap items-start justify-between gap-3 mb-4">
+        <div>
+          <h2 className="text-xl font-black flex items-center gap-2">
+            <Zap className="w-5 h-5 text-primary" /> {t("payouts.topUpTitle")}
+          </h2>
+          <p className="text-xs text-muted-foreground mt-1">{t("payouts.topUpHint")}</p>
+        </div>
+        <div className="flex gap-2">
+          <Button
+            size="sm"
+            variant={activeTab === "credits" ? "default" : "outline"}
+            className="rounded-full h-8 text-[11px]"
+            onClick={() => setActiveTab("credits")}
+          >
+            {t("credits.credits")}
+          </Button>
+          <Button
+            size="sm"
+            variant={activeTab === "frames" ? "default" : "outline"}
+            className="rounded-full h-8 text-[11px]"
+            onClick={() => setActiveTab("frames")}
+          >
+            Frames
+          </Button>
         </div>
       </div>
 
-      <div className="mb-3 flex flex-wrap items-center gap-1.5">
-        <span className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground mr-1">
-          {t("credits.priceCurrency")}
-        </span>
-        {DISPLAY_CURRENCIES.map((code) => (
-          <button
-            key={code}
-            type="button"
-            onClick={() => pickCurrency(code)}
-            className={cn(
-              "rounded-full border px-2.5 py-1 text-[11px] font-bold transition",
-              priceCurrency === code ? "border-primary bg-primary/10 text-primary" : "bg-card hover:border-primary/40"
-            )}
-          >
-            {code}
-          </button>
-        ))}
-        <span className="text-[10px] text-muted-foreground ml-auto">{t("credits.priceApprox")}</span>
-      </div>
-
-      <div className="grid grid-cols-2 lg:grid-cols-5 gap-3 sm:gap-4 mb-4">
-        {(data?.packages || []).map((pkg) => (          <button
-            key={pkg.id}
-            disabled={creatingId === pkg.id}
-            onClick={() => startTopUp(pkg)}
-            className={cn(
-              "relative rounded-3xl border p-5 text-left transition-all hover:-translate-y-1.5 disabled:opacity-70",
-              pkg.popular
-                ? "border-primary bg-gradient-to-b from-primary/15 to-transparent shadow-xl shadow-primary/15"
-                : "bg-card hover:border-primary/50"
-            )}
-          >
-            {pkg.popular && (
-              <span className="absolute -top-2.5 left-1/2 -translate-x-1/2 brand-gradient text-white text-[9px] font-black uppercase tracking-wider px-3 py-1 rounded-full whitespace-nowrap">
-                {t("credits.popular")}
-              </span>
-            )}
-            <div className="flex items-center gap-1.5 mb-2">
-              <Zap className={cn("w-5 h-5", pkg.popular ? "text-primary" : "text-amber-400")} />
-              <span className="text-2xl font-black tabular-nums">{formatCredits(pkg.credits)}</span>
-            </div>
-            {pkg.bonus > 0 && (
-              <p className="text-[10px] font-bold text-emerald-500 bg-emerald-500/10 border border-emerald-500/25 rounded-full px-2 py-0.5 inline-flex items-center gap-1 mb-2">
-                <Gift className="w-3 h-3" /> +{formatCredits(pkg.bonus)} {t("credits.bonus")}
-              </p>
-            )}
-            <p className="text-xs text-muted-foreground mt-1">{t("credits.total")} {formatCredits(pkg.credits + pkg.bonus)}</p>
-            <p className="text-lg font-black mt-2 flex items-center gap-1.5">
-              {creatingId === pkg.id ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
-              {pkg.priceDa && pkg.priceDa > 0 ? priceOf(pkg.priceDa) : "—"}
-            </p>
-          </button>
-        ))}
-      </div>
-      <p className="text-[11px] text-muted-foreground flex items-center gap-1.5 mb-10">
-        <ShieldCheck className="w-3.5 h-3.5 text-emerald-500" />
-        {t("credits.daSecured")}
-      </p>
-
-      <div className="glass rounded-3xl p-5 sm:p-6">
-        <h2 className="font-bold flex items-center gap-2 mb-4">
-          <History className="w-4.5 h-4.5 text-primary" /> {t("credits.history")}
-        </h2>
-        {!user ? (
-          <p className="text-sm text-muted-foreground text-center py-6">
-            <Button variant="link" onClick={() => setAuthOpen(true)} className="p-0 h-auto">{t("auth.signIn")}</Button> {t("credits.signInToHistory")}
-          </p>
-        ) : data && data.transactions.length > 0 ? (
-          <div className="space-y-2 max-h-96 overflow-y-auto fancy-scroll pr-1">
-            {data.transactions.map((tx) => (
-              <div key={tx.id} className="flex items-center gap-3 p-3 rounded-xl hover:bg-accent/50 transition">
-                <span className={cn(
-                  "w-9 h-9 rounded-full flex items-center justify-center font-black text-sm shrink-0",
-                  tx.amount > 0 ? "bg-emerald-500/15 text-emerald-500" : "bg-rose-500/15 text-rose-500"
-                )}>
-                  {tx.amount > 0 ? "+" : "−"}
-                </span>
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-semibold truncate">{tx.description}</p>
-                  <p className="text-[11px] text-muted-foreground">{timeAgo(tx.createdAt)} · {tx.type}</p>
+      {activeTab === "frames" ? (
+        <FramesShop />
+      ) : (
+        <div className="space-y-6">
+          <div className="grid grid-cols-2 lg:grid-cols-5 gap-3 sm:gap-4">
+            {(data?.packages || []).map((pkg) => (
+              <button
+                key={pkg.id}
+                disabled={creatingId === pkg.id}
+                onClick={() => startTopUp(pkg)}
+                className={cn(
+                  "relative rounded-3xl border p-5 text-left transition-all hover:-translate-y-1.5 disabled:opacity-70",
+                  pkg.popular
+                    ? "border-primary bg-gradient-to-b from-primary/15 to-transparent shadow-xl shadow-primary/15"
+                    : "bg-card hover:border-primary/50"
+                )}
+              >
+                {pkg.popular && (
+                  <span className="absolute -top-2.5 left-1/2 -translate-x-1/2 brand-gradient text-white text-[9px] font-black uppercase tracking-wider px-3 py-1 rounded-full whitespace-nowrap">
+                    {t("credits.popular")}
+                  </span>
+                )}
+                <div className="flex items-center gap-1.5 mb-2">
+                  <Zap className={cn("w-5 h-5", pkg.popular ? "text-primary" : "text-amber-400")} />
+                  <span className="text-2xl font-black tabular-nums">{formatCredits(pkg.credits)}</span>
                 </div>
-                <span className={cn("font-black tabular-nums text-sm shrink-0", tx.amount > 0 ? "text-emerald-500" : "text-rose-500")}>
-                  {tx.amount > 0 ? "+" : ""}{formatCredits(tx.amount)}
-                </span>
-              </div>
+                {pkg.bonus > 0 && (
+                  <p className="text-[10px] font-bold text-emerald-500 bg-emerald-500/10 border border-emerald-500/25 rounded-full px-2 py-0.5 inline-flex items-center gap-1 mb-2">
+                    <Gift className="w-3 h-3" /> +{formatCredits(pkg.bonus)} {t("credits.bonus")}
+                  </p>
+                )}
+                <p className="text-xs text-muted-foreground mt-1">{t("credits.total")} {formatCredits(pkg.credits + pkg.bonus)}</p>
+                <p className="text-lg font-black mt-2 flex items-center gap-1.5">
+                  {creatingId === pkg.id ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
+                  {pkg.priceDa && pkg.priceDa > 0 ? priceOf(pkg.priceDa) : "—"}
+                </p>
+              </button>
             ))}
           </div>
-        ) : (
-          <p className="text-sm text-muted-foreground text-center py-6">{t("credits.noTransactions")}</p>
-        )}
-      </div>
+          <p className="text-[11px] text-muted-foreground flex items-center gap-1.5">
+            <ShieldCheck className="w-3.5 h-3.5 text-emerald-500" />
+            {t("credits.daSecured")}
+          </p>
+
+          <div>
+            <h3 className="font-bold flex items-center gap-2 mb-4">
+              <History className="w-4.5 h-4.5 text-primary" /> {t("credits.history")}
+            </h3>
+            {!user ? (
+              <p className="text-sm text-muted-foreground text-center py-6">
+                <Button variant="link" onClick={() => setAuthOpen(true)} className="p-0 h-auto">{t("auth.signIn")}</Button> {t("credits.signInToHistory")}
+              </p>
+            ) : data && data.transactions.length > 0 ? (
+              <div className="space-y-2 max-h-96 overflow-y-auto fancy-scroll pr-1">
+                {data.transactions.map((tx) => (
+                  <div key={tx.id} className="flex items-center gap-3 p-3 rounded-xl hover:bg-accent/50 transition">
+                    <span className={cn(
+                      "w-9 h-9 rounded-full flex items-center justify-center font-black text-sm shrink-0",
+                      tx.amount > 0 ? "bg-emerald-500/15 text-emerald-500" : "bg-rose-500/15 text-rose-500"
+                    )}>
+                      {tx.amount > 0 ? "+" : "−"}
+                    </span>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-semibold truncate">{tx.description}</p>
+                      <p className="text-[11px] text-muted-foreground">{timeAgo(tx.createdAt)} · {tx.type}</p>
+                    </div>
+                    <span className={cn("font-black tabular-nums text-sm shrink-0", tx.amount > 0 ? "text-emerald-500" : "text-rose-500")}>
+                      {tx.amount > 0 ? "+" : ""}{formatCredits(tx.amount)}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-sm text-muted-foreground text-center py-6">{t("credits.noTransactions")}</p>
+            )}
+          </div>
+        </div>
+      )}
 
       <Dialog open={Boolean(topUp)} onOpenChange={(open) => { if (!open) setTopUp(null); }}>
         <DialogContent className="sm:max-w-[460px] rounded-2xl max-h-[90vh] overflow-y-auto">
@@ -417,8 +350,6 @@ export function CreditsView() {
           ) : null}
         </DialogContent>
       </Dialog>
-      </>
-      )}
-    </div>
+    </section>
   );
 }
