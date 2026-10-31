@@ -131,5 +131,11 @@ export function useMenuItemForView(): ResolvedNavItem | null {
   const view = useAppStore((s) => s.view);
   const items = useResolvedNav();
   const dockIds = new Set(NAV_ITEMS.filter((i) => i.mobilePrimary || i.mobileCenter).map((i) => i.id));
-  return items.find((i) => i.def.id === view.name && !dockIds.has(i.def.id)) ?? null;
+  return (
+    items.find(
+      (i) =>
+        !dockIds.has(i.def.id) &&
+        (i.def.id === view.name || (i.def.id === "payouts" && view.name === "credits"))
+    ) ?? null
+  );
 }
