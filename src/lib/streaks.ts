@@ -2,6 +2,7 @@
 // DubAniX Kunlik kirish, streak va streak freeze tizimi (11-QISM)
 
 import { db } from "./db";
+import { grantLevelUpCredits, levelFromXp } from "./xp";
 
 export const DEFAULT_TIMEZONE = "Asia/Tashkent";
 
@@ -205,7 +206,9 @@ export async function claimDailyStreak(userId: string): Promise<{
       },
     });
 
-    // 3. XP Event yozish
+    // 3. XP Event yozish va level mukofotini berish
+    const beforeXp = await tx.xpEvent.aggregate({ where: { userId }, _sum: { amount: true } });
+    const previousXp = Math.max(0, beforeXp._sum.amount ?? 0);
     await tx.xpEvent.create({
       data: {
         userId,
@@ -215,6 +218,12 @@ export async function claimDailyStreak(userId: string): Promise<{
         refId: `${today}_${newStreak}`,
       },
     });
+    await grantLevelUpCredits(
+      tx,
+      userId,
+      levelFromXp(previousXp).level,
+      levelFromXp(previousXp + xpAwarded).level,
+    );
   });
 
   return {

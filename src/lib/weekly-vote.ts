@@ -3,6 +3,7 @@
 
 import { db } from "./db";
 import { getWeekPeriodKey } from "./quests";
+import { grantLevelUpCredits, levelFromXp } from "./xp";
 
 export async function getOrCreateCurrentWeeklyPoll() {
   const weekKey = getWeekPeriodKey();
@@ -245,6 +246,11 @@ export async function resolveWeeklyPoll(weekKey: string) {
       // G'olibga ovoz berganlarga +30 XP ("Called it" mukofoti)
       const correctVoters = poll.votes.filter((v) => v.animeId === winnerAnimeId);
       for (const voter of correctVoters) {
+        const beforeXp = await tx.xpEvent.aggregate({
+          where: { userId: voter.userId },
+          _sum: { amount: true },
+        });
+        const previousXp = Math.max(0, beforeXp._sum.amount ?? 0);
         await tx.xpEvent.create({
           data: {
             userId: voter.userId,
@@ -254,6 +260,12 @@ export async function resolveWeeklyPoll(weekKey: string) {
             refId: poll.id,
           },
         });
+        await grantLevelUpCredits(
+          tx,
+          voter.userId,
+          levelFromXp(previousXp).level,
+          levelFromXp(previousXp + 30).level,
+        );
         await tx.weeklyAnimeVote.update({
           where: { id: voter.id },
           data: { rewardClaimed: true },

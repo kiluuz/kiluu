@@ -69,6 +69,8 @@ test("XP events are idempotent and level-up notification is emitted once", async
   assert.equal(await getXpTotal(user.id), xpAmount);
   assert.equal(await client.xpEvent.count({ where: { userId: user.id } }), 1);
   assert.equal(await client.notification.count({ where: { userId: user.id, type: "LEVEL_UP" } }), 1);
+  assert.equal((await client.user.findUniqueOrThrow({ where: { id: user.id } })).credits, 10);
+  assert.equal(await client.creditTransaction.count({ where: { userId: user.id, type: "LEVEL_REWARD" } }), 1);
 });
 
 test("achievement progress, seasonal and secret unlocks are persisted idempotently", async () => {
@@ -120,7 +122,8 @@ test("achievement progress, seasonal and secret unlocks are persisted idempotent
   });
 
   await evaluateAchievements(user.id);
-  assert.equal((await client.user.findUniqueOrThrow({ where: { id: user.id } })).credits, 50);
+  // 50 credits from the anime set bonus plus one 10-credit level-up reward.
+  assert.equal((await client.user.findUniqueOrThrow({ where: { id: user.id } })).credits, 60);
   assert.equal(await client.creditTransaction.count({
     where: { userId: user.id, idempotencyKey: `anime-set-bonus:${user.id}:${set.id}` },
   }), 1);
@@ -140,7 +143,7 @@ test("achievement progress, seasonal and secret unlocks are persisted idempotent
   const beforeXp = await client.xpEvent.count({ where: { userId: user.id, reason: "achievement" } });
   const beforeNotifications = await client.notification.count({ where: { userId: user.id, type: "ACHIEVEMENT" } });
   await evaluateAchievements(user.id);
-  assert.equal((await client.user.findUniqueOrThrow({ where: { id: user.id } })).credits, 50);
+  assert.equal((await client.user.findUniqueOrThrow({ where: { id: user.id } })).credits, 60);
   assert.equal(await client.xpEvent.count({ where: { userId: user.id, reason: "achievement" } }), beforeXp);
   assert.equal(await client.notification.count({ where: { userId: user.id, type: "ACHIEVEMENT" } }), beforeNotifications);
 

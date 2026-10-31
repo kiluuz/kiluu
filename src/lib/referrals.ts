@@ -3,6 +3,7 @@
 
 import { db } from "./db";
 import { randomBytes } from "crypto";
+import { grantLevelUpCredits, levelFromXp } from "./xp";
 
 export const REFERRAL_CONFIG = {
   monthlyMaxLimit: 20, // Bir oyda maksimal mukofotlanadigan referallar
@@ -175,6 +176,11 @@ export async function checkAndQualifyReferral(userId: string): Promise<{
         where: { id: referral.referrerId },
         data: { credits: { increment: REFERRAL_CONFIG.referrerReward.credits } },
       });
+      const referrerBeforeXp = await tx.xpEvent.aggregate({
+        where: { userId: referral.referrerId },
+        _sum: { amount: true },
+      });
+      const referrerPreviousXp = Math.max(0, referrerBeforeXp._sum.amount ?? 0);
       await tx.xpEvent.create({
         data: {
           userId: referral.referrerId,
@@ -184,6 +190,12 @@ export async function checkAndQualifyReferral(userId: string): Promise<{
           refId: referral.id,
         },
       });
+      await grantLevelUpCredits(
+        tx,
+        referral.referrerId,
+        levelFromXp(referrerPreviousXp).level,
+        levelFromXp(referrerPreviousXp + REFERRAL_CONFIG.referrerReward.xp).level,
+      );
       await tx.creditTransaction.create({
         data: {
           userId: referral.referrerId,
@@ -198,6 +210,11 @@ export async function checkAndQualifyReferral(userId: string): Promise<{
         where: { id: referral.referredId },
         data: { credits: { increment: REFERRAL_CONFIG.referredReward.credits } },
       });
+      const referredBeforeXp = await tx.xpEvent.aggregate({
+        where: { userId: referral.referredId },
+        _sum: { amount: true },
+      });
+      const referredPreviousXp = Math.max(0, referredBeforeXp._sum.amount ?? 0);
       await tx.xpEvent.create({
         data: {
           userId: referral.referredId,
@@ -207,6 +224,12 @@ export async function checkAndQualifyReferral(userId: string): Promise<{
           refId: referral.id,
         },
       });
+      await grantLevelUpCredits(
+        tx,
+        referral.referredId,
+        levelFromXp(referredPreviousXp).level,
+        levelFromXp(referredPreviousXp + REFERRAL_CONFIG.referredReward.xp).level,
+      );
       await tx.creditTransaction.create({
         data: {
           userId: referral.referredId,

@@ -24,6 +24,8 @@ export const XP_CONFIG = {
   } satisfies Record<string, number>,
 };
 
+export const LEVEL_UP_CREDITS = 10;
+
 export const DAILY_ACTIVITY_CAPS: Record<string, number> = {
   post: 50,     // 2 ta post
   comment: 40,  // 5 ta comment
@@ -104,6 +106,58 @@ export function isUniqueConstraintError(error: unknown): boolean {
 
 type XpTransaction = Prisma.TransactionClient;
 
+export function levelUpCredits(previousLevel: number, newLevel: number): number {
+  if (!Number.isFinite(previousLevel) || !Number.isFinite(newLevel)) return 0;
+  const gained = Math.floor(newLevel) - Math.floor(previousLevel);
+  return gained > 0 ? gained * LEVEL_UP_CREDITS : 0;
+}
+
+/**
+ * Credits every level crossed exactly once. The user row is locked first,
+ * so parallel awards for the same user see each other's ledger rows.
+ */
+export async function grantLevelUpCredits(
+  tx: XpTransaction,
+  userId: string,
+  previousLevel: number,
+  newLevel: number,
+): Promise<number> {
+  if (newLevel <= previousLevel) return 0;
+
+  await tx.user.update({ where: { id: userId }, data: { credits: { increment: 0 } } });
+
+  const total = await tx.xpEvent.aggregate({ where: { userId }, _sum: { amount: true } });
+  const currentLevel = levelFromXp(Math.max(0, total._sum.amount ?? 0)).level;
+  const ceiling = Math.max(Math.floor(newLevel), currentLevel);
+
+  const levels: number[] = [];
+  for (let level = Math.floor(previousLevel) + 1; level <= ceiling; level += 1) levels.push(level);
+  if (levels.length === 0) return 0;
+
+  const keyOf = (level: number) => `level-reward:${userId}:${level}`;
+  const paid = await tx.creditTransaction.findMany({
+    where: { idempotencyKey: { in: levels.map(keyOf) } },
+    select: { idempotencyKey: true },
+  });
+  const paidKeys = new Set(paid.map((row) => row.idempotencyKey));
+  const missing = levels.filter((level) => !paidKeys.has(keyOf(level)));
+  if (missing.length === 0) return 0;
+
+  const created = await tx.creditTransaction.createMany({
+    data: missing.map((level) => ({
+      userId,
+      amount: LEVEL_UP_CREDITS,
+      type: "LEVEL_REWARD",
+      description: `${level}-daraja mukofoti: +${LEVEL_UP_CREDITS} kredit`,
+      idempotencyKey: keyOf(level),
+    })),
+  });
+  const granted = created.count * LEVEL_UP_CREDITS;
+  if (granted <= 0) return 0;
+  await tx.user.update({ where: { id: userId }, data: { credits: { increment: granted } } });
+  return granted;
+}
+
 export async function awardXpInTransaction(
   tx: XpTransaction,
   userId: string,
@@ -126,8 +180,10 @@ export async function awardXpInTransaction(
   });
   const previousLevel = levelFromXp(previousTotal).level;
   const levelInfo = levelFromXp(previousTotal + value);
+  let creditsAwarded = 0;
 
   if (levelInfo.level > previousLevel) {
+    creditsAwarded = await grantLevelUpCredits(tx, userId, previousLevel, levelInfo.level);
     const current = await tx.user.findUniqueOrThrow({
       where: { id: userId },
       select: { showcase: true },
@@ -165,13 +221,13 @@ export async function awardXpInTransaction(
         userId,
         type: "LEVEL_UP",
         title: "Level up!",
-        body: `You reached Level ${levelInfo.level}.${earnedCosmetics.length ? ` New cosmetic unlocked: ${earnedCosmetics.join(", ")}.` : ""}`,
-        dataJson: JSON.stringify({ level: levelInfo.level, cosmetics: earnedCosmetics }),
+        body: `You reached Level ${levelInfo.level}.${creditsAwarded > 0 ? ` +${creditsAwarded} credits added to your balance.` : ""}${earnedCosmetics.length ? ` New cosmetic unlocked: ${earnedCosmetics.join(", ")}.` : ""}`,
+        dataJson: JSON.stringify({ level: levelInfo.level, cosmetics: earnedCosmetics, credits: creditsAwarded }),
       },
     });
   }
 
-  return { event, xpTotal: previousTotal + value, ...levelInfo };
+  return { event, xpTotal: previousTotal + value, creditsAwarded, ...levelInfo };
 }
 
 export async function awardXp(

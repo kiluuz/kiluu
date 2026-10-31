@@ -3,6 +3,7 @@
 
 import { db } from "./db";
 import { getDateStringInTimezone } from "./streaks";
+import { grantLevelUpCredits, levelFromXp } from "./xp";
 
 export const DEFAULT_DAILY_QUEST_TEMPLATES = [
   {
@@ -331,6 +332,8 @@ export async function claimQuestReward(userId: string, userQuestId: string): Pro
 
     // 2. XP berish
     if (xpReward > 0) {
+      const beforeXp = await tx.xpEvent.aggregate({ where: { userId }, _sum: { amount: true } });
+      const previousXp = Math.max(0, beforeXp._sum.amount ?? 0);
       await tx.xpEvent.create({
         data: {
           userId,
@@ -340,6 +343,12 @@ export async function claimQuestReward(userId: string, userQuestId: string): Pro
           refId: userQuestId,
         },
       });
+      await grantLevelUpCredits(
+        tx,
+        userId,
+        levelFromXp(previousXp).level,
+        levelFromXp(previousXp + xpReward).level,
+      );
     }
 
     // 3. Kredit berish (agar bor bo'lsa)

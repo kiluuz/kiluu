@@ -87,7 +87,8 @@ test("charges the server-side catalog price and ignores any client-supplied pric
   assert.equal(gift.message, "Enjoy the show");
 
   const sender = await db.user.findUniqueOrThrow({ where: { id: senderId } });
-  assert.equal(sender.credits, 500);
+  // 1000 starting credits − 500 gift price + one 10-credit level-up reward.
+  assert.equal(sender.credits, 510);
 
   const charge = await db.creditTransaction.findUnique({ where: { idempotencyKey: "gift-price-test" } });
   assert.equal(charge?.amount, -500);
@@ -135,6 +136,6 @@ test("repeating the same idempotency key never charges twice", async () => {
 
   assert.equal(again.id, firstGiftId);
   const sender = await db.user.findUniqueOrThrow({ where: { id: senderId } });
-  assert.equal(sender.credits, 500);
+  assert.equal(sender.credits, 510);
   assert.equal(await db.gift.count({ where: { idempotencyKey: "gift-price-test" } }), 1);
 });

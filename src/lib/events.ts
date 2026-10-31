@@ -6,7 +6,7 @@ import { getDateStringInTimezone, recordUserActivityForStreak } from "./streaks"
 import { processQuestsForEvent } from "./quests";
 import { checkAndQualifyReferral } from "./referrals";
 import { calculateLevel } from "./level-utils";
-import { DAILY_ACTIVITY_CAPS, isUniqueConstraintError } from "./xp";
+import { DAILY_ACTIVITY_CAPS, grantLevelUpCredits, isUniqueConstraintError } from "./xp";
 
 export interface EventResult {
   xpAwarded: number;
@@ -266,14 +266,16 @@ async function onUserLevelUp(
   title: string
 ) {
   try {
+    const creditsAwarded = await grantLevelUpCredits(db, userId, oldLevel, newLevel);
+
     // 1. In-app bildirishnoma yaratish
     await db.notification.create({
       data: {
         userId,
         type: "LEVEL_UP",
         title: "Darajangiz oshdi!",
-        body: `Tabriklaymiz! Siz ${newLevel}-darajaga yetdingiz. Yangi titul: ${title}`,
-        dataJson: JSON.stringify({ oldLevel, newLevel, title }),
+        body: `Tabriklaymiz! Siz ${newLevel}-darajaga yetdingiz. Yangi titul: ${title}.${creditsAwarded > 0 ? ` +${creditsAwarded} kredit hisobingizga qo'shildi.` : ""}`,
+        dataJson: JSON.stringify({ oldLevel, newLevel, title, credits: creditsAwarded }),
       },
     });
 
@@ -290,44 +292,11 @@ async function onUserLevelUp(
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           chat_id: user.telegramId,
-          text: `🎉 <b>DubAniX Daraja O'sishi!</b>\n\nTabriklaymiz! Siz <b>${newLevel}-daraja</b>ga (${title}) yetdingiz!\nProfil sozlamalari va yangi imkoniyatlar ochildi.`,
+          text: `🎉 <b>DubAniX Daraja O'sishi!</b>\n\nTabriklaymiz! Siz <b>${newLevel}-daraja</b>ga (${title}) yetdingiz!${creditsAwarded > 0 ? `\n\n💎 +${creditsAwarded} kredit hisobingizga qo'shildi.` : ""}\nProfil sozlamalari va yangi imkoniyatlar ochildi.`,
           parse_mode: "HTML",
         }),
         signal: AbortSignal.timeout(4000),
       }).catch(() => {});
-    }
-
-    // 3. Level mukofotlarini avtomatik berish (agar DB da mavjud bo'lsa)
-    const rewards = await db.levelReward.findMany({
-      where: {
-        level: { gt: oldLevel, lte: newLevel },
-      },
-    });
-
-    for (const r of rewards) {
-      if (r.rewardType === "credits") {
-        const credits = parseInt(r.rewardValue, 10) || 0;
-        if (credits > 0) {
-          await db.user.update({
-            where: { id: userId },
-            data: { credits: { increment: credits } },
-          });
-          await db.creditTransaction.create({
-            data: {
-              userId,
-              amount: credits,
-              type: "LEVEL_REWARD",
-              description: `${r.level}-daraja mukofoti: ${credits} kredit`,
-            },
-          });
-        }
-      } else if (r.rewardType === "streak_freeze") {
-        const freezes = parseInt(r.rewardValue, 10) || 1;
-        await db.user.update({
-          where: { id: userId },
-          data: { streakFreezeCount: { increment: freezes } },
-        });
-      }
     }
   } catch (e) {
     console.error("onUserLevelUp error:", e);
