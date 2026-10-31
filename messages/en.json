@@ -776,5 +776,7 @@
   "adminPay.error.state": "OAuth state check failed — start again",
   "adminPay.error.denied": "Connection was denied",
   "adminPay.error.exchange": "Token exchange failed — check client credentials",
-  "adminPay.error.generic": "Something went wrong"
+  "adminPay.error.generic": "Something went wrong",
+  "credits.priceCurrency": "Price currency",
+  "credits.priceApprox": "Approximate, by rate"
 }

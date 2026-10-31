@@ -776,5 +776,7 @@
   "adminPay.error.state": "Проверка OAuth state не прошла — начните заново",
   "adminPay.error.denied": "В подключении отказано",
   "adminPay.error.exchange": "Не удалось обменять токен — проверьте client credentials",
-  "adminPay.error.generic": "Что-то пошло не так"
+  "adminPay.error.generic": "Что-то пошло не так",
+  "credits.priceCurrency": "Валюта цен",
+  "credits.priceApprox": "Ориентировочно, по курсу"
 }

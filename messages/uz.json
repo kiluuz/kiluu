@@ -776,5 +776,7 @@
   "adminPay.error.state": "OAuth state tekshiruvi muvaffaqiyatsiz — qaytadan boshlang",
   "adminPay.error.denied": "Ulanish rad etildi",
   "adminPay.error.exchange": "Token almashinuvi xato — client kalitlarini tekshiring",
-  "adminPay.error.generic": "Xatolik yuz berdi"
+  "adminPay.error.generic": "Xatolik yuz berdi",
+  "credits.priceCurrency": "Narx valyutasi",
+  "credits.priceApprox": "Kurs bo‘yicha taxminiy"
 }

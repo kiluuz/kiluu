@@ -3,6 +3,7 @@ import { db } from "@/lib/db";
 import { getCurrentUser } from "@/lib/auth";
 import { ensureRuntimeSeed } from "@/lib/seed-runtime";
 import { daCurrency, daDonationUrl } from "@/lib/donationalerts";
+import { DISPLAY_CURRENCIES, displayRates } from "@/lib/display-currency";
 
 export async function GET() {
   await ensureRuntimeSeed();
@@ -42,7 +43,12 @@ export async function GET() {
       bonus: p.bonus,
       popular: p.popular,
     })),
-    payment: { provider: "donationalerts", currency: daCurrency(), donationUrl: daDonationUrl() },
+    payment: {
+      provider: "donationalerts",
+      currency: daCurrency(),
+      donationUrl: daDonationUrl(),
+      display: { currencies: DISPLAY_CURRENCIES, rates: displayRates() },
+    },
     balance: user?.credits ?? 0,
     transactions,
   });

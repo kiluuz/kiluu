@@ -14,12 +14,23 @@ import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { useI18n } from "@/components/i18n-provider";
 import { FramesShop } from "../frame-shop";
+import {
+  DISPLAY_CURRENCIES,
+  convertPrice,
+  formatDisplayPrice,
+  type DisplayCurrency,
+} from "@/lib/display-currency";
 
 interface CreditsData {
   packages: CreditPackage[];
   balance: number;
   transactions: CreditTx[];
-  payment?: { provider: string; currency: string; donationUrl: string };
+  payment?: {
+    provider: string;
+    currency: string;
+    donationUrl: string;
+    display?: { currencies: DisplayCurrency[]; rates: Record<DisplayCurrency, number> };
+  };
 }
 
 interface DonationIntent {
@@ -41,6 +52,16 @@ const ERROR_KEYS: Record<string, string> = {
   TOO_MANY_REQUESTS: "credits.daRate",
 };
 
+const PRICE_CURRENCY_KEY = "kiluu.priceCurrency";
+
+const LOCALE_CURRENCY: Record<string, DisplayCurrency> = {
+  uz: "UZS",
+  kk: "KZT",
+  ky: "KGS",
+  en: "USD",
+  ru: "UZS",
+};
+
 function formatMoney(minor: number, currency: string) {
   return `${(minor / 100).toLocaleString("ru-RU", { maximumFractionDigits: 2 })} ${currency}`;
 }
@@ -56,13 +77,46 @@ function minutesLeft(expiresAt: string, now: number) {
 
 export function CreditsView() {
   const { user, setUser, setAuthOpen } = useAppStore();
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
   const [loadedData, setLoadedData] = useState<{ userId: string | null; value: CreditsData } | null>(null);
   const data = loadedData?.userId === (user?.id ?? null) ? loadedData.value : null;
   const [activeTab, setActiveTab] = useState<"credits" | "frames">("credits");
   const [topUp, setTopUp] = useState<{ pkg: CreditPackage; intent: DonationIntent } | null>(null);
   const [creatingId, setCreatingId] = useState<string | null>(null);
   const [now, setNow] = useState(() => Date.now());
+  const [priceCurrency, setPriceCurrency] = useState<DisplayCurrency>(() => LOCALE_CURRENCY[locale] ?? "UZS");
+
+  useEffect(() => {
+    let restoreTimer: number | undefined;
+    try {
+      const saved = window.localStorage.getItem(PRICE_CURRENCY_KEY);
+      if (saved && (DISPLAY_CURRENCIES as readonly string[]).includes(saved)) {
+        restoreTimer = window.setTimeout(() => setPriceCurrency(saved as DisplayCurrency), 0);
+      }
+    } catch {
+      /* locale default is enough */
+    }
+    return () => {
+      if (restoreTimer !== undefined) window.clearTimeout(restoreTimer);
+    };
+  }, []);
+
+  function pickCurrency(code: DisplayCurrency) {
+    setPriceCurrency(code);
+    try {
+      window.localStorage.setItem(PRICE_CURRENCY_KEY, code);
+    } catch {
+      /* ignore storage failures */
+    }
+  }
+
+  const rates = data?.payment?.display?.rates;
+  const priceOf = (base: number) =>
+    formatDisplayPrice(convertPrice(base, priceCurrency, rates), priceCurrency);
+  const approxOf = (minor: number, currency: string) => {
+    if (currency !== (data?.payment?.currency ?? "RUB")) return null;
+    return priceOf(minor / 100);
+  };
 
   useEffect(() => {
     let active = true;
@@ -187,9 +241,28 @@ export function CreditsView() {
         </div>
       </div>
 
-      <div className="grid grid-cols-2 lg:grid-cols-5 gap-3 sm:gap-4 mb-4">
-        {(data?.packages || []).map((pkg) => (
+      <div className="mb-3 flex flex-wrap items-center gap-1.5">
+        <span className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground mr-1">
+          {t("credits.priceCurrency")}
+        </span>
+        {DISPLAY_CURRENCIES.map((code) => (
           <button
+            key={code}
+            type="button"
+            onClick={() => pickCurrency(code)}
+            className={cn(
+              "rounded-full border px-2.5 py-1 text-[11px] font-bold transition",
+              priceCurrency === code ? "border-primary bg-primary/10 text-primary" : "bg-card hover:border-primary/40"
+            )}
+          >
+            {code}
+          </button>
+        ))}
+        <span className="text-[10px] text-muted-foreground ml-auto">{t("credits.priceApprox")}</span>
+      </div>
+
+      <div className="grid grid-cols-2 lg:grid-cols-5 gap-3 sm:gap-4 mb-4">
+        {(data?.packages || []).map((pkg) => (          <button
             key={pkg.id}
             disabled={creatingId === pkg.id}
             onClick={() => startTopUp(pkg)}
@@ -217,7 +290,7 @@ export function CreditsView() {
             <p className="text-xs text-muted-foreground mt-1">{t("credits.total")} {formatCredits(pkg.credits + pkg.bonus)}</p>
             <p className="text-lg font-black mt-2 flex items-center gap-1.5">
               {creatingId === pkg.id ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
-              {pkg.priceDa && pkg.priceDa > 0 ? formatMoney(pkg.priceDa * 100, data?.payment?.currency || "RUB") : "—"}
+              {pkg.priceDa && pkg.priceDa > 0 ? priceOf(pkg.priceDa) : "—"}
             </p>
           </button>
         ))}
@@ -298,6 +371,9 @@ export function CreditsView() {
                 <div>
                   <p className="text-[11px] uppercase tracking-wider text-muted-foreground font-bold">{t("credits.daAmount")}</p>
                   <p className="text-2xl font-black">{formatMoney(topUp.intent.amountMinor, topUp.intent.currency)}</p>
+                  {approxOf(topUp.intent.amountMinor, topUp.intent.currency) && (
+                    <p className="text-[11px] text-muted-foreground">≈ {approxOf(topUp.intent.amountMinor, topUp.intent.currency)}</p>
+                  )}
                   <p className="text-xs text-muted-foreground">{formatCredits(topUp.intent.credits)} {t("credits.credits")}</p>
                 </div>
                 <div className="text-right">

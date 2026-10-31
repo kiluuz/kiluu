@@ -776,5 +776,7 @@
   "adminPay.error.state": "OAuth state тексерісі өтпеді — қайтадан бастаңыз",
   "adminPay.error.denied": "Қосылудан бас тартылды",
   "adminPay.error.exchange": "Токен алмасу қатесі — client кілттерін тексеріңіз",
-  "adminPay.error.generic": "Қате орын алды"
+  "adminPay.error.generic": "Қате орын алды",
+  "credits.priceCurrency": "Баға валютасы",
+  "credits.priceApprox": "Курс бойынша шамамен"
 }
