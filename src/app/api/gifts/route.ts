@@ -86,6 +86,9 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Not enough credits", need: (e as { need?: number }).need }, { status: 400 });
     }
     if (code === "SELF") return NextResponse.json({ error: "Cannot gift yourself" }, { status: 400 });
+    if (code === "NO_RECIPIENT") {
+      return NextResponse.json({ error: "No user found with that username", code }, { status: 404 });
+    }
     if (code === "CREATOR_RECIPIENT") {
       return NextResponse.json({ error: "Creator accounts can't receive anime gifts", code }, { status: 400 });
     }

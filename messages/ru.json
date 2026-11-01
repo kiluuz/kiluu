@@ -260,6 +260,8 @@
   "gifts.networkError": "Ошибка сети",
   "gifts.actionError": "Что-то пошло не так",
   "gifts.creatorBlocked": "Аккаунты авторов не могут получать аниме в подарок",
+  "gifts.revealCaption": "Вам пришёл подарок от @{username}",
+  "gifts.revealCta": "Открыть подарок",
   "gifts.claimed": "Подарок получен",
   "gifts.declined": "Подарок отклонён, кредиты возвращены",
   "gifts.description": "Подарок стоит кредитов, даже если аниме уже есть у вас. Получить его можно в течение 14 дней.",

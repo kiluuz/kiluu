@@ -6,6 +6,7 @@ import { grantPurchase } from "./bot-api";
 import { officialVersionId, userOwnsVersion } from "./owns";
 import { sendGiftNotificationEmail } from "./email";
 import { emitEvent } from "./events";
+import { findUserByHandle } from "./handles";
 import { isCreator } from "./rbac";
 
 export function giftExpiryDate(from = new Date()) {
@@ -79,16 +80,16 @@ export async function sendGift(opts: {
     throw Object.assign(new Error("NOT_FOR_SALE"), { code: "NOT_FOR_SALE" });
   }
 
-  const recipient = await db.user.findFirst({
-    where: { username: { equals: username } },
-  });
+  // Resolved before any charge: an unresolvable handle must not spend credits.
+  const recipient = await findUserByHandle(username);
+  if (!recipient) throw Object.assign(new Error("NO_RECIPIENT"), { code: "NO_RECIPIENT" });
 
   const sender = await db.user.findUnique({ where: { id: opts.senderId } });
   if (!sender) throw new Error("NO_USER");
-  if (recipient && isCreator(recipient)) {
+  if (isCreator(recipient)) {
     throw Object.assign(new Error("CREATOR_RECIPIENT"), { code: "CREATOR_RECIPIENT" });
   }
-  if (recipient && recipient.id === sender.id) {
+  if (recipient.id === sender.id) {
     throw Object.assign(new Error("SELF"), { code: "SELF" });
   }
 
@@ -144,7 +145,7 @@ export async function sendGift(opts: {
     const createdGift = await tx.gift.create({
       data: {
         senderId: sender.id,
-        recipientId: recipient?.id ?? null,
+        recipientId: recipient.id,
         recipientUsername: username,
         animeId: anime.id,
         versionId,
@@ -166,34 +167,32 @@ export async function sendGift(opts: {
   }
 
   // Recipient ga notification va email yuborish
-  if (recipient) {
-    try {
-      await db.notification.create({
-        data: {
-          userId: recipient.id,
-          type: "gift_received",
-          title: "Sizga sovg'a keldi! 🎁",
-          body: `@${sender.username} sizga "${anime.title}" animeni sovg'a qildi`,
-          dataJson: JSON.stringify({
-            giftId: gift.id,
-            animeId: anime.id,
-            animeSlug: anime.slug,
-            animeTitle: anime.title,
-            senderUsername: sender.username,
-          }),
-        },
-      });
-      // Email ham yuboramiz (background, xato bo'lsa bloklmasin)
-      sendGiftNotificationEmail({
-        to: recipient.email,
-        recipientUsername: recipient.username,
-        senderUsername: sender.username,
-        animeTitle: anime.title,
-        message: opts.message,
-      }).catch((err) => console.error("Gift email failed:", err));
-    } catch (err) {
-      console.error("Gift notification failed:", err);
-    }
+  try {
+    await db.notification.create({
+      data: {
+        userId: recipient.id,
+        type: "gift_received",
+        title: "Sizga sovg'a keldi! 🎁",
+        body: `@${sender.username} sizga "${anime.title}" animeni sovg'a qildi`,
+        dataJson: JSON.stringify({
+          giftId: gift.id,
+          animeId: anime.id,
+          animeSlug: anime.slug,
+          animeTitle: anime.title,
+          senderUsername: sender.username,
+        }),
+      },
+    });
+    // Email ham yuboramiz (background, xato bo'lsa bloklmasin)
+    sendGiftNotificationEmail({
+      to: recipient.email,
+      recipientUsername: recipient.username,
+      senderUsername: sender.username,
+      animeTitle: anime.title,
+      message: opts.message,
+    }).catch((err) => console.error("Gift email failed:", err));
+  } catch (err) {
+    console.error("Gift notification failed:", err);
   }
 
   return gift;

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import { db } from "@/lib/db";
 import { getCurrentUser } from "@/lib/auth";
+import { findUserByHandle } from "@/lib/handles";
+import { isCreator } from "@/lib/rbac";
 
 export async function GET(req: NextRequest) {
   const me = await getCurrentUser();
@@ -12,13 +13,23 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ user: null }, { headers: { "Cache-Control": "private, no-store" } });
   }
 
-  const user = await db.user.findFirst({
-    where: { username: { equals: username, mode: "insensitive" }, deletedAt: null },
-    select: { id: true, username: true, displayName: true, avatarUrl: true, accentColor: true, role: true },
-  });
+  // Same resolution rule as sendGift, so the form never accepts what the API rejects.
+  const user = await findUserByHandle(username);
 
+  const recipient = user && user.id !== me.id ? user : null;
   return NextResponse.json(
-    { user: user && user.id !== me.id ? user : null },
+    {
+      user: recipient
+        ? {
+            id: recipient.id,
+            username: recipient.username,
+            displayName: recipient.displayName,
+            avatarUrl: recipient.avatarUrl,
+            accentColor: recipient.accentColor,
+            canReceiveGift: !isCreator(recipient),
+          }
+        : null,
+    },
     { headers: { "Cache-Control": "private, no-store" } }
   );
 }

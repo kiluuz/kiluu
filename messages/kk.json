@@ -260,6 +260,8 @@
   "gifts.networkError": "Желі қатесі",
   "gifts.actionError": "Қате орын алды",
   "gifts.creatorBlocked": "Автор аккаунттары аниме сыйлық ретінде қабылдай алмайды",
+  "gifts.revealCaption": "@{username} сізге сыйлық жіберді",
+  "gifts.revealCta": "Сыйлықты ашу",
   "gifts.claimed": "Сыйлық алынды",
   "gifts.declined": "Сыйлықтан бас тартылды, кредиттер қайтарылды",
   "gifts.description": "Аниме сізде болса да, сыйлыққа кредит жұмсалады. Сыйлықты 14 күн ішінде алуға болады.",

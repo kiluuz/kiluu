@@ -9,6 +9,7 @@ import { MobileDock } from "./mobile-dock";
 import { MobileSearch } from "./mobile-search";
 import { Onboarding } from "./auth";
 import { ProfileModal } from "./profile-card";
+import { IncomingGiftReveal } from "./incoming-gift";
 import { Logo } from "./logo";
 import { PageLoader } from "@/components/brand/PageLoader";
 import { HomeView } from "./views/home";
@@ -294,6 +295,7 @@ export default function AnimeApp() {
       <MobileDock />
       <MobileSearch />
       <ProfileModal />
+      <IncomingGiftReveal />
       <Onboarding key={user.id} />
     </div>
   );

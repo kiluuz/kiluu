@@ -34,6 +34,8 @@ test("all selectable languages have translations for the main app views", () => 
     "gifts.description",
     "gifts.status.claimed",
     "gifts.creatorBlocked",
+    "gifts.revealCaption",
+    "gifts.revealCta",
     "profile.created",
     "profile.memberOf",
     "profile.members",

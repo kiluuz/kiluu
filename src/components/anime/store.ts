@@ -148,6 +148,8 @@ interface AppStore {
   viewHistory: View[];
   profileModalOpen: boolean;
   profileCardUser: string | null;
+  /** gift id the Gifts view should open as soon as its list is loaded */
+  giftFocusId: string | null;
   authOpen: boolean;
   searchOpen: boolean;
   setUser: (user: AuthUser | null) => void;
@@ -158,6 +160,8 @@ interface AppStore {
   setProfileModalOpen: (open: boolean) => void;
   openProfileCard: (username: string) => void;
   closeProfileCard: () => void;
+  openGiftDetail: (giftId: string) => void;
+  clearGiftFocus: () => void;
   setAuthOpen: (open: boolean) => void;
   setSearchOpen: (open: boolean) => void;
   /** full-screen mobile search overlay (poster thumbnails) */
@@ -178,6 +182,7 @@ export const useAppStore = create<AppStore>((set, get) => ({
   viewHistory: [],
   profileModalOpen: false,
   profileCardUser: null,
+  giftFocusId: null,
   authOpen: false,
   searchOpen: false,
   mobileSearchOpen: false,
@@ -240,6 +245,8 @@ export const useAppStore = create<AppStore>((set, get) => ({
   },
   openProfileCard: (username) => set({ profileModalOpen: true, profileCardUser: username }),
   closeProfileCard: () => set({ profileModalOpen: false, profileCardUser: null }),
+  openGiftDetail: (giftId) => set({ giftFocusId: giftId }),
+  clearGiftFocus: () => set({ giftFocusId: null }),
   setAuthOpen: (authOpen) => {
     // Full-page split login — "Sign in" now navigates to the login view
     if (authOpen) {

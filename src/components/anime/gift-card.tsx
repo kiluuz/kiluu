@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Coins, Loader2, Sparkles, Star, X } from "lucide-react";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -486,6 +486,133 @@ function GiftDetailBody({
           <p className="text-[10px] text-muted-foreground">The anime moves into your library when you unwrap it.</p>
         </div>
       )}
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+
+/**
+ * Full-screen prize reveal: petals, a shaking box, then the numbered card.
+ * Shared by the sender (after sending) and the recipient (live, from anywhere).
+ */
+export function GiftRevealOverlay({
+  gift,
+  caption,
+  actionLabel,
+  onAction,
+  onClose,
+}: {
+  gift: GiftCardRecord;
+  caption: React.ReactNode;
+  actionLabel?: string;
+  onAction?: () => void;
+  onClose: () => void;
+}) {
+  const rarity = giftRarityFor(gift);
+  const reducedMotion = useRef(false);
+  const [revealed, setRevealed] = useState(false);
+  const petals = useMemo(
+    () =>
+      Array.from({ length: 40 }).map((_, index) => ({
+        left: `${(index * 37) % 100}%`,
+        delay: `${(((index * 13) % 28) / 10).toFixed(1)}s`,
+        duration: `${(2 + ((index * 7) % 20) / 10).toFixed(1)}s`,
+        drift: `${((index * 29) % 160) - 80}px`,
+        size: 7 + (index % 5) * 2,
+      })),
+    []
+  );
+
+  useEffect(() => {
+    reducedMotion.current =
+      typeof window !== "undefined" && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    if (reducedMotion.current) {
+      setRevealed(true);
+      return;
+    }
+    const timer = setTimeout(() => setRevealed(true), 1000);
+    return () => clearTimeout(timer);
+  }, []);
+
+  useEffect(() => {
+    const previous = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => {
+      document.body.style.overflow = previous;
+      window.removeEventListener("keydown", onKey);
+    };
+  }, [onClose]);
+
+  return (
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-label={
+        gift.incoming
+          ? `Gift from @${gift.sender?.username ?? "someone"} — ${gift.anime.title}`
+          : `Gift sent to @${gift.recipientUsername} — ${gift.anime.title}`
+      }
+      onClick={onClose}
+      className="gift-fade-in fixed inset-0 z-[130] flex cursor-pointer items-center justify-center overflow-hidden bg-black/80 p-4 backdrop-blur-md"
+    >
+      <div className="pointer-events-none absolute inset-0 overflow-hidden" aria-hidden="true">
+        {petals.map((petal, index) => (
+          <span
+            key={index}
+            className="gift-petal"
+            style={
+              {
+                left: petal.left,
+                width: petal.size,
+                height: petal.size + 3,
+                "--petal-delay": petal.delay,
+                "--petal-duration": petal.duration,
+                "--petal-drift": petal.drift,
+              } as React.CSSProperties
+            }
+          />
+        ))}
+      </div>
+
+      <div className="relative z-10 flex flex-col items-center">
+        {revealed ? (
+          <div className="gift-pop-in flex w-full max-w-[340px] flex-col items-center">
+            <p className="mb-3 text-3xl font-black tracking-tight" style={{ color: rarity.color }}>
+              {rarity.label}!
+            </p>
+            <GiftCard
+              anime={gift.anime}
+              price={gift.pricePaid}
+              rarity={rarity}
+              toUsername={gift.incoming ? undefined : gift.recipientUsername}
+              fromUsername={gift.sender?.username}
+              message={gift.message}
+              serialNumber={giftSerialNumber(gift.id)}
+            />
+            <p className="mt-4 text-center text-sm font-semibold text-white/90">{caption}</p>
+            {actionLabel && onAction ? (
+              <Button
+                className="mt-3 w-full max-w-[320px] rounded-xl brand-gradient text-white"
+                onClick={(event) => {
+                  event.stopPropagation();
+                  onAction();
+                }}
+              >
+                <Sparkles className="h-4 w-4" />
+                {actionLabel}
+              </Button>
+            ) : null}
+            <p className="mt-2 text-[11px] text-white/50">Click anywhere to close</p>
+          </div>
+        ) : (
+          <GiftBox size="full" shaking />
+        )}
+      </div>
     </div>
   );
 }

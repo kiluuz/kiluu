@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   Check,
   Coins,
@@ -19,11 +19,12 @@ import { formatCredits } from "../ui-bits";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { useI18n } from "@/components/i18n-provider";
-import { giftRarity, giftRarityById, giftSerialNumber } from "@/lib/gift-rarity";
+import { giftRarity, giftRarityById } from "@/lib/gift-rarity";
 import {
   GiftBox,
   GiftCard,
   GiftDetailDialog,
+  GiftRevealOverlay,
   formatGiftDate,
   type GiftCardRecord,
 } from "../gift-card";
@@ -59,7 +60,7 @@ interface Recipient {
   displayName: string | null;
   avatarUrl: string | null;
   accentColor: string | null;
-  role?: string;
+  canReceiveGift?: boolean;
 }
 
 const MESSAGE_LIMIT = 80;
@@ -132,33 +133,50 @@ export function GiftsView() {
   const normalizedRecipient = recipientQuery.replace(/^@/, "").trim();
   const currentLookup = lookup && lookup.query === normalizedRecipient ? lookup : null;
   const lookupUser = currentLookup?.status === "valid" ? currentLookup.user : null;
-  const lookupUserIsCreator = lookupUser?.role?.toLowerCase() === "creator";
-  const recipient = normalizedRecipient && !lookupUserIsCreator ? lookupUser : null;
-  const recipientStatus: "idle" | "checking" | "valid" | "invalid" | "creator" = !normalizedRecipient
+  const recipientBlocked = lookupUser ? lookupUser.canReceiveGift === false : false;
+  const recipient = normalizedRecipient && !recipientBlocked ? lookupUser : null;
+  const recipientStatus: "idle" | "checking" | "valid" | "invalid" | "blocked" = !normalizedRecipient
     ? "idle"
     : !currentLookup
       ? "checking"
-      : currentLookup.status === "valid" && lookupUserIsCreator
-        ? "creator"
+      : currentLookup.status === "valid" && recipientBlocked
+        ? "blocked"
         : currentLookup.status;
   const price = selectedAnime?.price ?? 0;
   const need = selectedAnime ? Math.max(0, price - (user?.credits ?? 0)) : 0;
   const canSend = Boolean(recipient && selectedAnime) && !sending && need === 0;
+
+  // A gift revealed from another page lands here already opened, so the recipient
+  // never has to hunt for it in the list. Consumed straight from the store to keep
+  // the reveal a one-shot.
+  const revealFocused = useCallback((rows: GiftRow[]) => {
+    const { giftFocusId, clearGiftFocus } = useAppStore.getState();
+    if (!giftFocusId) return;
+    clearGiftFocus();
+    const match = rows.find((gift) => gift.id === giftFocusId);
+    if (!match) return;
+    setTab(match.incoming ? "received" : "sent");
+    setVisibleCount(12);
+    setSelectedGift(match);
+    setDetailOpen(true);
+  }, []);
 
   const load = useCallback(() => {
     fetch("/api/gifts", { cache: "no-store" })
       .then(async (response) => {
         const data = await response.json();
         if (!response.ok) throw new Error(data.error || "load failed");
-        setGifts(data.gifts || []);
+        const rows: GiftRow[] = data.gifts || [];
+        setGifts(rows);
         setLoadError(false);
+        revealFocused(rows);
       })
       .catch(() => {
         setLoadError(true);
         toast.error(t("gifts.loadError"));
       })
       .finally(() => setLoading(false));
-  }, [t]);
+  }, [t, revealFocused]);
 
   useEffect(() => {
     if (!user) return;
@@ -420,13 +438,13 @@ export function GiftsView() {
                 autoComplete="off"
                 spellCheck={false}
                 aria-label="Recipient username"
-                aria-invalid={recipientStatus === "invalid" || recipientStatus === "creator"}
+                aria-invalid={recipientStatus === "invalid" || recipientStatus === "blocked"}
                 className="h-11 rounded-xl pl-7 pr-10"
               />
               <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2">
                 {recipientStatus === "checking" ? <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" /> : null}
                 {recipientStatus === "valid" ? <Check className="h-4 w-4 text-emerald-400" /> : null}
-                {recipientStatus === "invalid" || recipientStatus === "creator" ? <X className="h-4 w-4 text-destructive" /> : null}
+                {recipientStatus === "invalid" || recipientStatus === "blocked" ? <X className="h-4 w-4 text-destructive" /> : null}
               </span>
             </div>
             {recipientStatus === "valid" && recipient ? (
@@ -452,7 +470,7 @@ export function GiftsView() {
                 No user found with that username.
               </p>
             ) : null}
-            {recipientStatus === "creator" ? (
+            {recipientStatus === "blocked" ? (
               <p className="mt-1.5 text-xs font-medium text-destructive">
                 {t("gifts.creatorBlocked")}
               </p>
@@ -773,100 +791,13 @@ export function GiftsView() {
         busy={acting}
       />
 
-      {celebration ? <SendCelebration gift={celebration} onClose={() => setCelebration(null)} /> : null}
-    </div>
-  );
-}
-
-function SendCelebration({ gift, onClose }: { gift: GiftCardRecord; onClose: () => void }) {
-  const rarity = giftRarityById(gift.rarity) ?? giftRarity(gift.pricePaid);
-  const reducedMotion = useRef(false);
-  const [revealed, setRevealed] = useState(false);
-  const petals = useMemo(
-    () =>
-      Array.from({ length: 40 }).map((_, index) => ({
-        left: `${(index * 37) % 100}%`,
-        delay: `${(((index * 13) % 28) / 10).toFixed(1)}s`,
-        duration: `${(2 + ((index * 7) % 20) / 10).toFixed(1)}s`,
-        drift: `${((index * 29) % 160) - 80}px`,
-        size: 7 + (index % 5) * 2,
-      })),
-    []
-  );
-
-  useEffect(() => {
-    reducedMotion.current =
-      typeof window !== "undefined" && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    if (reducedMotion.current) {
-      setRevealed(true);
-      return;
-    }
-    const timer = setTimeout(() => setRevealed(true), 1000);
-    return () => clearTimeout(timer);
-  }, []);
-
-  useEffect(() => {
-    const previous = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    const onKey = (event: KeyboardEvent) => {
-      if (event.key === "Escape") onClose();
-    };
-    window.addEventListener("keydown", onKey);
-    return () => {
-      document.body.style.overflow = previous;
-      window.removeEventListener("keydown", onKey);
-    };
-  }, [onClose]);
-
-  return (
-    <div
-      role="dialog"
-      aria-modal="true"
-      aria-label={`Gift sent to @${gift.recipientUsername}`}
-      onClick={onClose}
-      className="gift-fade-in fixed inset-0 z-[130] flex cursor-pointer items-center justify-center overflow-hidden bg-black/80 p-4 backdrop-blur-md"
-    >
-      <div className="pointer-events-none absolute inset-0 overflow-hidden" aria-hidden="true">
-        {petals.map((petal, index) => (
-          <span
-            key={index}
-            className="gift-petal"
-            style={
-              {
-                left: petal.left,
-                width: petal.size,
-                height: petal.size + 3,
-                "--petal-delay": petal.delay,
-                "--petal-duration": petal.duration,
-                "--petal-drift": petal.drift,
-              } as React.CSSProperties
-            }
-          />
-        ))}
-      </div>
-
-      <div className="relative z-10 flex flex-col items-center">
-        {revealed ? (
-          <div className="gift-pop-in flex flex-col items-center">
-            <p className="mb-3 text-3xl font-black tracking-tight" style={{ color: rarity.color }}>
-              {rarity.label}!
-            </p>
-            <GiftCard
-              anime={gift.anime}
-              price={gift.pricePaid}
-              rarity={rarity}
-              toUsername={gift.recipientUsername}
-              fromUsername={gift.sender?.username}
-              message={gift.message}
-              serialNumber={giftSerialNumber(gift.id)}
-            />
-            <p className="mt-4 text-sm font-semibold text-white/90">Gift sent to @{gift.recipientUsername}</p>
-            <p className="mt-1 text-[11px] text-white/50">Click anywhere to close</p>
-          </div>
-        ) : (
-          <GiftBox size="full" shaking />
-        )}
-      </div>
+      {celebration ? (
+        <GiftRevealOverlay
+          gift={celebration}
+          caption={`Gift sent to @${celebration.recipientUsername}`}
+          onClose={() => setCelebration(null)}
+        />
+      ) : null}
     </div>
   );
 }

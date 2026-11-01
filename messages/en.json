@@ -260,6 +260,8 @@
   "gifts.networkError": "Network error",
   "gifts.actionError": "Something went wrong",
   "gifts.creatorBlocked": "Creator accounts can't receive anime gifts",
+  "gifts.revealCaption": "@{username} sent you a gift",
+  "gifts.revealCta": "Open the gift",
   "gifts.claimed": "Gift claimed",
   "gifts.declined": "Gift declined; credits refunded",
   "gifts.description": "A gift costs credits even if you already own the anime. Gifts can be claimed within 14 days.",

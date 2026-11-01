@@ -260,6 +260,8 @@
   "gifts.networkError": "Тармак катасы",
   "gifts.actionError": "Ката кетти",
   "gifts.creatorBlocked": "Автор аккаунттары аниме белек катары кабыл ала албайт",
+  "gifts.revealCaption": "@{username} сизге белек жиберди",
+  "gifts.revealCta": "Белекти ачуу",
   "gifts.claimed": "Белек кабыл алынды",
   "gifts.declined": "Белек четке кагылды, кредиттер кайтарылды",
   "gifts.description": "Аниме сизде болсо да, белекке кредит кетет. Белекти 14 күндүн ичинде кабыл алса болот.",

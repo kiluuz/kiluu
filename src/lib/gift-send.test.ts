@@ -139,3 +139,72 @@ test("repeating the same idempotency key never charges twice", async () => {
   assert.equal(sender.credits, 510);
   assert.equal(await db.gift.count({ where: { idempotencyKey: "gift-price-test" } }), 1);
 });
+
+test("rejects a creator handle before any credit moves", async () => {
+  const creator = await db.user.create({
+    data: {
+      email: "gift-creator@example.test",
+      username: "GiftCreator",
+      password: "test-hash",
+      role: "creator",
+    },
+  });
+  const before = await db.user.findUniqueOrThrow({ where: { id: senderId } });
+
+  await assert.rejects(
+    () =>
+      sendGift({
+        senderId,
+        recipientUsername: "@giftcreator",
+        animeId,
+        idempotencyKey: "gift-creator-test",
+      }),
+    (error: { code?: string }) => error.code === "CREATOR_RECIPIENT"
+  );
+
+  const after = await db.user.findUniqueOrThrow({ where: { id: senderId } });
+  assert.equal(after.credits, before.credits);
+  assert.equal(await db.gift.findUnique({ where: { idempotencyKey: "gift-creator-test" } }), null);
+  assert.equal(creator.role, "creator");
+});
+
+test("rejects an unknown username instead of stranding credits in an unclaimed gift", async () => {
+  const before = await db.user.findUniqueOrThrow({ where: { id: senderId } });
+
+  await assert.rejects(
+    () =>
+      sendGift({
+        senderId,
+        recipientUsername: "nobody-here",
+        animeId,
+        idempotencyKey: "gift-unknown-test",
+      }),
+    (error: { code?: string }) => error.code === "NO_RECIPIENT"
+  );
+
+  const after = await db.user.findUniqueOrThrow({ where: { id: senderId } });
+  assert.equal(after.credits, before.credits);
+  assert.equal(await db.gift.findUnique({ where: { idempotencyKey: "gift-unknown-test" } }), null);
+});
+
+test("links and notifies a viewer whose stored handle is mixed case", async () => {
+  const fan = await db.user.create({
+    data: {
+      email: "gift-fan@example.test",
+      username: "GiftFan",
+      password: "test-hash",
+      role: "user",
+      credits: 0,
+    },
+  });
+
+  const gift = await sendGift({
+    senderId,
+    recipientUsername: "giftfan",
+    animeId,
+    idempotencyKey: "gift-mixed-case-test",
+  });
+
+  assert.equal(gift.recipientId, fan.id);
+  assert.equal(await db.notification.count({ where: { userId: fan.id, type: "gift_received" } }), 1);
+});

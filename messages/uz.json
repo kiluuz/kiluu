@@ -260,6 +260,8 @@
   "gifts.networkError": "Tarmoq xatosi",
   "gifts.actionError": "Xatolik yuz berdi",
   "gifts.creatorBlocked": "Creator hisoblar anime sovg'a qabul qila olmaydi",
+  "gifts.revealCaption": "@{username} sizga sovg‘a yubordi",
+  "gifts.revealCta": "Sovg‘ani ochish",
   "gifts.claimed": "Sovg‘a qabul qilindi",
   "gifts.declined": "Sovg‘a rad etildi, kreditlar qaytarildi",
   "gifts.description": "Anime sizda bor bo‘lsa ham sovg‘a uchun kredit sarflanadi. Sovg‘ani 14 kun ichida qabul qilish mumkin.",

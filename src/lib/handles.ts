@@ -27,3 +27,32 @@ export async function uniqueHandle(base: string): Promise<string> {
   }
   return `user_${randomInt(100000, 999999)}`;
 }
+
+/**
+ * Resolves a handle a person typed to the account that owns it, ignoring casing.
+ * Prisma's `mode: "insensitive"` only exists on Postgres, so the search narrows on
+ * the first letter in both casings and the comparison folds case in JS.
+ */
+export async function findUserByHandle(handle: string) {
+  const wanted = handle.replace(/^@/, "").trim().toLowerCase();
+  if (!wanted) return null;
+  const candidates = await db.user.findMany({
+    where: {
+      deletedAt: null,
+      OR: [
+        { username: { startsWith: wanted.charAt(0) } },
+        { username: { startsWith: wanted.charAt(0).toUpperCase() } },
+      ],
+    },
+    select: {
+      id: true,
+      username: true,
+      displayName: true,
+      avatarUrl: true,
+      accentColor: true,
+      role: true,
+      email: true,
+    },
+  });
+  return candidates.find((user) => user.username.toLowerCase() === wanted) ?? null;
+}
