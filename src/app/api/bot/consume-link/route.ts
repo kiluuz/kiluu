@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { consumeLinkToken } from "@/lib/telegram-link";
 import { botRequestAuthorized } from "@/lib/bot-secret";
+import { log } from "@/lib/logger";
 import { z } from "zod";
 
 const Body = z.object({
@@ -25,7 +26,12 @@ export async function POST(req: NextRequest) {
     telegramUsername: parsed.data.username,
   });
   if (!result.ok) {
-    return NextResponse.json({ error: result.error }, { status: 400 });
+    log.warn("consume-link refused", { code: result.code });
+    return NextResponse.json(
+      { error: `link_${result.code}`, code: result.code },
+      // 410/404 let the bot tell "get a fresh link" apart from a real config problem.
+      { status: result.code === "expired" ? 410 : 404 }
+    );
   }
   return NextResponse.json({ ok: true, site_user_id: result.userId });
 }

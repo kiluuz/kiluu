@@ -36,6 +36,7 @@ test("all selectable languages have translations for the main app views", () => 
     "gifts.creatorBlocked",
     "gifts.revealCaption",
     "gifts.revealCta",
+    "telegram.switchButton",
     "profile.created",
     "profile.memberOf",
     "profile.members",

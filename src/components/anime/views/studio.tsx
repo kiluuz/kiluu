@@ -419,14 +419,17 @@ export function StudioView() {
           </div>
         </div>
         {telegramLinked ? (
-          <div className="rounded-xl border border-emerald-500/25 bg-emerald-500/5 p-4 space-y-2 text-sm">
+          <div className="rounded-xl border border-emerald-500/25 bg-emerald-500/5 p-4 space-y-2 text-sm mb-3">
             <p className="font-semibold text-emerald-500">{t("studio.telegramLinked")}</p>
             <p className="text-muted-foreground">{t("studio.telegramHowto")}</p>
             <p className="text-xs text-muted-foreground">{t("studio.telegramHint")}</p>
           </div>
-        ) : (
-          <TelegramLinkWidget onLinked={() => user && setLinkedUserId(user.id)} />
-        )}
+        ) : null}
+        {/* Kept visible while linked so the account can be switched to another Telegram. */}
+        <TelegramLinkWidget
+          linkedHandle={user?.telegramUsername ?? null}
+          onLinked={() => user && setLinkedUserId(user.id)}
+        />
       </section>
 
       {/* My animes */}

@@ -5,6 +5,7 @@ import { Loader2, ExternalLink, Link2, Send, Star, CheckCircle2, Coins, Copy, Ch
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import { useI18n } from "@/components/i18n-provider";
 import type { BotAnime } from "./bot-hooks";
 
 function formatPrice(price: number) {
@@ -13,7 +14,15 @@ function formatPrice(price: number) {
 
 // ─── Telegram Link Widget ────────────────────────────────────────────────────
 
-export function TelegramLinkWidget({ onLinked }: { onLinked: () => void }) {
+export function TelegramLinkWidget({
+  onLinked,
+  linkedHandle,
+}: {
+  onLinked: () => void;
+  /** Telegram handle already bound; the card then offers switching to another account. */
+  linkedHandle?: string | null;
+}) {
+  const { t } = useI18n();
   const [linking, setLinking] = useState(false);
   const [linkUrl, setLinkUrl] = useState<string | null>(null);
   const [startCommand, setStartCommand] = useState<string | null>(null);
@@ -219,12 +228,18 @@ export function TelegramLinkWidget({ onLinked }: { onLinked: () => void }) {
           <Link2 className="w-4 h-4" />
         </div>
         <div>
-          <p className="font-bold text-sm">Connect your Telegram account</p>
-          <p className="text-xs text-muted-foreground">Purchased anime is delivered through the bot</p>
+          <p className="font-bold text-sm">
+            {linkedHandle
+              ? t("telegram.linkedAs", { handle: linkedHandle })
+              : t("telegram.connectTitle")}
+          </p>
+          <p className="text-xs text-muted-foreground">
+            {linkedHandle ? t("telegram.switchHint") : t("telegram.connectHint")}
+          </p>
         </div>
       </div>
       <p className="text-xs text-muted-foreground bg-background/60 p-2.5 rounded-xl border border-border/50">
-        ⚡ Tap the button to open <strong>Telegram</strong>, then tap <strong>/start</strong>. The site and bot will link automatically.
+        {t("telegram.autoLinkHint")}
       </p>
       <Button
         onClick={startLinking}
@@ -232,7 +247,11 @@ export function TelegramLinkWidget({ onLinked }: { onLinked: () => void }) {
         className="rounded-xl w-full gap-2 brand-gradient text-white font-bold h-11 shadow-md shadow-primary/20"
       >
         {linking ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
-        {linking ? "Ochilmoqda..." : "Telegram ilovasini ochish"}
+        {linking
+          ? t("telegram.opening")
+          : linkedHandle
+            ? t("telegram.switchButton")
+            : t("telegram.openAppButton")}
       </Button>
     </div>
   );

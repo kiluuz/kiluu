@@ -43,6 +43,7 @@ export interface AuthUser {
   favoriteGenres: string[];
   createdAt: string;
   telegramLinked?: boolean;
+  telegramUsername?: string | null;
   // customization
   pronouns: string | null;
   tagline: string | null;

@@ -2,7 +2,7 @@ import { randomBytes } from "crypto";
 import { db } from "@/lib/db";
 import { BOT_USERNAME } from "@/lib/bot-api";
 
-export const LINK_TTL_SEC = 15 * 60;
+export const LINK_TTL_SEC = 30 * 60;
 
 export function linkDeepUrl(token: string, botUsername = BOT_USERNAME): string {
   const name = botUsername.replace(/^@/, "");
@@ -10,9 +10,9 @@ export function linkDeepUrl(token: string, botUsername = BOT_USERNAME): string {
 }
 
 export async function issueLinkToken(userId: string) {
-  await db.telegramLinkToken.deleteMany({
-    where: { OR: [{ userId, usedAt: null }, { expiresAt: { lt: new Date() } }] },
-  });
+  // Only the newest link stays live, so an account can never be bound through two
+  // competing links at once.
+  await db.telegramLinkToken.deleteMany({ where: { userId, expiresAt: { gte: new Date() } } });
   const token = randomBytes(24).toString("base64url");
   const expiresAt = new Date(Date.now() + LINK_TTL_SEC * 1000);
   await db.telegramLinkToken.create({
@@ -21,16 +21,22 @@ export async function issueLinkToken(userId: string) {
   return { token, expiresAt, link: linkDeepUrl(token), expires_in: LINK_TTL_SEC };
 }
 
+/**
+ * Binds the Telegram account that opened the link to the site account that issued it.
+ * A link stays usable until it expires rather than after one hit: tapping it twice, or
+ * tapping it from the other Telegram account, re-binds instead of failing.
+ */
 export async function consumeLinkToken(opts: {
   token: string;
   telegramId: string;
   telegramUsername?: string | null;
-}) {
+}): Promise<{ ok: true; userId: string } | { ok: false; code: "expired" | "unknown" }> {
   const row = await db.telegramLinkToken.findUnique({ where: { token: opts.token } });
-  if (!row || row.usedAt || row.expiresAt < new Date()) {
-    return { ok: false as const, error: "expired_or_invalid" };
-  }
+  if (!row) return { ok: false, code: "unknown" };
+  if (row.expiresAt < new Date()) return { ok: false, code: "expired" };
 
+  // The handle moves to whoever taps the link last, so an old binding of the same
+  // Telegram account on another site profile is released instead of blocking the switch.
   const taken = await db.user.findFirst({
     where: { telegramId: opts.telegramId, NOT: { id: row.userId } },
   });
@@ -52,5 +58,5 @@ export async function consumeLinkToken(opts: {
     }),
   ]);
 
-  return { ok: true as const, userId: row.userId };
+  return { ok: true, userId: row.userId };
 }

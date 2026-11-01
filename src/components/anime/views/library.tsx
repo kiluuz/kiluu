@@ -306,6 +306,16 @@ export function LibraryView() {
                       <ExternalLink className="w-4 h-4" /> {t("library.openBot")}
                     </Button>
                   </a>
+                  {/* Fresh link, so switching to another Telegram account never reuses a dead one. */}
+                  <Button
+                    variant="outline"
+                    className="rounded-xl gap-2"
+                    onClick={startLinking}
+                    disabled={linkLoading}
+                  >
+                    {linkLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Link2 className="w-4 h-4" />}
+                    {t("telegram.switchButton")}
+                  </Button>
                 </>
               ) : polling ? (
                 <>
