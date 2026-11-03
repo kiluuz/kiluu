@@ -3,11 +3,12 @@
 import { useEffect, useState } from "react";
 import {
   UsersRound, Search, RefreshCw, ChevronLeft, ChevronRight,
-  ShieldAlert, Coins, UserPlus, Crown, Wifi, CheckCircle2,
+  ShieldAlert, Coins, UserPlus, Crown, Wifi, CheckCircle2, Loader2, Plus,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useAppStore } from "../store";
+import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 
 interface AdminUserRow {
@@ -79,6 +80,30 @@ export function AdminUsersView() {
   const [data, setData] = useState<UsersResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [grantAmounts, setGrantAmounts] = useState<Record<string, string>>({});
+  const [grantingId, setGrantingId] = useState<string | null>(null);
+
+  async function grantCredits(row: AdminUserRow) {
+    const amount = Number(grantAmounts[row.id] || "");
+    if (!Number.isInteger(amount) || amount <= 0) return;
+    setGrantingId(row.id);
+    try {
+      const res = await fetch(`/api/admin/users/${row.id}/credits`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ amount, requestId: crypto.randomUUID() }),
+      });
+      const json = await res.json().catch(() => null);
+      if (!res.ok) throw new Error(json?.error || "Kredit qo’shib bo’lmadi");
+      toast.success(`@${row.username}: +${amount.toLocaleString()} kredit · balans ${Number(json.balance).toLocaleString()}`);
+      setGrantAmounts((prev) => ({ ...prev, [row.id]: "" }));
+      setReload((n) => n + 1);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Kredit qo’shib bo’lmadi");
+    } finally {
+      setGrantingId(null);
+    }
+  }
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -294,6 +319,32 @@ export function AdminUsersView() {
                       <Coins className="h-3.5 w-3.5" aria-hidden="true" />
                       {u.credits.toLocaleString()}
                     </span>
+                    <div className="flex items-center gap-1.5">
+                      <Input
+                        value={grantAmounts[u.id] ?? ""}
+                        onChange={(e) =>
+                          setGrantAmounts((prev) => ({ ...prev, [u.id]: e.target.value.replace(/\D/g, "").slice(0, 7) }))
+                        }
+                        inputMode="numeric"
+                        placeholder="Kredit"
+                        aria-label={`${u.username} balansini to’ldirish`}
+                        className="h-8 w-[78px] rounded-lg text-[12px] tabular-nums"
+                      />
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="h-8 rounded-lg gap-1 px-2 text-[11px] font-bold"
+                        disabled={grantingId !== null || !Number(grantAmounts[u.id])}
+                        onClick={() => grantCredits(u)}
+                      >
+                        {grantingId === u.id ? (
+                          <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                        ) : (
+                          <Plus className="h-3.5 w-3.5" />
+                        )}
+                        Qo’shish
+                      </Button>
+                    </div>
                     <span className="text-[11.5px] text-muted-foreground md:w-[86px]" title="Ro’yxatdan o’tgan sana">
                       {formatDate(u.createdAt)}
                     </span>
