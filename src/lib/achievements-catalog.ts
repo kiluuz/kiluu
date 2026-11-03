@@ -125,4 +125,14 @@ export const ACHIEVEMENT_SEEDS: AchievementSeed[] = [
     condition: { type: "streak", gte: 100 },
     reward: { frames: ["stillwater-plate"] },
   },
+  {
+    id: "mission_referrals_10",
+    emoji: "🎟️",
+    name: "Onyx Veil",
+    description: "Refer 10 friends who actually watch or buy anime to unlock the Onyx Veil name frame",
+    rarity: "legendary",
+    category: "social",
+    condition: { type: "referrals", gte: 10 },
+    reward: { frames: ["onyx-veil"] },
+  },
 ];

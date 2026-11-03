@@ -155,3 +155,65 @@ test("achievement progress, seasonal and secret unlocks are persisted idempotent
   assert.equal(revealed?.name, "Mirror Name");
   assert.equal(revealed?.desc, "Have a username that reads the same backward.");
 });
+
+test("10 qualified referrals unlock the referral milestone name frame", async () => {
+  const referrer = await client.user.create({
+    data: { email: "frame-referrer@example.test", username: "frame-referrer", password: "test-hash" },
+  });
+  await client.frame.create({
+    data: {
+      id: "onyx-veil",
+      type: "name",
+      slug: "onyx-veil",
+      name: "Onyx Veil",
+      rarity: "legendary",
+      acquisition: "mission",
+    },
+  });
+
+  let invited = 0;
+  async function addQualifiedReferrals(count: number) {
+    for (let i = 0; i < count; i += 1) {
+      invited += 1;
+      const friend = await client.user.create({
+        data: {
+          email: `frame-friend-${invited}@example.test`,
+          username: `frame-friend-${invited}`,
+          password: "test-hash",
+        },
+      });
+      await client.referral.create({
+        data: {
+          referrerId: referrer.id,
+          referredId: friend.id,
+          code: "REF-FRAME",
+          status: "qualified",
+        },
+      });
+    }
+  }
+
+  await addQualifiedReferrals(9);
+  await evaluateAchievements(referrer.id);
+  const pending = await client.userAchievement.findUniqueOrThrow({
+    where: { userId_achievementId: { userId: referrer.id, achievementId: "mission_referrals_10" } },
+  });
+  assert.equal(pending.progress, 9);
+  assert.equal(pending.target, 10);
+  assert.equal(pending.unlockedAt, null);
+  assert.equal(await client.userFrame.count({ where: { userId: referrer.id } }), 0);
+
+  await addQualifiedReferrals(1);
+  await evaluateAchievements(referrer.id);
+  const unlocked = await client.userAchievement.findUniqueOrThrow({
+    where: { userId_achievementId: { userId: referrer.id, achievementId: "mission_referrals_10" } },
+  });
+  assert.ok(unlocked.unlockedAt);
+  const owned = await client.userFrame.findFirstOrThrow({ where: { userId: referrer.id } });
+  assert.equal(owned.frameId, "onyx-veil");
+  assert.equal(owned.source, "mission");
+  assert.ok(await client.notification.findFirst({ where: { userId: referrer.id, type: "FRAME" } }));
+
+  await evaluateAchievements(referrer.id);
+  assert.equal(await client.userFrame.count({ where: { userId: referrer.id } }), 1);
+});

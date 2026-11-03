@@ -121,7 +121,7 @@ function maxWatchStreak(dates: Date[], timezone: string | null): number {
 }
 
 async function getUserStats(userId: string): Promise<UserStats | null> {
-  const [user, purchases, orders, gifts, followerCount, xpTotal] = await Promise.all([
+  const [user, purchases, orders, gifts, followerCount, xpTotal, referredCount] = await Promise.all([
     db.user.findUnique({
       where: { id: userId },
       select: { createdAt: true, timezone: true, credits: true, username: true, streakCount: true },
@@ -144,6 +144,7 @@ async function getUserStats(userId: string): Promise<UserStats | null> {
     }),
     db.follow.count({ where: { followedId: userId } }),
     db.xpEvent.aggregate({ where: { userId }, _sum: { amount: true } }),
+    db.referral.count({ where: { referrerId: userId, status: { in: ["qualified", "rewarded"] } } }),
   ]);
   const [posts, comments, awardsGiven, watchEvents, completedProgress] = await Promise.all([
     db.post.findMany({
@@ -263,6 +264,7 @@ async function getUserStats(userId: string): Promise<UserStats | null> {
       gifts_sent: gifts.length,
       gift_unique_recipients: uniqueRecipients.size,
       followers: followerCount,
+      referrals: referredCount,
       post_likes: posts.reduce((max, post) => Math.max(max, post._count.likes), 0),
       post_count: posts.length,
       comments,
