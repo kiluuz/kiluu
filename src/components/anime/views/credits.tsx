@@ -16,7 +16,7 @@ import { useI18n } from "@/components/i18n-provider";
 import { FramesShop } from "../frame-shop";
 import { convertPrice, formatDisplayPrice, type DisplayCurrency } from "@/lib/display-currency";
 
-const SUPPORT_TELEGRAM_HANDLE = process.env.NEXT_PUBLIC_SUPPORT_TELEGRAM_HANDLE || "kiluuadmin";
+const SUPPORT_TELEGRAM_HANDLE = process.env.NEXT_PUBLIC_SUPPORT_TELEGRAM_HANDLE || "kiluupay";
 
 export interface CreditsData {
   packages: CreditPackage[];

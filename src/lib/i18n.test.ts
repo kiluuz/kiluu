@@ -101,7 +101,7 @@ test("referral frame reward and support CTA copy exists in every supported local
       `${locale} referral.frameRewardProgress does not interpolate`
     );
     assert.ok(
-      t(locale, "credits.supportCta", { handle: "@kiluuadmin" }).includes("@kiluuadmin"),
+      t(locale, "credits.supportCta", { handle: "@kiluupay" }).includes("@kiluupay"),
       `${locale} credits.supportCta does not interpolate the handle`
     );
     assert.ok(
