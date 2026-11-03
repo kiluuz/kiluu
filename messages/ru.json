@@ -803,5 +803,12 @@
   "payouts.method.optima": "Optima Bank",
   "credits.maintenanceTitle": "Платежи на техническом обслуживании",
   "credits.maintenanceBody": "Пополнение временно отключено: мы подключаем платёжную систему Payme. Скоро всё заработает — кредиты и история сохранятся.",
-  "credits.daMaintenance": "Платежи сейчас на техническом обслуживании. Скоро всё заработает."
+  "credits.daMaintenance": "Платежи сейчас на техническом обслуживании. Скоро всё заработает.",
+  "credits.supportTitle": "Пополнение пока через администратора",
+  "credits.supportBody": "Чтобы купить кредиты, напишите нашему администратору в Telegram {handle} — укажите username и сумму, баланс пополнят сразу.",
+  "credits.supportCta": "Написать {handle}",
+  "referral.frameRewardTitle": "Награда: рамка {name}",
+  "referral.frameRewardProgress": "{current} / {target} подтверждённых рефералов",
+  "referral.frameRewardUnlocked": "Рамка открыта — включите её в профиле.",
+  "referral.frameRewardHint": "Пригласите 10 друзей, которые посмотрят эпизод или купят кредиты, — {name} выдастся автоматически."
 }

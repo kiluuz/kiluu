@@ -803,5 +803,12 @@
   "payouts.method.optima": "Optima Bank",
   "credits.maintenanceTitle": "To‘lov tizimi texnik tuzatishda",
   "credits.maintenanceBody": "Hozircha hisobni to‘ldirish o‘chirilgan: Payme to‘lov tizimi ulanmoqda. Tez orada qayta ishga tushadi — kreditlaringiz va tarixingiz saqlanadi.",
-  "credits.daMaintenance": "To‘lov hozirda texnik tuzatishda. Tez orada qayta yoqiladi."
+  "credits.daMaintenance": "To‘lov hozirda texnik tuzatishda. Tez orada qayta yoqiladi.",
+  "credits.supportTitle": "Hozircha to‘lov admin orqali",
+  "credits.supportBody": "Kredit sotib olish uchun Telegramdagi {handle} adminiga yozing — username va summani ayting, balansingiz darhol to‘ldiriladi.",
+  "credits.supportCta": "{handle}ga yozish",
+  "referral.frameRewardTitle": "Sovg‘a: {name} name frame",
+  "referral.frameRewardProgress": "{current} / {target} tasdiqlangan taklif",
+  "referral.frameRewardUnlocked": "Frame ochildi — uni profil sozlamalaridan kiying.",
+  "referral.frameRewardHint": "10 do‘stni jalb qiling: ular epizod ko‘rsa yoki kredit sotib olsa, {name} avtomatik beriladi."
 }

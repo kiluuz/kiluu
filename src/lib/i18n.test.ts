@@ -82,3 +82,31 @@ test("creator studio and dub team copy exists in every supported locale", () => 
   }
   assert.equal(t("en", "dub.error.TEAM_LEADER_ONLY"), "Only the team leader can delete this anime");
 });
+
+test("referral frame reward and support CTA copy exists in every supported locale", () => {
+  for (const locale of LOCALES) {
+    for (const key of [
+      "referral.frameRewardTitle",
+      "referral.frameRewardProgress",
+      "referral.frameRewardUnlocked",
+      "referral.frameRewardHint",
+      "credits.supportTitle",
+      "credits.supportBody",
+      "credits.supportCta",
+    ]) {
+      assert.notEqual(t(locale, key), key, `${locale} is missing ${key}`);
+    }
+    assert.ok(
+      t(locale, "referral.frameRewardProgress", { current: "3", target: "10" }).includes("3 / 10"),
+      `${locale} referral.frameRewardProgress does not interpolate`
+    );
+    assert.ok(
+      t(locale, "credits.supportCta", { handle: "@kiluuadmin" }).includes("@kiluuadmin"),
+      `${locale} credits.supportCta does not interpolate the handle`
+    );
+    assert.ok(
+      t(locale, "referral.frameRewardTitle", { name: "Onyx Veil" }).includes("Onyx Veil"),
+      `${locale} referral.frameRewardTitle does not interpolate the frame name`
+    );
+  }
+});

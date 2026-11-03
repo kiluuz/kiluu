@@ -803,5 +803,12 @@
   "payouts.method.optima": "Optima Bank",
   "credits.maintenanceTitle": "Төлөмдөр техникалык тейлөөдө",
   "credits.maintenanceBody": "Толуктоо убактылуу өчүрүлгөн: Payme төлөм системасы туташтырылууда. Жакында кайра иштейт — кредиттериңиз жана тарыхыңыз сакталат.",
-  "credits.daMaintenance": "Төлөмдөр азыр техникалык тейлөөдө. Жакында кайра күйгүзүлөт."
+  "credits.daMaintenance": "Төлөмдөр азыр техникалык тейлөөдө. Жакында кайра күйгүзүлөт.",
+  "credits.supportTitle": "Толуктоо азырынча админ аркылуу",
+  "credits.supportBody": "Кредит сатып алуу үчүн Telegramдагы {handle} админге жазыңыз — username жана суммаңызды айтыңыз, балансыңыз дароо толукталат.",
+  "credits.supportCta": "{handle} жазуу",
+  "referral.frameRewardTitle": "Сыйлык: {name} рамка",
+  "referral.frameRewardProgress": "{current} / {target} ырасталган реферал",
+  "referral.frameRewardUnlocked": "Рамка ачылды — профильден кийгиңиз.",
+  "referral.frameRewardHint": "Эпизод көргөн же кредит сатып алган 10 дос чакырыңыз — {name} автоматтык түрдө берилет."
 }
