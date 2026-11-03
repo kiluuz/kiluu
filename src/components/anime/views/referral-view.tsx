@@ -20,8 +20,14 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { useAppStore } from "../store";
 import { FramedAvatar } from "../ui-bits";
+import { useI18n } from "@/components/i18n-provider";
+import { frameById } from "../../../../frames.config";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+
+const FRAME_REWARD_TARGET = 10;
+const FRAME_REWARD_SLUG = "onyx-veil";
+const FRAME_REWARD = frameById(FRAME_REWARD_SLUG);
 
 interface ReferralData {
   code: string;
@@ -57,6 +63,7 @@ interface LeaderboardItem {
 
 export function ReferralView() {
   const { user, setAuthOpen } = useAppStore();
+  const { t } = useI18n();
 
   const [data, setData] = useState<ReferralData | null>(null);
   const [leaderboard, setLeaderboard] = useState<LeaderboardItem[]>([]);
@@ -138,6 +145,8 @@ export function ReferralView() {
       </div>
     );
   }
+
+  const frameRewardReached = (data?.qualifiedCount ?? 0) >= FRAME_REWARD_TARGET;
 
   return (
     <div className="max-w-4xl mx-auto space-y-6 pb-12 animate-in fade-in duration-300">
@@ -257,6 +266,41 @@ export function ReferralView() {
               {data.qualifiedCount} / {data.monthlyMaxLimit}
             </p>
             <p className="text-xs text-muted-foreground mt-0.5">Oylik limit progressi</p>
+          </div>
+        </div>
+      )}
+
+      {/* Frame reward for 10 qualified referrals */}
+      {data && FRAME_REWARD && (
+        <div className="glass rounded-2xl border p-4 flex flex-col sm:flex-row items-center gap-4">
+          <div className="w-40 sm:w-48 shrink-0 rounded-xl bg-secondary/40 p-2">
+            <img
+              src={`/frames/${FRAME_REWARD.slug}.v${FRAME_REWARD.version ?? 1}.webp`}
+              alt={FRAME_REWARD.name}
+              className="w-full h-auto"
+              loading="lazy"
+            />
+          </div>
+          <div className="flex-1 w-full space-y-2 text-center sm:text-left">
+            <p className="font-bold text-sm flex items-center justify-center sm:justify-start gap-1.5">
+              <Sparkles className="w-4 h-4 text-primary shrink-0" />
+              {t("referral.frameRewardTitle", { name: FRAME_REWARD.name })}
+            </p>
+            <div className="h-2 rounded-full bg-secondary overflow-hidden">
+              <div
+                className="h-full brand-gradient transition-all"
+                style={{ width: `${Math.min(100, (data.qualifiedCount / FRAME_REWARD_TARGET) * 100)}%` }}
+              />
+            </div>
+            <p className="text-xs text-muted-foreground">
+              {t("referral.frameRewardProgress", {
+                current: String(data.qualifiedCount),
+                target: String(FRAME_REWARD_TARGET),
+              })}
+            </p>
+            <p className={cn("text-xs", frameRewardReached ? "font-semibold text-emerald-500" : "text-muted-foreground")}>
+              {frameRewardReached ? t("referral.frameRewardUnlocked") : t("referral.frameRewardHint")}
+            </p>
           </div>
         </div>
       )}

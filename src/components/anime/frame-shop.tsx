@@ -55,6 +55,7 @@ const MISSION_REQUIREMENTS: Record<string, string> = {
   "mission_streak_50": "50 kunlik streak (50-day login streak)",
   "mission_streak_70": "70 kunlik streak (70-day login streak)",
   "mission_streak_100": "100 kunlik streak (100-day login streak)",
+  "mission_referrals_10": "10 do'stni jalb qiling (Refer 10 friends)",
   "frame-easy": "Watch 3 episodes and publish your first post",
   "frame-medium": "Watch 25 episodes, reach 10 followers, and publish 10 posts",
   "frame-hard": "Watch 100 episodes, reach 50 followers, join 5 Watch Together rooms, and keep a 30-day streak",
