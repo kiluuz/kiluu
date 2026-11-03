@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import {
   Zap, Gift, History, Loader2, Sparkles, Copy, ExternalLink,
-  Clock, CheckCircle2, ShieldCheck, AlertTriangle, Wrench,
+  Clock, CheckCircle2, ShieldCheck, AlertTriangle, Wrench, Send,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
@@ -15,6 +15,8 @@ import { cn } from "@/lib/utils";
 import { useI18n } from "@/components/i18n-provider";
 import { FramesShop } from "../frame-shop";
 import { convertPrice, formatDisplayPrice, type DisplayCurrency } from "@/lib/display-currency";
+
+const SUPPORT_TELEGRAM_HANDLE = process.env.NEXT_PUBLIC_SUPPORT_TELEGRAM_HANDLE || "kiluuadmin";
 
 export interface CreditsData {
   packages: CreditPackage[];
@@ -201,6 +203,21 @@ export function TopUpSection({
               </div>
               <h3 className="text-lg font-black">{t("credits.maintenanceTitle")}</h3>
               <p className="text-sm text-muted-foreground max-w-md mx-auto">{t("credits.maintenanceBody")}</p>
+              <p className="text-sm font-bold max-w-md mx-auto">{t("credits.supportTitle")}</p>
+              <p className="text-sm text-muted-foreground max-w-md mx-auto">
+                {t("credits.supportBody", { handle: `@${SUPPORT_TELEGRAM_HANDLE}` })}
+              </p>
+              <a
+                href={`https://t.me/${SUPPORT_TELEGRAM_HANDLE}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-block"
+              >
+                <Button className="rounded-full gap-2 brand-gradient text-white font-bold">
+                  <Send className="w-4 h-4" />
+                  {t("credits.supportCta", { handle: `@${SUPPORT_TELEGRAM_HANDLE}` })}
+                </Button>
+              </a>
             </div>
           ) : (
             <>
