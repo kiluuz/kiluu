@@ -122,6 +122,7 @@ export function BotAdminView() {
   const { user } = useAppStore();
   const [animes, setAnimes] = useState<BotAnime[]>([]);
   const [loading, setLoading] = useState(true);
+  const [deleting, setDeleting] = useState<string | null>(null);
   const [editTarget, setEditTarget] = useState<BotAnime | null>(null);
 
   const isAdmin = user?.role === "ADMIN";
@@ -140,14 +141,18 @@ export function BotAdminView() {
   }
 
   async function deleteAnime(slug: string, title: string) {
-    if (!confirm(`Are you sure you want to permanently delete "${title}" from the site?`)) return;
+    if (!confirm(`Delete "${title}" from the bot catalog and the site? This cannot be undone.`)) return;
+    setDeleting(slug);
     try {
-      const res = await fetch(`/api/animes/${slug}`, { method: "DELETE" });
-      if (!res.ok) throw new Error("Could not delete the anime");
+      const res = await fetch(`/api/bot/admin/anime/${encodeURIComponent(slug)}`, { method: "DELETE" });
+      const data = await res.json().catch(() => null);
+      if (!res.ok) throw new Error(data?.error || "Could not delete the anime");
       toast.success("Anime deleted");
       setAnimes(prev => prev.filter(a => a.slug !== slug));
     } catch (e: any) {
       toast.error(e.message || "Something went wrong");
+    } finally {
+      setDeleting(null);
     }
   }
 
@@ -265,9 +270,14 @@ export function BotAdminView() {
                     variant="destructive"
                     className="rounded-lg px-2 text-xs h-7"
                     title="Delete anime"
+                    disabled={deleting !== null}
                     onClick={() => deleteAnime(anime.slug, anime.title)}
                   >
-                    <Trash2 className="w-3.5 h-3.5" />
+                    {deleting === anime.slug ? (
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    ) : (
+                      <Trash2 className="w-3.5 h-3.5" />
+                    )}
                   </Button>
                 </div>
               </div>

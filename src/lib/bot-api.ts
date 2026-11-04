@@ -78,6 +78,10 @@ export async function updateBotAnime(slug: string, data: Record<string, unknown>
   });
 }
 
+export async function deleteBotAnime(slug: string) {
+  return fetchBotApi(`/api/animes/${slug}`, { method: "DELETE" });
+}
+
 export async function getDeletedAnimes(): Promise<string[]> {
   try {
     const res = await fetchBotApi("/api/deleted-animes", { cache: "no-store" });
