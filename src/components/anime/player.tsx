@@ -20,6 +20,12 @@ export interface PlayerControls {
   isBuffering: () => boolean;
   /** Returns true when playback is paused — including when autoplay was blocked. */
   isPaused: () => boolean;
+  /**
+   * True while a byte range for the current seek target is still being fetched.
+   * Guests must not interrupt it: a fresh range request starts the download
+   * over, and these files take tens of seconds through the delivery proxy.
+   */
+  isSeeking: () => boolean;
   /** Guest-side safety net: start playback if the party expects it to be playing. */
   ensurePlaying: () => void;
   /** Guest-side recovery for a buffer that stopped progressing mid-playback. */
@@ -147,6 +153,12 @@ export function VideoPlayer({
   const [sourceError, setSourceError] = useState<string | null>(null);
   const [metadataLoaded, setMetadataLoaded] = useState(false);
   const [stalled, setStalled] = useState(false);
+  const [probe, setProbe] = useState<{ url: string; size: number; type: string; status: number } | null>(null);
+  const probed = probe && probe.url === playbackUrl ? probe : null;
+  const fileInfo = probed && probed.size > 0 ? { size: probed.size, type: probed.type } : null;
+  const [loadElapsed, setLoadElapsed] = useState(0);
+  const loadStartedAtRef = useRef<number>(Date.now());
+  const hlsRetryRef = useRef(0);
   // The controls object lives for the lifetime of the player, but playbackUrl
   // arrives later. A ref keeps play() from seeing a stale null URL.
   const playbackUrlRef = useRef<string | null>(initialUrl);
@@ -239,10 +251,44 @@ export function VideoPlayer({
     return () => { cancelled = true; };
   }, [episode.id, episode.streamId, episode.hlsKey, episode.videoUrl, episode.telegramMessageId]);
 
+  // Direct files (not HLS) are single MOV/MKV/MP4 downloads, and most of them
+  // are hundreds of megabytes behind one shared proxy. One 1-byte range request
+  // returns the container, the real total size, and whether the file exists at
+  // all — without competing for bandwidth — so the loading state can say what is
+  // actually happening instead of pretending a slow download is a failure. It
+  // never decides playability: canPlayType() reports "" for video/quicktime in
+  // Chromium even though those files do play, so only the element's own error
+  // events are trusted for that.
+  useEffect(() => {
+    loadStartedAtRef.current = Date.now();
+    if (!playbackUrl || /\.m3u8(?:$|\?)/i.test(playbackUrl)) return;
+    const controller = new AbortController();
+    const url = playbackUrl;
+    fetch(url, { headers: { Range: "bytes=0-0" }, signal: controller.signal })
+      .then((res) => {
+        const type = (res.headers.get("content-type") ?? "").split(";")[0].trim();
+        controller.abort();
+        if (!res.ok) {
+          setProbe({ url, size: 0, type, status: res.status });
+          return;
+        }
+        const fromRange = Number((res.headers.get("content-range") ?? "").split("/")[1]);
+        const total = Number.isFinite(fromRange) && fromRange > 0 ? fromRange : Number(res.headers.get("content-length") ?? 0);
+        if (total > 0) setProbe({ url, size: total, type, status: res.status });
+      })
+      .catch(() => {
+        // A server that ignores range probes simply gives no hint.
+      });
+    return () => controller.abort();
+  }, [playbackUrl]);
+
   useEffect(() => {
     const video = videoRef.current;
     if (!video || !playbackUrl || !/\.m3u8(?:$|\?)/i.test(playbackUrl)) return;
-    if (video.canPlayType("application/vnd.apple.mpegurl")) {
+    // Chromium answers "maybe" for the Apple HLS MIME type but cannot demux a
+    // playlist, so native playback is only used where it is really declared and
+    // MSE is unavailable (iOS Safari); everywhere else hls.js drives it.
+    if (video.canPlayType("application/vnd.apple.mpegurl") === "probably" && !Hls.isSupported()) {
       // Safari handles HLS natively — set src directly and call load() so
       // Safari picks up the new source even if the element already exists.
       if (video.src !== playbackUrl) {
@@ -259,8 +305,20 @@ export function VideoPlayer({
     hlsRef.current = hls;
     hls.loadSource(playbackUrl);
     hls.attachMedia(video);
+    hls.on(Hls.Events.MANIFEST_PARSED, () => { hlsRetryRef.current = 0; });
     hls.on(Hls.Events.ERROR, (_event, data) => {
-      if (data.fatal) setSourceError("The HLS stream could not be played.");
+      if (!data.fatal) return;
+      // A dropped fragment or a wedged SourceBuffer is recoverable; giving up on
+      // the first fatal event left HLS-backed parties dead until a page reload.
+      if (hlsRetryRef.current < 2) {
+        hlsRetryRef.current += 1;
+        setSourceError(null);
+        setWaiting(true);
+        if (data.type === Hls.ErrorTypes.MEDIA_ERROR) hls.recoverMediaError();
+        else hls.startLoad();
+        return;
+      }
+      setSourceError("Video oqimi (HLS) ishlamay qoldi. Qayta urinish tugmasini bosing.");
     });
     return () => {
       hlsRef.current = null;
@@ -268,13 +326,36 @@ export function VideoPlayer({
     };
   }, [playbackUrl]);
 
-  // If the stream server is slow to even return metadata (common when it is
-  // waking up or busy), offer a manual reload instead of an infinite spinner.
+  // "Stalled" has to mean *nothing is arriving*, not *this file is big*. These
+  // episodes are one raw file served through a shared proxy: measured 14 s to
+  // metadata and 28 s for a mid-file seek, and a reload during a healthy
+  // download throws away everything already fetched. So the banner waits for
+  // real silence and the spinner reports how long the wait has been.
   useEffect(() => {
-    if (!playbackUrl || (!waiting && metadataLoaded)) return;
-    const timer = setTimeout(() => setStalled(true), 20_000);
-    return () => clearTimeout(timer);
-  }, [playbackUrl, waiting, metadataLoaded]);
+    if (!playbackUrl || (!waiting && metadataLoaded) || (probed && probed.status >= 400)) return;
+    const startedAt = loadStartedAtRef.current;
+    const quietLimit = 45_000;
+    // Locating the moov atom of a non-faststart file means reading the tail of
+    // a several-hundred-megabyte download before a single frame exists.
+    const coldStartLimit = probed && probed.size > 400_000_000 ? 180_000 : 100_000;
+    let lastMarker = "";
+    let quietSince = Date.now();
+    function tick() {
+      const v = videoRef.current;
+      const now = Date.now();
+      setLoadElapsed(Math.max(0, Math.round((now - startedAt) / 1000)));
+      const buffered = v && v.buffered.length ? v.buffered.end(v.buffered.length - 1) : 0;
+      const marker = `${buffered.toFixed(2)}:${(v?.currentTime ?? 0).toFixed(2)}`;
+      if (marker !== lastMarker) {
+        lastMarker = marker;
+        quietSince = now;
+      }
+      const silent = metadataLoaded ? now - quietSince >= quietLimit : now - startedAt >= coldStartLimit;
+      setStalled(silent);
+    }
+    const timer = setInterval(tick, 1000);
+    return () => clearInterval(timer);
+  }, [playbackUrl, waiting, metadataLoaded, probe]);
 
   function clearPlayRetry() {
     if (playRetryTimerRef.current) {
@@ -376,6 +457,10 @@ export function VideoPlayer({
   function restart(pos: number) {
     const v = videoRef.current;
     if (!v || !syncMode || isHost) return;
+    // A pending seek is a byte-range fetch in progress. Pausing and re-seeking
+    // aborts it and pulls the same hundreds of megabytes again — that is how a
+    // guest that was only downloading slowly ended up reporting failure.
+    if (v.seeking) return;
     wantPlayRef.current = true;
     try {
       v.pause();
@@ -425,6 +510,8 @@ export function VideoPlayer({
     setStalled(false);
     setWaiting(true);
     setMetadataLoaded(false);
+    setLoadElapsed(0);
+    loadStartedAtRef.current = Date.now();
     // Managed HLS: restart the loader instead of tearing down the MediaSource.
     if (hlsRef.current) {
       hlsRef.current.startLoad();
@@ -718,6 +805,7 @@ export function VideoPlayer({
         return v.seeking || v.readyState < HTMLMediaElement.HAVE_FUTURE_DATA;
       },
       isPaused: () => videoRef.current?.paused ?? true,
+      isSeeking: () => videoRef.current?.seeking ?? false,
       ensurePlaying,
       recover,
       restart,
@@ -825,13 +913,17 @@ export function VideoPlayer({
           setWaiting(false);
           setStalled(false);
           const err = e.currentTarget.error;
-          if (err && err.code === 1) return; // MEDIA_ERR_ABORTED — ignore
+          if (err && err.code === 1) return; // MEDIA_ERR_ABORTED — our own pause/seek
           if (!playbackUrl) return;
-          // MEDIA_ERR_NETWORK (2) — server may be waking up, auto-retry up to 3 times
+          const sizeHint = fileInfo ? ` Fayl ${(fileInfo.size / 1_048_576).toFixed(0)} MB.` : "";
+          // MEDIA_ERR_NETWORK (2) — the shared proxy drops long range requests
+          // (cold start, sleep, bandwidth). Reconnect a few times before
+          // admitting defeat; each attempt restarts the download, so the
+          // loading clock starts over with it.
           if (err && err.code === 2 && retryCountRef.current < 3) {
             retryCountRef.current += 1;
             const delay = retryCountRef.current * 5000; // 5s, 10s, 15s
-            setSourceError(`Video yuklanmoqda, qayta urinilmoqda… (${retryCountRef.current}/3)`);
+            setSourceError(`Aloqa uzildi. Qayta ulanmoqda… (${retryCountRef.current}/3)`);
             if (retryTimerRef.current) clearTimeout(retryTimerRef.current);
             retryTimerRef.current = setTimeout(() => {
               const v = videoRef.current;
@@ -846,6 +938,8 @@ export function VideoPlayer({
               };
               v.addEventListener("loadedmetadata", onMeta);
               v.load(); // reload source
+              loadStartedAtRef.current = Date.now();
+              setLoadElapsed(0);
               setSourceError(null);
               setWaiting(true);
             }, delay);
@@ -856,11 +950,13 @@ export function VideoPlayer({
             // MEDIA_ERR_SRC_NOT_SUPPORTED. On iPhone this almost always means
             // the MP4 is HEVC (hev1) or not faststart — Safari needs H.264 or
             // an HLS rendition.
-            setSourceError("Bu video formati brauzerda qo'llab-quvvatlanmaydi. iPhone uchun H.264 yoki HLS versiyasi kerak.");
+            setSourceError("Bu qism fayli brauzeringizda ochilmaydi (HEVC yoki MKV bo'lishi mumkin). Boshqa qismni tanlab ko'ring.");
           } else if (err && err.code === 3) {
             setSourceError("Videoni dekodlashda xatolik yuz berdi. Sahifani yangilab qayta urinib ko'ring.");
+          } else if (err && err.code === 2) {
+            setSourceError(`Video serveri javob bermadi (3 marta urinish bekor bo'ldi).${sizeHint} Qayta urinishni bosing.`);
           } else {
-            setSourceError("Video yuklanmadi. Sahifani yangilab ko'ring yoki biroz kutib yana urinib ko'ring.");
+            setSourceError(`Video oqimi to'xtadi.${sizeHint} Yuklanishni qayta boshlash uchun tugmani bosing.`);
           }
         }}
         onEnded={() => {
@@ -885,23 +981,43 @@ export function VideoPlayer({
         </div>
       )}
 
-      {/* Slow-stream fallback: the server may be waking up or busy */}
+      {/* The probe proved the file itself is not on the server. Saying so beats
+          making everyone watch a spinner for a minute and then blame their
+          connection. */}
+      {probed && probed.status >= 400 && !sourceError && (
+        <div className="absolute inset-x-4 top-16 z-10 rounded-xl bg-black/80 px-4 py-3 text-center text-sm text-white">
+          <p>Bu qismning video fayli serverda yoʻq (HTTP {probed.status}). Muammo internetda emas.</p>
+        </div>
+      )}
+
+      {/* Nothing has arrived for a long time: the proxy is asleep or the
+          connection died. The overlay must not swallow taps, and the button
+          restarts the download from zero, so say exactly that. */}
       {stalled && !sourceError && (
-        <div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-3 bg-black/50">
-          <p className="px-6 text-center text-sm text-white/90">Video hali yuklanmoqda…</p>
+        <div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-3 bg-black/50 pointer-events-none">
+          <p className="px-6 text-center text-sm text-white/90">
+            Server {loadElapsed} s davomida hech qanday ma'lumot yubormadi.
+          </p>
           <button
             onClick={retrySource}
-            className="rounded-full bg-white/15 px-5 py-2 text-xs font-bold text-white hover:bg-white/25 transition"
+            className="pointer-events-auto rounded-full bg-white/15 px-5 py-2 text-xs font-bold text-white hover:bg-white/25 transition"
           >
-            Qayta urinish
+            Yuklanishni qayta boshlash
           </button>
         </div>
       )}
 
       {/* Loading spinner */}
       {waiting && !stalled && (
-        <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+        <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 pointer-events-none">
           <Loader2 className="w-10 h-10 animate-spin text-white/80" />
+          {loadElapsed > 4 && (
+            <p className="rounded-full bg-black/60 px-3 py-1 text-[11px] font-semibold text-white/80">
+              {fileInfo
+                ? `${(fileInfo.size / 1_048_576).toFixed(0)} MB · ${loadElapsed} s`
+                : `${loadElapsed} s`}
+            </p>
+          )}
         </div>
       )}
 

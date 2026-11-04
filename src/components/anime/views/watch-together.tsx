@@ -124,6 +124,8 @@ export function WatchTogetherView() {
   const lastPlayAttemptAtRef = useRef(0);
   const hostMismatchTicksRef = useRef(0);
   const bufferingSinceRef = useRef(0);
+  /** Non-zero while the guest element has a byte-range fetch in flight. */
+  const seekingSinceRef = useRef(0);
   const applyRetryCountRef = useRef(0);
   const lastProgressAtRef = useRef(0);
   const lastProgressValueRef = useRef(-1);
@@ -327,6 +329,7 @@ export function WatchTogetherView() {
     lastPlayAttemptAtRef.current = 0;
     hostMismatchTicksRef.current = 0;
     bufferingSinceRef.current = 0;
+    seekingSinceRef.current = 0;
     lastProgressAtRef.current = 0;
     lastProgressValueRef.current = -1;
     timelineAdvancedRef.current = false;
@@ -381,6 +384,7 @@ export function WatchTogetherView() {
       lastPlayAttemptAtRef.current = 0;
       hostMismatchTicksRef.current = 0;
       bufferingSinceRef.current = 0;
+      seekingSinceRef.current = 0;
       lastProgressAtRef.current = 0;
       lastProgressValueRef.current = -1;
       timelineAdvancedRef.current = false;
@@ -434,19 +438,32 @@ export function WatchTogetherView() {
         // produced a single frame since joining gets restarted sooner than one
         // that stalled mid-playback.
         if (controls.isBuffering()) {
+          // A pending seek is a byte-range fetch in progress. Measured through
+          // the delivery proxy: ~14 s to metadata and ~28 s for a mid-file seek
+          // of a 300 MB episode. Interrupting it starts the same hundreds of
+          // megabytes over, which is the loop that ended in "video could not be
+          // loaded". Only a seek that never finishes gets recovered.
+          if (controls.isSeeking()) {
+            if (!seekingSinceRef.current) seekingSinceRef.current = now;
+            if (now - seekingSinceRef.current < 90_000) return;
+          } else {
+            seekingSinceRef.current = 0;
+          }
           // A start that has not rendered a frame yet gets a longer grace
           // period: the initial seek may still be fetching a large fragment,
           // and restarting the loader too early aborts it.
-          const limit = timelineAdvancedRef.current ? 12_000 : 20_000;
+          const limit = timelineAdvancedRef.current ? 30_000 : 45_000;
           if (!bufferingSinceRef.current) {
             bufferingSinceRef.current = now;
           } else if (now - bufferingSinceRef.current >= limit) {
             bufferingSinceRef.current = now;
+            seekingSinceRef.current = 0;
             controls.recover();
           }
           return;
         }
         bufferingSinceRef.current = 0;
+        seekingSinceRef.current = 0;
         // Guest is paused even though the party is playing: this is either a
         // blocked autoplay or a dropped play() while the stream was loading.
         // Keep nudging playback instead of waiting for another host action.
@@ -636,6 +653,7 @@ export function WatchTogetherView() {
     lastPlayAttemptAtRef.current = 0;
     hostMismatchTicksRef.current = 0;
     bufferingSinceRef.current = 0;
+    seekingSinceRef.current = 0;
     lastProgressAtRef.current = 0;
     lastProgressValueRef.current = -1;
     timelineAdvancedRef.current = false;
