@@ -2,7 +2,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth";
 import { db } from "@/lib/db";
-import { checkRoomAccess, pushToRoom, getOrCreateRoom } from "@/lib/chat";
+import { checkRoomAccess, pushToRoom, getOrCreateRoom, roomAcceptsReactions } from "@/lib/chat";
 
 interface RouteContext {
   params: Promise<{ id: string }>;
@@ -19,6 +19,17 @@ export async function POST(req: NextRequest, context: RouteContext) {
     const room = await getOrCreateRoom(rawRoomId);
     if (!room) {
       return NextResponse.json({ error: "Xona topilmadi" }, { status: 404 });
+    }
+
+    // A club's team chat carries no reactions: a reply says what a fire emoji
+    // was meant to say, and the room reads as conversation instead of voting.
+    // Checked on the resolved room so a cuid instead of the "club:" prefix
+    // cannot slip through.
+    if (!roomAcceptsReactions(room.type)) {
+      return NextResponse.json(
+        { error: "Klub chatida reaksiyalar mavjud emas — javob qaytaring" },
+        { status: 400 }
+      );
     }
 
     const access = await checkRoomAccess(rawRoomId, user.id);

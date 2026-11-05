@@ -6,6 +6,7 @@ import {
   globalRoomId,
   clubRoomId,
   animeRoomId,
+  roomAcceptsReactions,
   clubLevelFromXp,
   chatRateLimit,
   EXTRA_CLUB_COST_CREDITS,
@@ -35,6 +36,12 @@ test("room ID helper formats", () => {
   assert.equal(globalRoomId(), "global");
   assert.equal(clubRoomId("clb_123"), "club:clb_123");
   assert.equal(animeRoomId("anm_456"), "anime:anm_456");
+});
+
+test("a club team room takes replies but no reactions", () => {
+  assert.equal(roomAcceptsReactions("club"), false);
+  assert.equal(roomAcceptsReactions("global"), true);
+  assert.equal(roomAcceptsReactions("anime"), true);
 });
 
 test("clubLevelFromXp calculates level progression within 1-20 bounds", () => {

@@ -55,6 +55,8 @@ interface ChatPanelProps {
   onlineMembers?: ChatMember[];
   memberCount?: number;
   slowModeSeconds?: number;
+  /** Club team rooms are text and replies only — no emoji reactions. */
+  allowReactions?: boolean;
 }
 
 const QUICK_EMOJIS = ["🔥", "❤️", "😂", "👍", "😮", "😢", "🎉", "💯"];
@@ -114,6 +116,7 @@ export function ChatPanel({
   onlineMembers,
   memberCount,
   slowModeSeconds = 0,
+  allowReactions = true,
 }: ChatPanelProps) {
   const { user, setAuthOpen, navigate } = useAppStore();
   const openProfile = useOpenProfile();
@@ -798,7 +801,9 @@ export function ChatPanel({
               const hasSpoiler = Boolean(message.spoiler);
               const isSpoilerRevealed = revealedSpoilers[message.id];
               const isHidden = hasSpoiler && message.spoiler?.hidden && !isSpoilerRevealed;
-              const reactions = Object.entries(message.reactions || {}).filter(([, data]) => data.count > 0);
+              const reactions = allowReactions
+                ? Object.entries(message.reactions || {}).filter(([, data]) => data.count > 0)
+                : [];
 
               return (
                 <div key={message.id}>
@@ -1082,22 +1087,26 @@ export function ChatPanel({
                         grouped && "top-0"
                       )}
                     >
-                      <button
-                        type="button"
-                        onClick={() => handleReaction(message.id, "🔥")}
-                        className="rounded-md p-1 text-[13px] transition hover:bg-secondary"
-                        aria-label="Olov reaksiyasi"
-                      >
-                        🔥
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => handleReaction(message.id, "❤️")}
-                        className="rounded-md p-1 text-[13px] transition hover:bg-secondary"
-                        aria-label="Yurak reaksiyasi"
-                      >
-                        ❤️
-                      </button>
+                      {allowReactions && (
+                        <>
+                          <button
+                            type="button"
+                            onClick={() => handleReaction(message.id, "🔥")}
+                            className="rounded-md p-1 text-[13px] transition hover:bg-secondary"
+                            aria-label="Olov reaksiyasi"
+                          >
+                            🔥
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleReaction(message.id, "❤️")}
+                            className="rounded-md p-1 text-[13px] transition hover:bg-secondary"
+                            aria-label="Yurak reaksiyasi"
+                          >
+                            ❤️
+                          </button>
+                        </>
+                      )}
                       <button
                         type="button"
                         onClick={() => {
@@ -1109,39 +1118,41 @@ export function ChatPanel({
                       >
                         <Reply className="h-3.5 w-3.5" />
                       </button>
-                      <Popover
-                        open={reactionPickerFor === `more-${message.id}`}
-                        onOpenChange={(open) =>
-                          setReactionPickerFor(open ? `more-${message.id}` : null)
-                        }
-                      >
-                        <PopoverTrigger asChild>
-                          <button
-                            type="button"
-                            aria-label="Boshqa reaksiyalar"
-                            className="rounded-md p-1 text-muted-foreground transition hover:bg-secondary hover:text-foreground"
-                          >
-                            <Smile className="h-3.5 w-3.5" />
-                          </button>
-                        </PopoverTrigger>
-                        <PopoverContent side="top" align="end" className="w-auto p-1.5">
-                          <div className="flex items-center gap-0.5">
-                            {QUICK_EMOJIS.map((emoji) => (
-                              <button
-                                key={emoji}
-                                type="button"
-                                onClick={() => {
-                                  handleReaction(message.id, emoji);
-                                  setReactionPickerFor(null);
-                                }}
-                                className="rounded-md p-1 text-base transition hover:bg-secondary"
-                              >
-                                {emoji}
-                              </button>
-                            ))}
-                          </div>
-                        </PopoverContent>
-                      </Popover>
+                      {allowReactions && (
+                        <Popover
+                          open={reactionPickerFor === `more-${message.id}`}
+                          onOpenChange={(open) =>
+                            setReactionPickerFor(open ? `more-${message.id}` : null)
+                          }
+                        >
+                          <PopoverTrigger asChild>
+                            <button
+                              type="button"
+                              aria-label="Boshqa reaksiyalar"
+                              className="rounded-md p-1 text-muted-foreground transition hover:bg-secondary hover:text-foreground"
+                            >
+                              <Smile className="h-3.5 w-3.5" />
+                            </button>
+                          </PopoverTrigger>
+                          <PopoverContent side="top" align="end" className="w-auto p-1.5">
+                            <div className="flex items-center gap-0.5">
+                              {QUICK_EMOJIS.map((emoji) => (
+                                <button
+                                  key={emoji}
+                                  type="button"
+                                  onClick={() => {
+                                    handleReaction(message.id, emoji);
+                                    setReactionPickerFor(null);
+                                  }}
+                                  className="rounded-md p-1 text-base transition hover:bg-secondary"
+                                >
+                                  {emoji}
+                                </button>
+                              ))}
+                            </div>
+                          </PopoverContent>
+                        </Popover>
+                      )}
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
                           <button

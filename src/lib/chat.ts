@@ -45,6 +45,12 @@ export function animeRoomId(animeId: string): string {
   return `anime:${animeId}`;
 }
 
+// Klub jamoaviy chatida reaksiyalar yo'q: javob qaytarish yozib qo'yiladigan
+// yagona munosabat. Global va anime xonalar avvalgi holatida qoladi.
+export function roomAcceptsReactions(roomType: string): boolean {
+  return roomType !== "club";
+}
+
 // ─── Xonani DB dan topish yoki yaratish (string yoki CUID qabul qiladi) ─────
 export async function getOrCreateRoom(roomIdentifier: string) {
   let type: "global" | "club" | "anime" = "global";

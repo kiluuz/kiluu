@@ -584,6 +584,7 @@ export function ClubsView({ initialClubId }: { initialClubId?: string }) {
             onlineMembers={onlineMembers}
             memberCount={clubDetail.memberCount}
             slowModeSeconds={clubDetail.slowMode}
+            allowReactions={false}
           />
         )}
 
