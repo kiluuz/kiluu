@@ -2,6 +2,7 @@ import type { Prisma, PrismaClient } from "@prisma/client";
 import { randomInt } from "node:crypto";
 import { db } from "@/lib/db";
 import { userOwnsVersion } from "@/lib/owns";
+import { verifyPartyTicket } from "@/lib/watch-party-auth";
 
 type DbClient = PrismaClient | Prisma.TransactionClient;
 
@@ -62,13 +63,47 @@ export async function getOwnedHlsEpisode(client: DbClient, userId: string, episo
   return { episode: resolved.episode };
 }
 
-export function watchPartyJoinPrice(): number {
-  const raw = process.env.WATCH_PARTY_JOIN_PRICE_CREDITS;
-  const price = Number(raw ?? "20");
-  if (!Number.isSafeInteger(price) || price < 1) {
-    throw new Error("WATCH_PARTY_JOIN_PRICE_CREDITS must be a positive integer");
+/**
+ * Entry fee for one participant of a room, host included, paid by someone who
+ * already owns the anime. Deliberately a constant: the price a user sees has to
+ * match what the join route charges, whatever a deployment's env says.
+ */
+export const WATCH_PARTY_ENTRY_PRICE_CREDITS = 10;
+
+/**
+ * A guest who paid to enter a room may watch that room's episode, and only it.
+ * This is a viewing grant, not a purchase: no Purchase row is written, so the
+ * anime stays unowned and every other request for it still requires buying it.
+ */
+export async function getPartyStreamEpisode(
+  client: DbClient,
+  userId: string,
+  episodeId: string,
+  ticket: string
+) {
+  if (!ticket) return null;
+  let access: { partyId: string; userId: string } | null = null;
+  try {
+    access = verifyPartyTicket(ticket);
+  } catch {
+    // Without WATCH_PARTY_SECRET no ticket can be vouched for.
+    return null;
   }
-  return price;
+  if (!access || access.userId !== userId) return null;
+  const party = await client.watchParty.findFirst({
+    where: {
+      id: access.partyId,
+      episodeId,
+      endedAt: null,
+      expiresAt: { gt: new Date() },
+      members: { some: { userId } },
+    },
+    select: { id: true },
+  });
+  if (!party) return null;
+  const resolved = await getPartyEpisode(client, userId, episodeId);
+  if ("error" in resolved || !resolved.hasStream) return null;
+  return resolved.episode;
 }
 
 /**

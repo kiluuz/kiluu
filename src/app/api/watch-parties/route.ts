@@ -5,17 +5,11 @@ import { db } from "@/lib/db";
 import { evaluateAchievements } from "@/lib/achievements";
 import { awardXpInTransaction } from "@/lib/xp";
 import { createPartyTicket } from "@/lib/watch-party-auth";
-import { chargePartyEntry, createPartyCode, getOwnedHlsEpisode, partyJoinCosts, watchPartyJoinPrice } from "@/lib/watch-parties";
+import { chargePartyEntry, createPartyCode, getOwnedHlsEpisode, partyJoinCosts, WATCH_PARTY_ENTRY_PRICE_CREDITS } from "@/lib/watch-parties";
 import { r2ObjectExists } from "@/lib/r2";
 
 export async function GET() {
-  let entryCostCredits: number;
-  try {
-    entryCostCredits = watchPartyJoinPrice();
-  } catch (error) {
-    console.error("Watch party price configuration error", error);
-    return NextResponse.json({ error: "Watch party pricing is not configured" }, { status: 503 });
-  }
+  const entryCostCredits = WATCH_PARTY_ENTRY_PRICE_CREDITS;
   const now = new Date();
   const cutoff = new Date(now.getTime() - 60_000);
   const parties = await db.watchParty.findMany({
@@ -103,13 +97,7 @@ export async function POST(request: NextRequest) {
       console.error("Watch party media availability check failed (non-fatal)", error);
     }
   }
-  let joinPrice: number;
-  try {
-    joinPrice = watchPartyJoinPrice();
-  } catch (error) {
-    console.error("Watch party price configuration error", error);
-    return NextResponse.json({ error: "Watch party pricing is not configured" }, { status: 503 });
-  }
+  const joinPrice = WATCH_PARTY_ENTRY_PRICE_CREDITS;
   const name = typeof body.name === "string" ? body.name.trim().slice(0, 60) : "";
   const id = randomUUID();
   let ticket: string;

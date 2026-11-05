@@ -110,6 +110,9 @@ export function WatchTogetherView() {
 
   // party state
   const [activeRoom, setActiveRoom] = useState<PartyRoom | null>(null);
+  /** Viewing grant for the room's episode — a guest who paid entry but does not
+   *  own the anime still needs it to resolve the stream URL. */
+  const [partyTicket, setPartyTicket] = useState("");
   const [participants, setParticipants] = useState<Participant[]>([]);
   const [isHost, setIsHost] = useState(false);
   const [reactions, setReactions] = useState<FloatingReaction[]>([]);
@@ -222,7 +225,7 @@ export function WatchTogetherView() {
     }
   }, [selAnime]);
 
-  function applyPlaybackState(state: PartyPlaybackState) {
+  function applyPlaybackState(state: PartyPlaybackState, opts?: { force?: boolean }) {
     const previous = playbackStateRef.current;
     // A party:state snapshot can be read just before a host update yet reach
     // the client after the newer playback:state broadcast. Never let such a
@@ -265,6 +268,15 @@ export function WatchTogetherView() {
       // HLS fragment fetch that is already in flight, so a slow start never
       // completes and the guest sits on a black frame until the host pauses.
       const expected = computeExpected();
+      if (opts?.force) {
+        // A guest tap is the user gesture mobile browsers require. Re-issue the
+        // seek and play even when an earlier attempt is still waiting for its
+        // first frame, so the tap continues from the party's live position.
+        startRequestedRef.current = true;
+        lastPlayAttemptAtRef.current = Date.now();
+        controls.play(expected);
+        return;
+      }
       if (!timelineAdvancedRef.current) {
         if (!startRequestedRef.current) {
           startRequestedRef.current = true;
@@ -317,6 +329,7 @@ export function WatchTogetherView() {
   ) {
     socketRef.current?.disconnect();
     setActiveRoom(party);
+    setPartyTicket(ticket);
     const participantsWithKeys = initialParticipants.map((participant) => ({
       ...participant,
       socketId: participant.socketId || participant.userId,
@@ -554,6 +567,7 @@ export function WatchTogetherView() {
       toast.info(reason);
       socket.disconnect();
       setActiveRoom(null);
+      setPartyTicket("");
       setParticipants([]);
       void refreshRooms();
     });
@@ -657,11 +671,23 @@ export function WatchTogetherView() {
     }
   }
 
+  /** A guest's play tap: resume from the party's live position, never from 0. */
+  function resumeAsGuest() {
+    if (partyPaused) {
+      toast.info(t("wt.hostPaused"));
+      return;
+    }
+    const state = playbackStateRef.current;
+    if (state) applyPlaybackState(state, { force: true });
+    else controlsRef.current?.ensurePlaying();
+  }
+
   function leaveRoom() {
     socketRef.current?.emit("party:leave");
     socketRef.current?.disconnect();
     socketRef.current = null;
     setActiveRoom(null);
+    setPartyTicket("");
     setParticipants([]);
     setReactions([]);
     setChatMessages([]);
@@ -732,6 +758,8 @@ export function WatchTogetherView() {
           syncMode
           isHost={isHost}
           syncPaused={partyPaused}
+          partyTicket={partyTicket}
+          onGuestResume={resumeAsGuest}
           controlsRef={controlsRef}
           onLocalPlay={(pos) => socketRef.current?.emit("playback:play", { position: pos })}
           onLocalPause={(pos) => socketRef.current?.emit("playback:pause", { position: pos })}

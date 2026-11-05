@@ -64,7 +64,6 @@ See [.env.example](./.env.example) for the full list. Important values:
 | `R2_HLS_SIGNING_SECRET` | High-entropy HMAC key shared by the website and media Worker |
 | `CF_STREAM_ACCOUNT_ID`, `CF_STREAM_API_TOKEN` | Optional legacy playback for episodes already stored in Cloudflare Stream |
 | `WATCH_PARTY_SECRET`, `WATCH_PARTY_PORT`, `WATCH_PARTY_ALLOWED_ORIGINS` | Signed socket tickets and service configuration |
-| `WATCH_PARTY_JOIN_PRICE_CREDITS` | Credit cost for each party participant, including its host (intended value: `5`) |
 | `NEXT_PUBLIC_WATCH_PARTY_URL` | Browser-reachable Watch Together Socket.IO URL; route TLS/WebSocket traffic to the service |
 | `REDIS_URL` | Optional Socket.IO Redis adapter for multiple service instances |
 | `CRON_SECRET` | Bearer secret for the schedule-notification cron endpoint |
@@ -122,7 +121,7 @@ node --env-file=.env scripts/upload-hls-to-r2.mjs \
   --source ./hls-output --prefix hls/my-anime/1
 ```
 
-Replace `my-anime/1` with the exact slug and episode number returned by Creator Studio. The script uploads only HLS playlist/segment formats; the private bucket is never exposed directly. Playback links are short-lived but shareable while valid. Watch Together charges each person, including the host, the configured `WATCH_PARTY_JOIN_PRICE_CREDITS` (default `5`) at first entry; the debit and ledger entry commit atomically with party membership.
+Replace `my-anime/1` with the exact slug and episode number returned by Creator Studio. The script uploads only HLS playlist/segment formats; the private bucket is never exposed directly. Playback links are short-lived but shareable while valid. Watch Together charges each person once, at first entry to a room: a fixed 10 credits for someone who already owns the anime (the host included), or half the anime's price for a guest who does not. That guest payment buys the room, not the anime — no purchase row is written, so the title stays unowned outside the party and every other request for it still requires buying it. Half of the guest payment goes to the creator who dubbed it. The debit and ledger entry commit atomically with party membership.
 
 For the current shared-secret setup, set the web app's `ANIME_BOT_API_KEY` and `SITE_API_KEY`, and the bot's `API_KEY` and `SITE_API_KEY`, to the same high-entropy value; never use the Telegram bot token for this. The bot also needs `SITE_API_URL`, `PUBLIC_URL`, a PostgreSQL `DATABASE_URL`, and administrator posting rights in `CHANNEL_ID`. Keep the bot API private. Viewer accounts are denied server-side even if they try to call Creator bot commands directly.
 

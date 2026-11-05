@@ -9,7 +9,7 @@ import {
   getPartyEpisode,
   partyJoinCost,
   partyJoinCreatorShare,
-  watchPartyJoinPrice,
+  WATCH_PARTY_ENTRY_PRICE_CREDITS,
 } from "@/lib/watch-parties";
 import { expectedPlaybackPosition } from "@/lib/watch-party-sync";
 import { r2ObjectExists } from "@/lib/r2";
@@ -44,13 +44,7 @@ export async function POST(request: NextRequest) {
       console.error("Watch party media availability check failed (non-fatal)", error);
     }
   }
-  let joinPrice: number;
-  try {
-    joinPrice = watchPartyJoinPrice();
-  } catch (error) {
-    console.error("Watch party price configuration error", error);
-    return NextResponse.json({ error: "Watch party pricing is not configured" }, { status: 503 });
-  }
+  const joinPrice = WATCH_PARTY_ENTRY_PRICE_CREDITS;
 
   // Joining does not require owning the anime: a guest who does not own it pays
   // half its price and the dubbing creator takes half of that payment.

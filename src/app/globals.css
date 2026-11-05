@@ -639,6 +639,12 @@ html.kiluu-splash-seen .kiluu-splash {
   animation: shimmer 1.6s infinite linear;
 }
 
+/* CSS stage used by the player when the Fullscreen API is unavailable (iPhone Safari). */
+html.kiluu-stage-fullscreen,
+html.kiluu-stage-fullscreen body {
+  overflow: hidden;
+}
+
 /* Video player custom range */
 input[type="range"].player-range {
   -webkit-appearance: none;

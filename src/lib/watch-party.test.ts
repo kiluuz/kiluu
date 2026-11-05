@@ -14,8 +14,10 @@ import {
   chargePartyEntry,
   getOwnedHlsEpisode,
   getPartyEpisode,
+  getPartyStreamEpisode,
   partyJoinCost,
   partyJoinCreatorShare,
+  WATCH_PARTY_ENTRY_PRICE_CREDITS,
 } from "@/lib/watch-parties";
 
 const secret = "watch-party-test-secret-with-more-than-thirty-two-characters";
@@ -303,6 +305,112 @@ test("a guest pays half the anime price and the dubbing creator takes half of th
   );
   assert.deepEqual(retry, { charged: false });
   assert.equal((await client.user.findUniqueOrThrow({ where: { id: creator.id } })).credits, 25);
+});
+
+test("an entry fee buys the room and not the anime, at 10 credits for an owner", async () => {
+  assert.equal(WATCH_PARTY_ENTRY_PRICE_CREDITS, 10);
+  assert.equal(partyJoinCost({ owns: true, fullPrice: 100, joinPrice: WATCH_PARTY_ENTRY_PRICE_CREDITS }), 10);
+  assert.equal(
+    partyJoinCost({ owns: false, fullPrice: 100, joinPrice: WATCH_PARTY_ENTRY_PRICE_CREDITS }),
+    50
+  );
+
+  const host = await client.user.create({
+    data: { email: "party-grant-host@example.test", username: "partygrantrhost", password: "test-hash" },
+  });
+  const viewer = await client.user.create({
+    data: { email: "party-grant-viewer@example.test", username: "partygrantviewer", password: "test-hash", credits: 60 },
+  });
+  const outsider = await client.user.create({
+    data: { email: "party-grant-outsider@example.test", username: "partygrantoutsider", password: "test-hash" },
+  });
+  const anime = await client.anime.create({
+    data: {
+      slug: "watch-party-grant",
+      title: "Grant Watch Party",
+      description: "Test anime",
+      coverImage: "",
+      genres: "Action",
+      year: 2026,
+      price: 100,
+      isFree: false,
+      hidden: false,
+      moderationStatus: "APPROVED",
+    },
+  });
+  const version = await client.animeVersion.create({
+    data: { animeId: anime.id, kind: "creator", creatorId: host.id, price: 100, status: "published" },
+  });
+  const episode = await client.episode.create({
+    data: {
+      animeId: anime.id,
+      versionId: version.id,
+      number: 1,
+      title: "Room Episode",
+      videoUrl: "r2-hls",
+      hlsKey: "hls/watch-party-test-anime/4/index.m3u8",
+    },
+  });
+  const otherEpisode = await client.episode.create({
+    data: {
+      animeId: anime.id,
+      versionId: version.id,
+      number: 2,
+      title: "Episode Outside The Room",
+      videoUrl: "r2-hls",
+      hlsKey: "hls/watch-party-test-anime/5/index.m3u8",
+    },
+  });
+  const now = new Date();
+  const party = await client.watchParty.create({
+    data: {
+      code: "GRANT1",
+      name: "Grant room",
+      hostId: host.id,
+      createdById: host.id,
+      animeId: anime.id,
+      episodeId: episode.id,
+      position: 5,
+      serverTs: BigInt(now.getTime()),
+      expiresAt: new Date(now.getTime() + 60 * 60_000),
+      members: { create: [{ userId: host.id, lastSeenAt: now }, { userId: viewer.id, lastSeenAt: now }] },
+    },
+  });
+
+  const entry = await client.$transaction((tx) =>
+    chargePartyEntry(tx, viewer.id, party.id, 50, { creatorId: host.id, amount: 25 })
+  );
+  assert.deepEqual(entry, { charged: true });
+
+  const ticket = createPartyTicket(viewer.id, party.id);
+  const granted = await getPartyStreamEpisode(client, viewer.id, episode.id, ticket);
+  assert.ok(granted);
+  assert.equal(granted?.hlsKey, "hls/watch-party-test-anime/4/index.m3u8");
+
+  // Only this room, only this episode, only while the room runs.
+  assert.equal(await getPartyStreamEpisode(client, viewer.id, episode.id, ""), null);
+  assert.equal(await getPartyStreamEpisode(client, viewer.id, otherEpisode.id, ticket), null);
+  assert.equal(
+    await getPartyStreamEpisode(client, outsider.id, episode.id, createPartyTicket(outsider.id, party.id)),
+    null
+  );
+  assert.equal(await getPartyStreamEpisode(client, viewer.id, episode.id, createPartyTicket(viewer.id, "no-party")), null);
+  assert.equal(
+    await getPartyStreamEpisode(client, viewer.id, episode.id, `${ticket.slice(0, -1)}${ticket.endsWith("A") ? "B" : "A"}`),
+    null
+  );
+
+  await client.watchParty.update({ where: { id: party.id }, data: { endedAt: new Date() } });
+  assert.equal(await getPartyStreamEpisode(client, viewer.id, episode.id, ticket), null);
+  await client.watchParty.update({ where: { id: party.id }, data: { endedAt: null, expiresAt: new Date() } });
+  assert.equal(await getPartyStreamEpisode(client, viewer.id, episode.id, ticket), null);
+
+  // Paying for the room never turns into owning the anime.
+  assert.deepEqual(await getOwnedHlsEpisode(client, viewer.id, episode.id), { error: "FORBIDDEN" });
+  assert.equal(await client.purchase.count({ where: { userId: viewer.id } }), 0);
+  const after = await getPartyEpisode(client, viewer.id, episode.id);
+  if ("error" in after) throw new Error("the granted episode must still resolve for pricing");
+  assert.equal(after.owns, false);
 });
 
 test("Watch Together entry charges credits and records the debit atomically and idempotently", async () => {

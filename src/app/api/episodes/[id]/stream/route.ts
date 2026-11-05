@@ -2,18 +2,26 @@ import { NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { createCloudflarePlaybackUrl } from "@/lib/cloudflare-stream";
-import { getOwnedHlsEpisode } from "@/lib/watch-parties";
+import { getOwnedHlsEpisode, getPartyStreamEpisode } from "@/lib/watch-parties";
 import { createSignedHlsUrl, r2ObjectExists } from "@/lib/r2";
 
 export async function GET(
-  _request: Request,
+  request: Request,
   { params }: { params: Promise<{ id: string }> },
 ) {
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const { id } = await params;
-  const result = await getOwnedHlsEpisode(db, user.id, id);
+  // A Watch Together guest who paid to enter is granted this room's episode only,
+  // without owning the anime. Without the ticket the purchase gate still applies.
+  const partyEpisode = await getPartyStreamEpisode(
+    db,
+    user.id,
+    id,
+    request.headers.get("x-party-ticket")?.trim() ?? ""
+  );
+  const result = partyEpisode ? { episode: partyEpisode } : await getOwnedHlsEpisode(db, user.id, id);
   if ("error" in result) {
     if (result.error === "NOT_FOUND") return NextResponse.json({ error: "Episode not found" }, { status: 404 });
     if (result.error === "FORBIDDEN") return NextResponse.json({ error: "Purchase required" }, { status: 403 });

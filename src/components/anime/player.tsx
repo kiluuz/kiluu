@@ -78,6 +78,8 @@ export function VideoPlayer({
   onAutoplayBlocked,
   onEnded,
   onSyncReady,
+  onGuestResume,
+  partyTicket,
   controlsRef,
 }: {
   episode: PlayerEpisode;
@@ -100,6 +102,12 @@ export function VideoPlayer({
    *  to receive a seek + play command. Use this to re-apply the current party
    *  playback state so late-joiners land at the correct live position. */
   onSyncReady?: () => void;
+  /** A guest tapped play. The party owns playback, so the room decides what the
+   *  tap means: re-apply the live position, or say the host paused it. */
+  onGuestResume?: () => void;
+  /** Watch Together viewing grant for this room's episode; a guest who does not
+   *  own the anime still needs it to resolve the stream URL. */
+  partyTicket?: string;
   controlsRef?: React.MutableRefObject<PlayerControls | null>;
 }) {
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -149,6 +157,7 @@ export function VideoPlayer({
   const [muted, setMuted] = useState(false);
   const [speed, setSpeed] = useState(1);
   const [fullscreen, setFullscreen] = useState(false);
+  const [stageFullscreen, setStageFullscreen] = useState(false);
   const [showControls, setShowControls] = useState(true);
   const [speedOpen, setSpeedOpen] = useState(false);
   const [listOpen, setListOpen] = useState(false);
@@ -195,6 +204,7 @@ export function VideoPlayer({
 
   useEffect(() => {
     let cancelled = false;
+    const streamRequest = { cache: "no-store" as const, ...(partyTicket ? { headers: { "x-party-ticket": partyTicket } } : {}) };
 
     const directUrl = episode.videoUrl && (episode.videoUrl.startsWith("http://") || episode.videoUrl.startsWith("https://"))
       ? episode.videoUrl
@@ -211,7 +221,7 @@ export function VideoPlayer({
     // the API route to get a signed URL. Prefer it over any direct MP4 because
     // iPhone Safari only supports HLS for many codecs.
     if (episode.hlsKey || episode.streamId) {
-      fetch(`/api/episodes/${encodeURIComponent(episode.id)}/stream`, { cache: "no-store" })
+      fetch(`/api/episodes/${encodeURIComponent(episode.id)}/stream`, streamRequest)
         .then(async (response) => {
           const data = await response.json();
           if (!response.ok || !data.streamUrl) throw new Error(data.error || "Unable to authorize episode playback");
@@ -253,7 +263,7 @@ export function VideoPlayer({
         if (!cancelled) setSourceError(error instanceof Error ? error.message : "Unable to load episode stream");
       });
     return () => { cancelled = true; };
-  }, [episode.id, episode.streamId, episode.hlsKey, episode.videoUrl, episode.telegramMessageId]);
+  }, [episode.id, episode.streamId, episode.hlsKey, episode.videoUrl, episode.telegramMessageId, partyTicket]);
 
   // Direct files (not HLS) are single MOV/MKV/MP4 downloads, and most of them
   // are hundreds of megabytes behind one shared proxy. One 1-byte range request
@@ -627,9 +637,13 @@ export function VideoPlayer({
     const v = videoRef.current;
     if (!v) return;
     if (syncMode && !isHost) {
-      // Guests cannot control the party, but a tap is a valid user gesture:
-      // use it to resume synced playback when mobile autoplay was blocked.
-      ensurePlaying();
+      // Guests cannot control the party. A tap while paused is a valid user
+      // gesture, so hand it to the room, which resumes from the live party
+      // position; a tap while playing must not pause everybody else.
+      if (v.paused) {
+        if (onGuestResume) onGuestResume();
+        else ensurePlaying();
+      }
       return;
     }
     if (!v.src && !playbackUrl) {
@@ -686,23 +700,78 @@ export function VideoPlayer({
     setMuted(v.muted);
   }
 
+  /** iPhone Safari exposes no element Fullscreen API, so the button falls back
+   *  to a CSS stage that covers the viewport. A stage keeps our own controls —
+   *  and the party's "guests may not seek" rule — instead of handing the viewer
+   *  the native player, which would let them scrub away from the party. */
+  function fullscreenElement(): Element | null {
+    const doc = document as Document & { webkitFullscreenElement?: Element | null };
+    return doc.fullscreenElement ?? doc.webkitFullscreenElement ?? null;
+  }
+
+  function exitFullscreen() {
+    const doc = document as Document & { webkitExitFullscreen?: () => void };
+    if (fullscreenElement()) {
+      try {
+        (doc.exitFullscreen ?? doc.webkitExitFullscreen)?.call(doc);
+      } catch {
+        // The document already left fullscreen.
+      }
+    }
+    setFullscreen(false);
+    setStageFullscreen(false);
+  }
+
   function toggleFullscreen() {
     const c = containerRef.current;
     if (!c) return;
-    if (document.fullscreenElement) {
-      document.exitFullscreen().catch(() => {});
-    } else {
-      c.requestFullscreen().catch(() => {});
+    if (fullscreenElement() || stageFullscreen) {
+      exitFullscreen();
+      return;
     }
+    const el = c as HTMLElement & { webkitRequestFullscreen?: () => void };
+    if (typeof el.requestFullscreen === "function") {
+      el.requestFullscreen()
+        .then(() => setFullscreen(true))
+        .catch(() => setStageFullscreen(true));
+      return;
+    }
+    if (typeof el.webkitRequestFullscreen === "function") {
+      el.webkitRequestFullscreen();
+      setFullscreen(true);
+      return;
+    }
+    setStageFullscreen(true);
   }
 
   useEffect(() => {
     function onFs() {
-      setFullscreen(Boolean(document.fullscreenElement));
+      const active = Boolean(fullscreenElement());
+      setFullscreen(active);
+      if (active) setStageFullscreen(false);
     }
     document.addEventListener("fullscreenchange", onFs);
-    return () => document.removeEventListener("fullscreenchange", onFs);
+    document.addEventListener("webkitfullscreenchange", onFs);
+    return () => {
+      document.removeEventListener("fullscreenchange", onFs);
+      document.removeEventListener("webkitfullscreenchange", onFs);
+    };
   }, []);
+
+  // A CSS stage has no browser-provided Escape, and the page behind it must not
+  // scroll while the player owns the screen.
+  useEffect(() => {
+    if (!stageFullscreen) return;
+    function onKey(e: KeyboardEvent) {
+      if (e.key === "Escape") setStageFullscreen(false);
+    }
+    document.documentElement.classList.add("kiluu-stage-fullscreen");
+    window.addEventListener("keydown", onKey);
+    return () => {
+      document.documentElement.classList.remove("kiluu-stage-fullscreen");
+      window.removeEventListener("keydown", onKey);
+    };
+  }, [stageFullscreen]);
 
   function setRate(r: number) {
     const v = videoRef.current;
@@ -851,7 +920,8 @@ export function VideoPlayer({
       ref={containerRef}
       className={cn(
         "relative w-full bg-black rounded-none sm:rounded-2xl overflow-hidden group select-none",
-        fullscreen && "rounded-none",
+        fullscreen && "h-dvh w-full rounded-none",
+        stageFullscreen && "fixed inset-0 z-[100] h-dvh w-full rounded-none",
         !showControls && playing && "cursor-none"
       )}
       onMouseMove={wake}
@@ -861,7 +931,10 @@ export function VideoPlayer({
       <video
         ref={videoRef}
         src={playbackUrl && !/\.m3u8(?:$|\?)/i.test(playbackUrl) ? playbackUrl : undefined}
-        className="w-full aspect-video max-h-[82vh] object-contain bg-black"
+        className={cn(
+          "bg-black object-contain",
+          fullscreen || stageFullscreen ? "h-full w-full" : "aspect-video max-h-[82vh] w-full"
+        )}
         playsInline
         preload="metadata"
         onLoadedMetadata={(e) => {
@@ -1234,7 +1307,7 @@ export function VideoPlayer({
             )}
 
             <button onClick={toggleFullscreen} className="p-2 hover:scale-110 transition" aria-label="Fullscreen">
-              {fullscreen ? <Minimize className="w-4.5 h-4.5" /> : <Maximize className="w-4.5 h-4.5" />}
+              {fullscreen || stageFullscreen ? <Minimize className="w-4.5 h-4.5" /> : <Maximize className="w-4.5 h-4.5" />}
             </button>
           </div>
         </div>
