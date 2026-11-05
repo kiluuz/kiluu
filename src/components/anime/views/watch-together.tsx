@@ -438,21 +438,29 @@ export function WatchTogetherView() {
         // produced a single frame since joining gets restarted sooner than one
         // that stalled mid-playback.
         if (controls.isBuffering()) {
-          // A pending seek is a byte-range fetch in progress. Measured through
-          // the delivery proxy: ~14 s to metadata and ~28 s for a mid-file seek
-          // of a 300 MB episode. Interrupting it starts the same hundreds of
-          // megabytes over, which is the loop that ended in "video could not be
-          // loaded". Only a seek that never finishes gets recovered.
+          // Two different deliveries need two different clocks.
+          //
+          // One raw file through the proxy: ~14 s to metadata and ~28 s for a
+          // mid-file seek of a 300 MB episode, and interrupting it starts the
+          // same hundreds of megabytes over — that is the loop that ended in
+          // "video could not be loaded", so it gets the long grace.
+          //
+          // HLS: a seek is one 0.4-1 MB segment. Measured through the media
+          // Worker, the median is ~1-2 s but the tail reaches ~15 s because
+          // nothing is cached at the edge, so a guest that joined mid-playback
+          // waits on one cold request. Recovering is cheap here (restart the
+          // fragment loader and retry play), and the old 45 s wait made that
+          // single slow request look like a dead player.
+          const hls = controls.isHls();
           if (controls.isSeeking()) {
             if (!seekingSinceRef.current) seekingSinceRef.current = now;
-            if (now - seekingSinceRef.current < 90_000) return;
+            if (now - seekingSinceRef.current < (hls ? 20_000 : 90_000)) return;
           } else {
             seekingSinceRef.current = 0;
           }
-          // A start that has not rendered a frame yet gets a longer grace
-          // period: the initial seek may still be fetching a large fragment,
-          // and restarting the loader too early aborts it.
-          const limit = timelineAdvancedRef.current ? 30_000 : 45_000;
+          const limit = hls
+            ? (timelineAdvancedRef.current ? 12_000 : 15_000)
+            : (timelineAdvancedRef.current ? 30_000 : 45_000);
           if (!bufferingSinceRef.current) {
             bufferingSinceRef.current = now;
           } else if (now - bufferingSinceRef.current >= limit) {

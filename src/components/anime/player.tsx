@@ -26,6 +26,8 @@ export interface PlayerControls {
    * over, and these files take tens of seconds through the delivery proxy.
    */
   isSeeking: () => boolean;
+  /** True when the current source is an HLS playlist rather than one big file. */
+  isHls: () => boolean;
   /** Guest-side safety net: start playback if the party expects it to be playing. */
   ensurePlaying: () => void;
   /** Guest-side recovery for a buffer that stopped progressing mid-playback. */
@@ -56,6 +58,8 @@ function fmtTime(sec: number): string {
 }
 
 const SPEEDS = [0.5, 0.75, 1, 1.25, 1.5, 2];
+
+const isHlsSource = (url: string | null | undefined): boolean => Boolean(url && /\.m3u8(?:$|\?)/i.test(url));
 
 export function VideoPlayer({
   episode,
@@ -286,9 +290,11 @@ export function VideoPlayer({
     const video = videoRef.current;
     if (!video || !playbackUrl || !/\.m3u8(?:$|\?)/i.test(playbackUrl)) return;
     // Chromium answers "maybe" for the Apple HLS MIME type but cannot demux a
-    // playlist, so native playback is only used where it is really declared and
-    // MSE is unavailable (iOS Safari); everywhere else hls.js drives it.
-    if (video.canPlayType("application/vnd.apple.mpegurl") === "probably" && !Hls.isSupported()) {
+    // playlist, so "probably" identifies the engines that really play HLS
+    // natively (Apple WebKit). Use the built-in stack there: a mid-playlist
+    // seek is a single segment GET, while hls.js on top of (Managed)MediaSource
+    // only adds a second buffering state machine for the same bytes.
+    if (video.canPlayType("application/vnd.apple.mpegurl") === "probably") {
       // Safari handles HLS natively — set src directly and call load() so
       // Safari picks up the new source even if the element already exists.
       if (video.src !== playbackUrl) {
@@ -748,6 +754,14 @@ export function VideoPlayer({
             type: "play",
             pos: typeof pos === "number" && isFinite(pos) ? pos : undefined,
           };
+          if (isHlsSource(playbackUrlRef.current)) {
+            // With preload="metadata" a playlist that is never played can sit
+            // at readyState 0 forever, so the pending command would wait on an
+            // event that only a play() can trigger. Starting playback now costs
+            // nothing: loadedmetadata discards this command in sync mode and the
+            // party position is applied fresh from the live state.
+            attemptPlay();
+          }
           return;
         }
         attemptPlay();
@@ -806,6 +820,7 @@ export function VideoPlayer({
       },
       isPaused: () => videoRef.current?.paused ?? true,
       isSeeking: () => videoRef.current?.seeking ?? false,
+      isHls: () => isHlsSource(playbackUrlRef.current),
       ensurePlaying,
       recover,
       restart,
