@@ -13,6 +13,7 @@ import {
 } from "@/lib/chat";
 import { emitEvent } from "@/lib/events";
 import { isDurableMediaUrl } from "@/lib/storage";
+import { MEDIA_ATTACHMENTS_ENABLED } from "@/lib/media-upload";
 import { calculateLevel } from "@/lib/level-utils";
 
 interface RouteContext {
@@ -312,6 +313,10 @@ export async function POST(req: NextRequest, context: RouteContext) {
 
     if (text.length > 2000) {
       return NextResponse.json({ error: "Xabar hajmi 2000 belgidan oshmasligi kerak" }, { status: 400 });
+    }
+
+    if (attachmentUrl && !MEDIA_ATTACHMENTS_ENABLED) {
+      return NextResponse.json({ error: "Rasm va GIF yuborish vaqtincha o'chirilgan" }, { status: 403 });
     }
 
     if (attachmentUrl && (typeof attachmentUrl !== "string" || attachmentUrl.length > 500 || !isDurableMediaUrl(attachmentUrl))) {

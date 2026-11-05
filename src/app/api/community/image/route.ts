@@ -2,8 +2,12 @@ import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth";
 import { saveUpload } from "@/lib/storage";
 import { rateLimit } from "@/lib/rate-limit";
+import { MEDIA_ATTACHMENTS_ENABLED } from "@/lib/media-upload";
 
 export async function POST(req: NextRequest) {
+  if (!MEDIA_ATTACHMENTS_ENABLED) {
+    return NextResponse.json({ error: "Image posts are temporarily disabled" }, { status: 403 });
+  }
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: "Please sign in to upload images" }, { status: 401 });
   if (user.communityBlocked) return NextResponse.json({ error: "Your community access is restricted" }, { status: 403 });

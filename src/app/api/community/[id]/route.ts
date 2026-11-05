@@ -3,6 +3,7 @@ import { getCurrentUser } from "@/lib/auth";
 import { isAdminUser } from "@/lib/config";
 import { db } from "@/lib/db";
 import { isCommunityPostImageUrl } from "@/lib/r2";
+import { MEDIA_ATTACHMENTS_ENABLED } from "@/lib/media-upload";
 import { canDeleteCommunityPost, COMMUNITY_CATEGORIES } from "@/lib/community";
 import { rateLimit } from "@/lib/rate-limit";
 import { sanitizeText } from "@/lib/sanitize";
@@ -95,6 +96,9 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   }
   if (category === "Reviews" && rating === null) {
     return NextResponse.json({ error: "Reviews require a rating from 1 to 10" }, { status: 400 });
+  }
+  if (body.imageUrl && !MEDIA_ATTACHMENTS_ENABLED) {
+    return NextResponse.json({ error: "Image posts are temporarily disabled" }, { status: 403 });
   }
   if (body.imageUrl !== undefined && body.imageUrl !== null &&
       (typeof body.imageUrl !== "string" || !isCommunityPostImageUrl(body.imageUrl))) {

@@ -14,6 +14,7 @@ import type { CommunityPost, CommentItem, AuthUser, AnimeSummary, PostType, Comm
 import { useAppStore, useOpenProfile } from "../store";
 import { toast } from "sonner";
 import { readApiJson } from "@/lib/api-response";
+import { MEDIA_ATTACHMENTS_ENABLED } from "@/lib/media-upload";
 import { useI18n } from "@/components/i18n-provider";
 
 // ==========================================
@@ -224,38 +225,42 @@ export function PostComposer({ user, animes, onPost }: { user: AuthUser | null, 
 
               <div className="flex items-center justify-between gap-2 flex-wrap pt-2 border-t border-border/50">
                 <div className="flex items-center gap-1.5">
-                  <Button variant="ghost" size="icon" className="w-8 h-8 rounded-full text-muted-foreground" title={t("community.addImage")} disabled={uploading} onClick={() => imageInput.current?.click()}>
-                    <ImageIcon className="w-4 h-4" />
-                  </Button>
-                  <input
-                    ref={imageInput}
-                    type="file"
-                    accept="image/jpeg,image/png,image/webp,image/gif"
-                    className="hidden"
-                    onChange={async (event) => {
-                      const file = event.currentTarget.files?.[0];
-                      event.currentTarget.value = "";
-                      if (!file) return;
-                      setUploading(true);
-                      try {
-                        const form = new FormData();
-                        form.set("file", file);
-                        const response = await fetch("/api/community/image", { method: "POST", body: form });
-                        const data = await readApiJson(response);
-                        if (!response.ok) {
-                          throw new Error(typeof data.error === "string" ? data.error : `Image upload failed (HTTP ${response.status})`);
-                        }
-                        if (typeof data.imageUrl !== "string" || !data.imageUrl) {
-                          throw new Error("Image upload response did not include an image URL");
-                        }
-                        setImageUrl(data.imageUrl);
-                      } catch (error) {
-                        toast.error(error instanceof Error ? error.message : "Image upload failed");
-                      } finally {
-                        setUploading(false);
-                      }
-                    }}
-                  />
+                  {MEDIA_ATTACHMENTS_ENABLED && (
+                    <>
+                      <Button variant="ghost" size="icon" className="w-8 h-8 rounded-full text-muted-foreground" title={t("community.addImage")} disabled={uploading} onClick={() => imageInput.current?.click()}>
+                        <ImageIcon className="w-4 h-4" />
+                      </Button>
+                      <input
+                        ref={imageInput}
+                        type="file"
+                        accept="image/jpeg,image/png,image/webp,image/gif"
+                        className="hidden"
+                        onChange={async (event) => {
+                          const file = event.currentTarget.files?.[0];
+                          event.currentTarget.value = "";
+                          if (!file) return;
+                          setUploading(true);
+                          try {
+                            const form = new FormData();
+                            form.set("file", file);
+                            const response = await fetch("/api/community/image", { method: "POST", body: form });
+                            const data = await readApiJson(response);
+                            if (!response.ok) {
+                              throw new Error(typeof data.error === "string" ? data.error : `Image upload failed (HTTP ${response.status})`);
+                            }
+                            if (typeof data.imageUrl !== "string" || !data.imageUrl) {
+                              throw new Error("Image upload response did not include an image URL");
+                            }
+                            setImageUrl(data.imageUrl);
+                          } catch (error) {
+                            toast.error(error instanceof Error ? error.message : "Image upload failed");
+                          } finally {
+                            setUploading(false);
+                          }
+                        }}
+                      />
+                    </>
+                  )}
                   <Button variant="ghost" size="icon" className="w-8 h-8 rounded-full text-muted-foreground" onClick={() => setAttachOpen(!attachOpen)} title={t("community.attachAnime")}>
                     <Sparkles className="w-4 h-4" />
                   </Button>

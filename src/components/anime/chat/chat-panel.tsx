@@ -34,6 +34,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { useAppStore, useOpenProfile } from "../store";
 import { FramedAvatar, SmartImage } from "../ui-bits";
 import { getRealtimeClient, RealtimeStatus, ChatMessagePayload } from "@/lib/realtime-client";
+import { MEDIA_ATTACHMENTS_ENABLED } from "@/lib/media-upload";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 
@@ -1286,15 +1287,17 @@ export function ChatPanel({
           className="flex items-end gap-2"
         >
           <div className="flex min-w-0 flex-1 items-end gap-0.5 rounded-[24px] border border-primary/25 bg-background/60 py-1 pl-1 pr-1 focus-within:border-primary/50">
-            <button
-              type="button"
-              onClick={() => fileInputRef.current?.click()}
-              disabled={uploading}
-              aria-label="Rasm biriktirish"
-              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-muted-foreground transition hover:bg-secondary hover:text-foreground disabled:opacity-50"
-            >
-              {uploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4.5 w-4.5" />}
-            </button>
+            {MEDIA_ATTACHMENTS_ENABLED && (
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                disabled={uploading}
+                aria-label="Rasm biriktirish"
+                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-muted-foreground transition hover:bg-secondary hover:text-foreground disabled:opacity-50"
+              >
+                {uploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4.5 w-4.5" />}
+              </button>
+            )}
 
             <Popover>
               <PopoverTrigger asChild>
@@ -1335,15 +1338,17 @@ export function ChatPanel({
               </PopoverContent>
             </Popover>
 
-            <button
-              type="button"
-              onClick={() => gifInputRef.current?.click()}
-              disabled={uploading}
-              aria-label="GIF yuklash"
-              className="flex h-9 shrink-0 items-center justify-center rounded-full px-1.5 text-[9px] font-black tracking-wide text-muted-foreground transition hover:bg-secondary hover:text-foreground disabled:opacity-50"
-            >
-              GIF
-            </button>
+            {MEDIA_ATTACHMENTS_ENABLED && (
+              <button
+                type="button"
+                onClick={() => gifInputRef.current?.click()}
+                disabled={uploading}
+                aria-label="GIF yuklash"
+                className="flex h-9 shrink-0 items-center justify-center rounded-full px-1.5 text-[9px] font-black tracking-wide text-muted-foreground transition hover:bg-secondary hover:text-foreground disabled:opacity-50"
+              >
+                GIF
+              </button>
+            )}
 
             <textarea
               rows={1}
@@ -1389,20 +1394,24 @@ export function ChatPanel({
             : "Enter — yuborish · Shift+Enter — yangi qator"}
         </p>
 
-        <input
-          ref={fileInputRef}
-          type="file"
-          accept="image/*"
-          className="hidden"
-          onChange={handlePickFile}
-        />
-        <input
-          ref={gifInputRef}
-          type="file"
-          accept="image/gif"
-          className="hidden"
-          onChange={handlePickFile}
-        />
+        {MEDIA_ATTACHMENTS_ENABLED && (
+          <>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*"
+              className="hidden"
+              onChange={handlePickFile}
+            />
+            <input
+              ref={gifInputRef}
+              type="file"
+              accept="image/gif"
+              className="hidden"
+              onChange={handlePickFile}
+            />
+          </>
+        )}
       </div>
 
       {/* Poll creation dialog */}
