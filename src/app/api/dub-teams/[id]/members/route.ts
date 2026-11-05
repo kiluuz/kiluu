@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth";
 import {
-  addDubTeamMember,
   assertTeamManager,
   dubErrorInfo,
   inviteDubTeamMember,
@@ -17,12 +16,15 @@ export async function POST(
   try {
     await assertTeamManager(id, user);
     const body = await req.json();
-    if (typeof body?.userId === "string" && body.userId) {
-      const invite = await inviteDubTeamMember(id, user!.id, body.userId);
-      return NextResponse.json({ invite, pending: true }, { status: 201 });
+    // Only Kiluu accounts can join a team — a name typed by hand is not a member.
+    if (typeof body?.userId !== "string" || !body.userId) {
+      return NextResponse.json(
+        { error: "Jamoaga faqat Kiluu hisoblarini qo‘shish mumkin", code: "USER_REQUIRED" },
+        { status: 400 }
+      );
     }
-    const member = await addDubTeamMember(id, { name: body?.name, role: body?.role });
-    return NextResponse.json({ member }, { status: 201 });
+    const invite = await inviteDubTeamMember(id, user!.id, body.userId);
+    return NextResponse.json({ invite, pending: true }, { status: 201 });
   } catch (error) {
     const info = dubErrorInfo(error);
     return NextResponse.json({ error: info.message, code: info.code }, { status: info.status });

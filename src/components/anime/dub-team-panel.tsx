@@ -8,7 +8,6 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Progress } from "@/components/ui/progress";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useAppStore } from "./store";
 import { useI18n } from "@/components/i18n-provider";
 import { SmartImage } from "./ui-bits";
@@ -17,7 +16,6 @@ import {
   DUB_ROLES,
   dubErrorText,
   dubTeamTitle,
-  type DubRole,
   type DubTitleKey,
 } from "@/lib/dub-team-shared";
 
@@ -95,10 +93,6 @@ export function DubTeamPanel() {
   const [teamName, setTeamName] = useState("");
   const [teamAbout, setTeamAbout] = useState("");
   const [creating, setCreating] = useState(false);
-
-  const [memberName, setMemberName] = useState("");
-  const [memberRole, setMemberRole] = useState<DubRole>("voice");
-  const [addingMember, setAddingMember] = useState(false);
 
   const [userSearch, setUserSearch] = useState("");
   const [userResults, setUserResults] = useState<
@@ -203,28 +197,6 @@ export function DubTeamPanel() {
       fail(error, t("dub.teamCreateFailed"));
     } finally {
       setCreating(false);
-    }
-  }
-
-  async function addMember() {
-    if (!team) return;
-    if (memberName.trim().length < 2) {
-      toast.error(t("dub.error.INVALID_NAME"));
-      return;
-    }
-    setAddingMember(true);
-    try {
-      await api(`/api/dub-teams/${team.id}/members`, {
-        method: "POST",
-        body: JSON.stringify({ name: memberName.trim(), role: memberRole }),
-      });
-      setMemberName("");
-      toast.success(t("dub.memberAdded"));
-      refresh();
-    } catch (error) {
-      fail(error, t("dub.memberAddFailed"));
-    } finally {
-      setAddingMember(false);
     }
   }
 
@@ -512,38 +484,9 @@ export function DubTeamPanel() {
               )}
             </div>
 
-            <div className="flex flex-col sm:flex-row gap-2">
-              <Input
-                value={memberName}
-                onChange={(event) => setMemberName(event.target.value)}
-                maxLength={60}
-                placeholder={t("dub.memberNamePlaceholder")}
-                className="h-9 rounded-xl sm:max-w-[220px]"
-              />
-              <Select value={memberRole} onValueChange={(value) => setMemberRole(value as DubRole)}>
-                <SelectTrigger className="h-9 rounded-xl sm:w-[170px]">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {DUB_ROLES.map((role) => (
-                    <SelectItem key={role} value={role}>
-                      {t(`dub.role.${role}`)}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <Button
-                type="button"
-                size="sm"
-                variant="secondary"
-                onClick={addMember}
-                disabled={addingMember}
-                className="rounded-xl font-bold"
-              >
-                {addingMember ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Plus className="w-3.5 h-3.5" />}
-                {t("dub.addMember")}
-              </Button>
-            </div>
+            <p className="text-[11px] text-muted-foreground bg-background/60 rounded-xl border border-border/50 px-3 py-2">
+              {t("dub.accountsOnlyHint")}
+            </p>
           </div>
 
           <div>

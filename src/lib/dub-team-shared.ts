@@ -29,6 +29,7 @@ export const DUB_ERROR_CODES = [
   "DUPLICATE_MEMBER",
   "DUPLICATE_CREDIT",
   "TEAM_LEADER_ONLY",
+  "USER_REQUIRED",
 ] as const;
 
 export function dubErrorText(

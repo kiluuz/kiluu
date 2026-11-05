@@ -476,15 +476,36 @@ type SiteNotification = {
   type: string;
   title: string;
   body: string;
+  dataJson?: string;
   previewUrl: string | null;
   readAt: string | null;
   createdAt: string;
 };
 
+type DubInvitePayload = { inviteId: string; teamName: string; clubId: string; inviterName: string };
+
+/** Bell rows of this type are rendered from locale strings, not stored text. */
+function dubInvitePayload(notification: SiteNotification): DubInvitePayload | null {
+  if (notification.type !== "dub_invite" || !notification.dataJson) return null;
+  try {
+    const data = JSON.parse(notification.dataJson) as Record<string, unknown>;
+    if (typeof data.inviteId !== "string") return null;
+    return {
+      inviteId: data.inviteId,
+      teamName: typeof data.teamName === "string" ? data.teamName : "",
+      clubId: typeof data.clubId === "string" ? data.clubId : "",
+      inviterName: typeof data.inviterName === "string" ? data.inviterName : "",
+    };
+  } catch {
+    return null;
+  }
+}
+
 /** Slim top bar — compact on mobile/tablet, search + actions on desktop. */
 export function TopBar() {
   const { user, view, goBack, setProfileModalOpen, navigate } = useAppStore();
   const { theme, setTheme } = useTheme();
+  const { t } = useI18n();
   const [scrolled, setScrolled] = useState(false);
   const [notifications, setNotifications] = useState<SiteNotification[]>([]);
   const [unreadNotifications, setUnreadNotifications] = useState(0);
@@ -730,22 +751,33 @@ export function TopBar() {
                 ) : notificationsUserId !== user?.id || !notifications.length ? (
                   <p className="p-3 text-xs text-muted-foreground">No notifications yet.</p>
                 ) : (
-                  notifications.map((notification) => (
-                    <button
-                      key={notification.id}
-                      onClick={() => { if (!notification.readAt) void markAllNotificationsRead(); }}
-                      className={cn(
-                        "block w-full rounded-xl p-3 text-left text-xs hover:bg-secondary/50",
-                        !notification.readAt && "bg-primary/5"
-                      )}
-                    >
-                      {notification.previewUrl && (
-                        <img src={notification.previewUrl} alt="" className="mb-2 h-12 w-16 rounded-lg object-contain" loading="lazy" />
-                      )}
-                      <span className="font-bold">{notification.title}</span>
-                      <span className="mt-1 block text-muted-foreground">{notification.body}</span>
-                    </button>
-                  ))
+                  notifications.map((notification) => {
+                    const invite = dubInvitePayload(notification);
+                    return (
+                      <button
+                        key={notification.id}
+                        onClick={() => {
+                          if (!notification.readAt) void markAllNotificationsRead();
+                          if (invite?.clubId) {
+                            setNotificationsOpen(false);
+                            navigate("community", { filters: { club: invite.clubId } });
+                          }
+                        }}
+                        className={cn(
+                          "block w-full rounded-xl p-3 text-left text-xs hover:bg-secondary/50",
+                          !notification.readAt && "bg-primary/5"
+                        )}
+                      >
+                        {notification.previewUrl && (
+                          <img src={notification.previewUrl} alt="" className="mb-2 h-12 w-16 rounded-lg object-contain" loading="lazy" />
+                        )}
+                        <span className="font-bold">{invite ? t("notif.dubInviteTitle") : notification.title}</span>
+                        <span className="mt-1 block text-muted-foreground">
+                          {invite ? t("notif.dubInviteBody", { team: invite.teamName, by: invite.inviterName }) : notification.body}
+                        </span>
+                      </button>
+                    );
+                  })
                 )}
               </div>
             )}

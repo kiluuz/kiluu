@@ -12,6 +12,7 @@ let shared: typeof import("./dub-team-shared");
 let ownerId: string;
 let memberTwoId: string;
 let memberThreeId: string;
+let memberFourId: string;
 let inviteeId: string;
 let teamId: string;
 let animeA: string;
@@ -40,6 +41,9 @@ before(async () => {
   });
   const third = await db.user.create({
     data: { email: "dub-member-3@example.test", username: "dub-member-3", password: "test-hash" },
+  });
+  const fourth = await db.user.create({
+    data: { email: "dub-member-4@example.test", username: "dub-member-4", password: "test-hash" },
   });
   const invitee = await db.user.create({
     data: { email: "dub-invitee@example.test", username: "dub-invitee", password: "test-hash" },
@@ -70,6 +74,7 @@ before(async () => {
   ownerId = owner.id;
   memberTwoId = second.id;
   memberThreeId = third.id;
+  memberFourId = fourth.id;
   inviteeId = invitee.id;
   animeA = first.id;
   animeB = secondAnime.id;
@@ -100,15 +105,28 @@ test("creates a team with a slug, a private club and zero reputation", async () 
 });
 
 test("members raise activity-based reputation before any ratings exist", async () => {
-  await service.addDubTeamMember(teamId, { name: "Ali Valiyev", role: "director" });
+  await assert.rejects(
+    () => service.addDubTeamMember(teamId, { name: "Ali Valiyev" } as unknown as { userId: string }),
+    (error: { code?: string }) => error.code === "USER_REQUIRED"
+  );
+  await assert.rejects(
+    () => service.addDubTeamMember(teamId, { userId: "no-such-user" }),
+    (error: { code?: string }) => error.code === "USER_REQUIRED"
+  );
+
+  await service.addDubTeamMember(teamId, { userId: memberFourId, role: "director" });
   let team = await db.dubTeam.findUniqueOrThrow({ where: { id: teamId } });
   assert.equal(team.reputation, 1);
 
-  await service.addDubTeamMember(teamId, { name: "Dilnoza Karimova", userId: ownerId });
-  await service.addDubTeamMember(teamId, { name: "Sardor Toshev", userId: memberTwoId });
-  await service.addDubTeamMember(teamId, { name: "Madina Yusupova", userId: memberThreeId });
+  await service.addDubTeamMember(teamId, { userId: ownerId });
+  await service.addDubTeamMember(teamId, { userId: memberTwoId });
+  await service.addDubTeamMember(teamId, { userId: memberThreeId });
   team = await db.dubTeam.findUniqueOrThrow({ where: { id: teamId } });
   assert.equal(team.reputation, 4);
+
+  const stored = await db.dubTeamMember.findMany({ where: { teamId }, orderBy: { createdAt: "asc" } });
+  assert.deepEqual(stored.map((member) => member.userId), [memberFourId, ownerId, memberTwoId, memberThreeId]);
+  assert.equal(stored[0].name, "dub-member-4");
 });
 
 test("counts distinct speakers case-insensitively", async () => {
@@ -226,14 +244,14 @@ test("publish guard requires three linked members owned by the creator", async (
   );
 
   const small = await service.createDubTeam({ ownerId, name: "Kichik Jamoa" });
-  await service.addDubTeamMember(small.id, { name: "Yolg'iz A'zo", userId: ownerId });
+  await service.addDubTeamMember(small.id, { userId: ownerId });
   await assert.rejects(
     () => service.assertPublishTeam(small.id, ownerId),
     (error: { code?: string }) => error.code === "INVALID_TEAM"
   );
 
   const guard = await service.assertPublishTeam(teamId, ownerId);
-  assert.equal(guard.linkedMemberCount, 4);
+  assert.equal(guard.linkedMemberCount, 5);
 });
 
 test("awards team titles by reputation and verification", () => {

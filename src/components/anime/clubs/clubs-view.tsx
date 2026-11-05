@@ -142,11 +142,14 @@ export function ClubsView({ initialClubId }: { initialClubId?: string }) {
   const [dubInvites, setDubInvites] = useState<
     {
       id: string;
-      team: { id: string; name: string; avatarUrl?: string | null };
+      team: { id: string; name: string; avatarUrl?: string | null; clubId?: string | null };
       invitedBy?: { username: string; displayName: string | null } | null;
     }[]
   >([]);
   const [inviteBusyId, setInviteBusyId] = useState<string | null>(null);
+  const [dubPromptSkipped, setDubPromptSkipped] = useState<{ clubId: string | null; inviteId: string } | null>(null);
+  const dubPromptSkippedInviteId =
+    dubPromptSkipped && dubPromptSkipped.clubId === selectedClubId ? dubPromptSkipped.inviteId : null;
 
   useEffect(() => {
     let active = true;
@@ -191,6 +194,13 @@ export function ClubsView({ initialClubId }: { initialClubId?: string }) {
       setInviteBusyId(null);
     }
   };
+
+  // Klub ochilganda shu jamoaning kutilayotgan taklifi bo‘lsa, darhol so‘raymiz.
+  const pendingDubInvite = selectedClubId
+    ? dubInvites.find(
+        (invite) => invite.team.clubId === selectedClubId && invite.id !== dubPromptSkippedInviteId
+      ) ?? null
+    : null;
 
   const fetchClubs = async () => {
     setLoading(true);
@@ -671,6 +681,59 @@ export function ClubsView({ initialClubId }: { initialClubId?: string }) {
             onCreateInvite={() => handleGenerateInvite(clubDetail.id)}
             onLeave={() => handleLeaveClub(clubDetail.id)}
           />
+        )}
+
+        {pendingDubInvite && (
+          <div className="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
+            <div className="w-full max-w-sm rounded-3xl border bg-background p-6 shadow-2xl" role="dialog" aria-modal="true">
+              <div className="flex items-start gap-3 mb-4">
+                <div className="w-11 h-11 rounded-2xl bg-primary/15 flex items-center justify-center shrink-0 text-primary">
+                  <UserPlus className="w-5 h-5" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <h3 className="font-black text-base leading-tight">{t("dub.promptTitle")}</h3>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    {t("dub.promptQuestion", { team: pendingDubInvite.team.name })}
+                    {pendingDubInvite.invitedBy
+                      ? ` · ${t("dub.inviteBannerBy", {
+                          name: pendingDubInvite.invitedBy.displayName || pendingDubInvite.invitedBy.username,
+                        })}`
+                      : ""}
+                  </p>
+                </div>
+                <button
+                  onClick={() => setDubPromptSkipped({ clubId: selectedClubId, inviteId: pendingDubInvite.id })}
+                  className="p-1 rounded-lg text-muted-foreground hover:bg-secondary shrink-0"
+                  aria-label={t("dub.promptLater")}
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+              <p className="text-[11px] text-muted-foreground">{t("dub.inviteBannerHint")}</p>
+              <div className="mt-5 flex gap-2">
+                <Button
+                  variant="outline"
+                  className="flex-1 rounded-xl"
+                  disabled={inviteBusyId === pendingDubInvite.id}
+                  onClick={() => void respondDubInvite(pendingDubInvite.id, false)}
+                >
+                  {t("dub.inviteDecline")}
+                </Button>
+                <Button
+                  className="flex-1 rounded-xl brand-gradient text-white font-bold"
+                  disabled={inviteBusyId === pendingDubInvite.id}
+                  onClick={() => void respondDubInvite(pendingDubInvite.id, true)}
+                >
+                  {inviteBusyId === pendingDubInvite.id ? (
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                  ) : (
+                    <Check className="w-3.5 h-3.5" />
+                  )}
+                  {t("dub.inviteAccept")}
+                </Button>
+              </div>
+            </div>
+          </div>
         )}
       </div>
     );

@@ -85,6 +85,7 @@ export function dubErrorInfo(error: unknown): { status: number; message: string;
   if (code === "NOT_FOUND") return { status: 404, message, code };
   if (code?.startsWith("INVALID")) return { status: 400, message, code };
   if (code?.startsWith("DUPLICATE")) return { status: 409, message, code };
+  if (code === "USER_REQUIRED") return { status: 400, message, code };
   return { status: 500, message, code };
 }
 
@@ -165,26 +166,57 @@ export async function updateDubTeam(
   return db.dubTeam.update({ where: { id: teamId }, data: update });
 }
 
-export async function addDubTeamMember(
+/**
+ * A’zo yozuvini yaratadi yoki shu nomdagi eski (hisobsiz) yozuvni hisobga bog'laydi.
+ * `@@unique([teamId, name])` bir xil ko'rinadigan ismli ikki hisobga yo'l qo'ymaydi.
+ */
+async function createOrAdoptMember(
+  client: Db,
   teamId: string,
-  opts: { name: string; role?: unknown; userId?: string | null }
+  user: { id: string; username: string | null; displayName: string | null },
+  role: DubRole
 ) {
-  const name = cleanText(opts.name, 60);
-  if (name.length < 2) throw fail("INVALID_NAME", "A’zo nomi kamida 2 belgidan iborat bo‘lsin");
+  const displayName = (user.displayName || user.username || "").trim().slice(0, 60);
+  if (displayName.length < 2) throw fail("INVALID_NAME", "A’zo nomi kamida 2 belgidan iborat bo‘lsin");
+  const sameName = await client.dubTeamMember.findFirst({
+    where: { teamId, name: displayName },
+    select: { id: true, userId: true },
+  });
+  if (sameName && !sameName.userId) {
+    await client.dubTeamMember.update({ where: { id: sameName.id }, data: { userId: user.id, role } });
+    return client.dubTeamMember.findUniqueOrThrow({ where: { id: sameName.id } });
+  }
+  if (sameName) {
+    const altName = `${displayName.slice(0, 46)} (@${user.username})`.slice(0, 60);
+    return client.dubTeamMember.create({ data: { teamId, userId: user.id, name: altName, role } });
+  }
+  return client.dubTeamMember.create({ data: { teamId, userId: user.id, name: displayName, role } });
+}
+
+/** Jamoaga faqat Kiluu hisobi qo'shiladi; a'zo nomi shu hisobdan olinadi. */
+export async function addDubTeamMember(teamId: string, opts: { userId: unknown; role?: unknown }) {
+  if (typeof opts.userId !== "string" || !opts.userId.trim()) {
+    throw fail("USER_REQUIRED", "Jamoaga faqat Kiluu hisoblarini qo‘shish mumkin");
+  }
+  const target = await db.user.findUnique({
+    where: { id: opts.userId },
+    select: { id: true, username: true, displayName: true },
+  });
+  if (!target) throw fail("USER_REQUIRED", "Jamoaga faqat Kiluu hisoblarini qo‘shish mumkin");
+
+  const already = await db.dubTeamMember.findFirst({ where: { teamId, userId: target.id }, select: { id: true } });
+  if (already) throw fail("DUPLICATE_MEMBER", "Bu foydalanuvchi allaqachon jamoada");
+
   const role: DubRole = isDubRole(opts.role) ? opts.role : "voice";
   try {
-    const member = await db.dubTeamMember.create({
-      data: { teamId, name, role, userId: opts.userId || null },
-    });
-    if (opts.userId) {
-      const team = await db.dubTeam.findUnique({ where: { id: teamId }, select: { clubId: true, ownerId: true } });
-      if (team?.clubId && team.ownerId !== opts.userId) {
-        await db.clubMember.upsert({
-          where: { clubId_userId: { clubId: team.clubId, userId: opts.userId } },
-          create: { clubId: team.clubId, userId: opts.userId, role: "member" },
-          update: {},
-        });
-      }
+    const member = await createOrAdoptMember(db, teamId, target, role);
+    const team = await db.dubTeam.findUnique({ where: { id: teamId }, select: { clubId: true, ownerId: true } });
+    if (team?.clubId && team.ownerId !== target.id) {
+      await db.clubMember.upsert({
+        where: { clubId_userId: { clubId: team.clubId, userId: target.id } },
+        create: { clubId: team.clubId, userId: target.id, role: "member" },
+        update: {},
+      });
     }
     await recomputeTeamReputation(teamId);
     return member;
@@ -225,7 +257,7 @@ export async function inviteDubTeamMember(teamId: string, inviterId: string, use
   if (!userId || userId === inviterId) throw fail("INVALID_INVITE", "O‘zingizni taklif qila olmaysiz");
   const team = await db.dubTeam.findUnique({
     where: { id: teamId },
-    select: { id: true, name: true, status: true },
+    select: { id: true, name: true, status: true, clubId: true },
   });
   if (!team || team.status !== "active") throw fail("NOT_FOUND", "Jamoa topilmadi");
 
@@ -238,6 +270,11 @@ export async function inviteDubTeamMember(teamId: string, inviterId: string, use
   });
   if (!target) throw fail("NOT_FOUND", "Foydalanuvchi topilmadi");
 
+  const inviter = await db.user.findUnique({
+    where: { id: inviterId },
+    select: { username: true, displayName: true },
+  });
+
   const invite = await db.dubTeamInvite.upsert({
     where: { teamId_userId: { teamId, userId } },
     create: { teamId, userId, invitedById: inviterId },
@@ -245,12 +282,32 @@ export async function inviteDubTeamMember(teamId: string, inviterId: string, use
     select: { id: true, status: true, createdAt: true },
   });
 
-  void ensureTeamClub(teamId).catch(() => null);
+  const clubId = await ensureTeamClub(teamId).catch(() => team.clubId);
+  const inviterName = (inviter?.displayName || inviter?.username || "Kiluu").trim();
+
+  // Navbar notification: the bell renders `dub_invite` from dataJson in the
+  // viewer's own language, so the stored text is only a fallback.
+  await db.notification.create({
+    data: {
+      userId,
+      type: "dub_invite",
+      title: inviterName,
+      body: `Sizni ${team.name} dub jamoasiga taklif qildi`,
+      dataJson: JSON.stringify({
+        inviteId: invite.id,
+        teamId: team.id,
+        teamName: team.name,
+        clubId: clubId ?? "",
+        inviterName,
+      }),
+    },
+  });
+
   void notifyTelegramUser(
     target.id,
     team.name,
     `Sizni <b>${team.name}</b> dub jamoasiga speaker sifatida taklif qilishdi. ` +
-      `Kiluu → Creator Studio → Dub jamoasi bo‘limida qabul qilishingiz mumkin.`
+      `Kiluu → Community bo‘limida taklifni qabul qilishingiz mumkin.`
   ).catch(() => null);
 
   return { invite, user: target };
@@ -264,10 +321,18 @@ export async function listDubTeamInvites(userId: string) {
       id: true,
       createdAt: true,
       invitedBy: { select: { username: true, displayName: true, avatarUrl: true } },
-      team: { select: { id: true, name: true, slug: true, avatarUrl: true, reputation: true, verified: true } },
+      team: { select: { id: true, name: true, slug: true, avatarUrl: true, reputation: true, verified: true, clubId: true } },
     },
   });
   return invites;
+}
+
+/** Javob berilgan taklifning qo'ng'irog'ini belldan olib tashlaydi. */
+async function dismissDubInviteNotification(userId: string, inviteId: string) {
+  await db.notification.updateMany({
+    where: { userId, type: "dub_invite", readAt: null, dataJson: { contains: `"inviteId":"${inviteId}"` } },
+    data: { readAt: new Date() },
+  });
 }
 
 export async function respondDubTeamInvite(inviteId: string, userId: string, accept: boolean) {
@@ -282,6 +347,7 @@ export async function respondDubTeamInvite(inviteId: string, userId: string, acc
   if (!invite) throw fail("NOT_FOUND", "Taklif topilmadi yoki allaqachon javob berilgan");
   if (!accept) {
     await db.dubTeamInvite.update({ where: { id: invite.id }, data: { status: "declined", respondedAt: new Date() } });
+    await dismissDubInviteNotification(userId, invite.id);
     return { teamId: invite.teamId, clubId: null, accepted: false };
   }
   if (invite.team.status !== "active") throw fail("FORBIDDEN", "Jamoa faol emas");
@@ -293,24 +359,10 @@ export async function respondDubTeamInvite(inviteId: string, userId: string, acc
   if (!user) throw fail("NOT_FOUND", "Foydalanuvchi topilmadi");
 
   const clubId = await ensureTeamClub(invite.teamId);
-  const displayName = (user.displayName || user.username || "A’zo").trim().slice(0, 60);
 
   await db.$transaction(async (tx) => {
     const member = await tx.dubTeamMember.findFirst({ where: { teamId: invite.teamId, userId }, select: { id: true } });
-    if (!member) {
-      const sameName = await tx.dubTeamMember.findFirst({
-        where: { teamId: invite.teamId, name: displayName },
-        select: { id: true, userId: true },
-      });
-      if (sameName && !sameName.userId) {
-        await tx.dubTeamMember.update({ where: { id: sameName.id }, data: { userId } });
-      } else if (sameName) {
-        const altName = `${displayName.slice(0, 46)} (@${user.username})`.slice(0, 60);
-        await tx.dubTeamMember.create({ data: { teamId: invite.teamId, userId, name: altName, role: "voice" } });
-      } else {
-        await tx.dubTeamMember.create({ data: { teamId: invite.teamId, userId, name: displayName, role: "voice" } });
-      }
-    }
+    if (!member) await createOrAdoptMember(tx, invite.teamId, user, "voice");
     if (clubId) {
       await tx.clubMember.upsert({
         where: { clubId_userId: { clubId, userId } },
@@ -322,6 +374,7 @@ export async function respondDubTeamInvite(inviteId: string, userId: string, acc
   });
 
   await recomputeTeamReputation(invite.teamId);
+  await dismissDubInviteNotification(userId, invite.id);
   return { teamId: invite.teamId, clubId, accepted: true };
 }
 
