@@ -168,32 +168,6 @@ export function Onboarding() {
           <>
             <div className="grid sm:grid-cols-2 gap-4">
               <button
-                onClick={() => setChoice("CREATOR")}
-                className={`group relative rounded-2xl border-2 p-6 text-left transition-all overflow-hidden ${
-                  choice === "CREATOR"
-                    ? "border-primary brand-gradient text-white shadow-xl shadow-primary/30"
-                    : "border-border bg-card hover:border-primary/50 hover:-translate-y-1"
-                }`}
-                aria-pressed={choice === "CREATOR"}
-              >
-                <Clapperboard className="w-9 h-9 mb-3" />
-                <h3 className="font-black text-lg">Creator</h3>
-                <p className={`text-xs mt-1.5 leading-relaxed ${choice === "CREATOR" ? "text-white/85" : "text-muted-foreground"}`}>
-                  Publish animes, add episodes, set prices and grow your audience. Earn from every purchase.
-                </p>
-                <ul className={`mt-3 space-y-1 text-[11px] ${choice === "CREATOR" ? "text-white/80" : "text-muted-foreground"}`}>
-                  <li className="flex items-center gap-1.5"><Check className="w-3 h-3" /> Publish unlimited animes</li>
-                  <li className="flex items-center gap-1.5"><Check className="w-3 h-3" /> Creator Studio dashboard</li>
-                  <li className="flex items-center gap-1.5"><Check className="w-3 h-3" /> One team account for your studio</li>
-                </ul>
-                {choice === "CREATOR" && (
-                  <div className="absolute top-3 right-3 w-6 h-6 rounded-full bg-white flex items-center justify-center">
-                    <Check className="w-4 h-4 text-primary" />
-                  </div>
-                )}
-              </button>
-
-              <button
                 onClick={() => setChoice("VIEWER")}
                 className={`group relative rounded-2xl border-2 p-6 text-left transition-all overflow-hidden ${
                   choice === "VIEWER"
@@ -213,6 +187,32 @@ export function Onboarding() {
                   <li className="flex items-center gap-1.5"><Check className="w-3 h-3" /> Watch parties & community</li>
                 </ul>
                 {choice === "VIEWER" && (
+                  <div className="absolute top-3 right-3 w-6 h-6 rounded-full bg-white flex items-center justify-center">
+                    <Check className="w-4 h-4 text-primary" />
+                  </div>
+                )}
+              </button>
+
+              <button
+                onClick={() => setChoice("CREATOR")}
+                className={`group relative rounded-2xl border-2 p-6 text-left transition-all overflow-hidden ${
+                  choice === "CREATOR"
+                    ? "border-primary brand-gradient text-white shadow-xl shadow-primary/30"
+                    : "border-border bg-card hover:border-primary/50 hover:-translate-y-1"
+                }`}
+                aria-pressed={choice === "CREATOR"}
+              >
+                <Clapperboard className="w-9 h-9 mb-3" />
+                <h3 className="font-black text-lg">Creator</h3>
+                <p className={`text-xs mt-1.5 leading-relaxed ${choice === "CREATOR" ? "text-white/85" : "text-muted-foreground"}`}>
+                  Publish animes, add episodes, set prices and grow your audience. Earn from every purchase.
+                </p>
+                <ul className={`mt-3 space-y-1 text-[11px] ${choice === "CREATOR" ? "text-white/80" : "text-muted-foreground"}`}>
+                  <li className="flex items-center gap-1.5"><Check className="w-3 h-3" /> Publish unlimited animes</li>
+                  <li className="flex items-center gap-1.5"><Check className="w-3 h-3" /> Creator Studio dashboard</li>
+                  <li className="flex items-center gap-1.5"><Check className="w-3 h-3" /> One team account for your studio</li>
+                </ul>
+                {choice === "CREATOR" && (
                   <div className="absolute top-3 right-3 w-6 h-6 rounded-full bg-white flex items-center justify-center">
                     <Check className="w-4 h-4 text-primary" />
                   </div>
