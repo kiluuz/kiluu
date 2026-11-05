@@ -214,6 +214,7 @@
   "community.emptyTitle": "No posts found",
   "community.emptyHint": "Try a different category or be the first to post!",
   "community.commentsRetry": "Could not refresh comments. Retrying…",
+  "community.likeFailed": "Could not update like.",
   "community.moderation": "Community moderation",
   "community.noReports": "No open community reports.",
   "community.dismiss": "Dismiss",

@@ -214,6 +214,7 @@
   "community.emptyTitle": "Постов не найдено",
   "community.emptyHint": "Выберите другую категорию или станьте первым автором!",
   "community.commentsRetry": "Не удалось обновить комментарии. Повторная попытка…",
+  "community.likeFailed": "Не удалось обновить лайк.",
   "community.moderation": "Модерация сообщества",
   "community.noReports": "Нет открытых жалоб.",
   "community.dismiss": "Закрыть",

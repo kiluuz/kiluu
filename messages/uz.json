@@ -214,6 +214,7 @@
   "community.emptyTitle": "Postlar topilmadi",
   "community.emptyHint": "Boshqa bo‘limni tanlang yoki birinchi bo‘lib post qoldiring!",
   "community.commentsRetry": "Izohlarni yangilab bo‘lmadi. Qayta urinilmoqda…",
+  "community.likeFailed": "Laykni yangilab bo‘lmadi.",
   "community.moderation": "Hamjamiyat nazorati",
   "community.noReports": "Ko‘rib chiqilmagan shikoyatlar yo‘q.",
   "community.dismiss": "Yopish",

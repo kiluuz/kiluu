@@ -214,6 +214,7 @@
   "community.emptyTitle": "Жазбалар табылмады",
   "community.emptyHint": "Басқа санатты таңдаңыз немесе алғашқы болып жазыңыз!",
   "community.commentsRetry": "Пікірлерді жаңарту мүмкін болмады. Қайталап көруде…",
+  "community.likeFailed": "Лайк жаңартылмады.",
   "community.moderation": "Қауымдастық модерациясы",
   "community.noReports": "Ашық шағымдар жоқ.",
   "community.dismiss": "Жабу",

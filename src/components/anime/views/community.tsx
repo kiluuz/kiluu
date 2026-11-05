@@ -18,6 +18,7 @@ import { ChatPanel } from "../chat/chat-panel";
 import { ClubsView } from "../clubs/clubs-view";
 import { ReferralView } from "./referral-view";
 import { getCached, setCached, isStale } from "@/lib/client-cache";
+import { holdViewerState, mergeFeedPage } from "@/lib/community-feed";
 
 const CATEGORIES: ("All" | PostType)[] = ["All", "Theories", "Reviews", "Discussions", "Memes", "Fan Art", "Recommendations", "UZ Dubbing", "Watch Parties"];
 
@@ -57,6 +58,7 @@ export function CommunityView() {
   const [replyTargets, setReplyTargets] = useState<Record<string, string | null>>({});
   const scrolledShareId = useRef("");
   const likingPostsRef = useRef<Set<string>>(new Set());
+  const viewerStateHoldsRef = useRef<Map<string, number>>(new Map());
   const [moderationReports, setModerationReports] = useState<CommunityReport[] | null>(null);
   const [moderationUserId, setModerationUserId] = useState<string | null>(null);
   const openPostIds = Object.keys(openComments).filter((postId) => openComments[postId]);
@@ -104,8 +106,7 @@ export function CommunityView() {
         setCached(`community:${feedKey}`, incoming);
         setPosts((previous) => {
           if (initial) return incoming;
-          const fresh = new Map(incoming.map((post) => [post.id, post]));
-          return [...incoming, ...previous.filter((post) => !fresh.has(post.id))];
+          return mergeFeedPage(incoming, previous, viewerStateHoldsRef.current);
         });
           if (initial) setCursor(data.nextCursor || null);
       } catch (error) {
@@ -276,6 +277,8 @@ export function CommunityView() {
     }
     if (likingPostsRef.current.has(postId)) return;
     likingPostsRef.current.add(postId);
+    holdViewerState(viewerStateHoldsRef.current, postId);
+    const before = posts.find((p) => p.id === postId);
 
     // Optimistik yangilash — UI zudlik bilan javob beradi va qaytib olinmaydi
     setPosts((prev) =>
@@ -294,23 +297,18 @@ export function CommunityView() {
       const res = await fetch(`/api/community/${postId}/like`, { method: "POST" });
       const d = await res.json();
       if (!res.ok) throw new Error(d.error || "Could not update like");
+      holdViewerState(viewerStateHoldsRef.current, postId);
       setPosts((prev) =>
         prev.map((p) => (p.id === postId ? { ...p, liked: d.liked, likeCount: d.likeCount } : p))
       );
     } catch (error) {
       // Xatolik yuz bersa optimistik o'zgarishni bekor qilish
       setPosts((prev) =>
-        prev.map((p) => {
-          if (p.id !== postId) return p;
-          const nextLiked = !p.liked;
-          return {
-            ...p,
-            liked: nextLiked,
-            likeCount: Math.max(0, p.likeCount + (nextLiked ? 1 : -1)),
-          };
-        })
+        prev.map((p) =>
+          p.id === postId && before ? { ...p, liked: before.liked, likeCount: before.likeCount } : p
+        )
       );
-      toast.error(error instanceof Error ? error.message : "Could not update like");
+      toast.error(error instanceof Error ? error.message : t("community.likeFailed"));
     } finally {
       likingPostsRef.current.delete(postId);
     }
@@ -394,6 +392,7 @@ export function CommunityView() {
       const response = await fetch(`/api/community/${postId}/bookmark`, { method: "POST" });
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || "Could not update bookmark");
+      holdViewerState(viewerStateHoldsRef.current, postId);
       setPosts((previous) => previous.map((post) => post.id === postId ? { ...post, bookmarked: data.bookmarked } : post));
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Could not update bookmark");
@@ -414,6 +413,9 @@ export function CommunityView() {
       const response = await fetch(`/api/community/users/${post.user.id}/follow`, { method: "POST" });
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || "Could not update follow");
+      posts
+        .filter((item) => item.user.id === post.user.id)
+        .forEach((item) => holdViewerState(viewerStateHoldsRef.current, item.id));
       setPosts((previous) => previous.map((item) => item.user.id === post.user.id
         ? { ...item, user: { ...item.user, following: data.following } }
         : item));
