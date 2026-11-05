@@ -4,6 +4,8 @@ import { getCurrentUser } from "@/lib/auth";
 import { getBotCatalog, getDeletedAnimes } from "@/lib/bot-api";
 import { ensureAnimeInDatabase } from "@/lib/anime-enricher";
 import { animeDubSignals } from "@/lib/dub-teams";
+import { genreFilterTerms } from "@/lib/genre-match";
+import { storedGenreTokens } from "@/lib/genre-tokens";
 import { collectibleRarity } from "@/lib/gift-rarity";
 
 // Auto-sync cache: fire-and-forget so users never wait for Render cold-start
@@ -73,7 +75,9 @@ export async function GET(req: NextRequest) {
     hidden: false,
     moderationStatus: "APPROVED",
   };
+  const filters: Record<string, unknown>[] = [];
   if (search) {
+    const storedGenres = await storedGenreTokens();
     const cleanSearch = search.trim();
     const withAsciiApostrophe = cleanSearch.replace(/[\u02bb\u02bc\u2018\u2019`]/g, "'");
     const withUzbekTurnedComma = cleanSearch.replace(/['`\u2018\u2019\u02bc]/g, "ʻ");
@@ -82,16 +86,36 @@ export async function GET(req: NextRequest) {
 
     const variations = Array.from(new Set([cleanSearch, withAsciiApostrophe, withUzbekTurnedComma, withoutApostrophe, ...words])).filter(Boolean);
 
-    where.OR = variations.flatMap((term) => [
-      { title: { contains: term, mode: "insensitive" } },
-      { altTitle: { contains: term, mode: "insensitive" } },
-      { description: { contains: term, mode: "insensitive" } },
-      { studio: { contains: term, mode: "insensitive" } },
-      { slug: { contains: term, mode: "insensitive" } },
-    ]);
+    // Typing a genre in the search box has to find that genre's anime, even when
+    // the catalogue spells the label differently from the chip.
+    const genreTerms = new Set<string>();
+    for (const variation of variations) {
+      for (const term of genreFilterTerms(variation, storedGenres)) genreTerms.add(term);
+    }
+
+    filters.push({
+      OR: [
+        ...variations.flatMap((term) => [
+          { title: { contains: term, mode: "insensitive" } },
+          { altTitle: { contains: term, mode: "insensitive" } },
+          { description: { contains: term, mode: "insensitive" } },
+          { studio: { contains: term, mode: "insensitive" } },
+          { slug: { contains: term, mode: "insensitive" } },
+        ]),
+        ...[...genreTerms].map((term) => ({ genres: { contains: term, mode: "insensitive" } })),
+      ],
+    });
   }
   if (genre) {
-    where.genres = { contains: genre, mode: "insensitive" };
+    const terms = genreFilterTerms(genre, await storedGenreTokens());
+    filters.push(
+      terms.length
+        ? { OR: terms.map((term) => ({ genres: { contains: term, mode: "insensitive" } })) }
+        : { genres: { contains: genre, mode: "insensitive" } }
+    );
+  }
+  if (filters.length) {
+    where.AND = filters;
   }
   if (type) {
     where.type = type;
