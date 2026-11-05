@@ -4,12 +4,13 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { io, Socket } from "socket.io-client";
 import {
   Users, Plus, KeyRound, Loader2, Crown, Heart, Laugh, Angry,
-  ThumbsUp, PartyPopper, LogOut, RefreshCw, Sparkles,
+  ThumbsUp, PartyPopper, LogOut, RefreshCw, Sparkles, Coins,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
+import { useI18n } from "@/components/i18n-provider";
 import { useAppStore } from "../store";
 import type { AnimeDetail, EpisodeItem, AnimeSummary } from "../types";
 import { VideoPlayer, PlayerControls } from "../player";
@@ -37,6 +38,8 @@ interface PartyRoom {
   hostName: string;
   participantCount: number;
   capacity?: number;
+  entryCostCredits?: number;
+  ownsEpisode?: boolean;
 }
 
 interface Participant {
@@ -87,6 +90,7 @@ const REACTIONS = [
 
 export function WatchTogetherView() {
   const { user, setAuthOpen, navigate } = useAppStore();
+  const { t } = useI18n();
   const [rooms, setRooms] = useState<PartyRoom[]>([]);
   const [loading, setLoading] = useState(true);
   const [entryCostCredits, setEntryCostCredits] = useState<number | null>(null);
@@ -609,13 +613,13 @@ export function WatchTogetherView() {
       };
       setCreateOpen(false);
       connectToParty(data.ticket, data.party, [host]);
-      toast.success(`Party created! Share code: ${data.party.code}`, {
-        description: `${data.entryCostCredits} credits charged for entry.`,
+      toast.success(t("wt.partyCreated", { code: data.party.code }), {
+        description: t("wt.entryCharged", { price: data.entryCostCredits }),
         duration: 8000,
       });
       void refreshRooms();
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Failed to create party");
+      toast.error(error instanceof Error ? error.message : t("wt.createFailed"));
     } finally {
       setCreating(false);
     }
@@ -635,14 +639,21 @@ export function WatchTogetherView() {
         body: JSON.stringify({ code: finalCode }),
       });
       const data = await response.json();
-      if (!response.ok) throw new Error(data.error || "Failed to join party");
+      if (response.status === 402) {
+        toast.error(t("wt.notEnoughCredits", { price: Number(data.requiredCredits) || 0 }));
+        return;
+      }
+      if (!response.ok) throw new Error(data.error || t("wt.joinFailed"));
       setJoinOpen(false);
       setJoinCode("");
       connectToParty(data.ticket, data.party, data.participants || [], data.state, data.messages || []);
-      toast.success(`Joined ${data.party.name}!`, { description: `${data.entryCostCredits} credits charged for entry.` });
+      const charged = Number(data.entryCostCredits) || 0;
+      toast.success(t("wt.joinSuccess", { name: data.party.name }), {
+        description: charged > 0 ? t("wt.entryCharged", { price: charged }) : undefined,
+      });
       void refreshRooms();
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Failed to join party");
+      toast.error(error instanceof Error ? error.message : t("wt.joinFailed"));
     }
   }
 
@@ -915,6 +926,10 @@ export function WatchTogetherView() {
                 <span className="absolute top-2.5 left-2.5 bg-black/60 backdrop-blur text-white text-[10px] font-bold rounded-full px-2.5 py-1 flex items-center gap-1.5 border border-white/15">
                   <Users className="w-3 h-3" /> {room.participantCount}
                 </span>
+                <span className="absolute top-2.5 right-2.5 bg-black/60 backdrop-blur text-white text-[10px] font-bold rounded-full px-2.5 py-1 flex items-center gap-1 border border-white/15">
+                  <Coins className="w-3 h-3 text-amber-400" />
+                  {room.entryCostCredits ?? entryCostCredits ?? 0}
+                </span>
                 <div className="absolute bottom-0 p-3">
                   <p className="text-white font-bold text-sm truncate">{room.name}</p>
                   <p className="text-white/70 text-[11px] truncate">
@@ -952,7 +967,7 @@ export function WatchTogetherView() {
               <PartyPopper className="w-5 h-5 text-primary" /> New Watch Party
             </DialogTitle>
             <DialogDescription>
-              Choose an anime you own and start the sync. Entry costs {entryCostCredits ?? "…"} credits per participant, host included.
+              {t("wt.createPricingNote", { price: entryCostCredits ?? "…" })}
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 pt-2">
@@ -1033,7 +1048,9 @@ export function WatchTogetherView() {
           <DialogHeader>
             <DialogTitle>Join a Watch Party</DialogTitle>
             <DialogDescription>
-              Enter the 6-character party code. Joining costs {entryCostCredits ?? "…"} credits.
+              {t("wt.joinHint")}{" "}
+              <span className="block mt-1 text-[11px]">{t("wt.pricingOwned", { price: entryCostCredits ?? "…" })}</span>
+              <span className="block text-[11px]">{t("wt.pricingGuest")}</span>
             </DialogDescription>
           </DialogHeader>
           <div className="flex gap-2 pt-2">

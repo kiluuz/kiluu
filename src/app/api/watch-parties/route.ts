@@ -5,7 +5,7 @@ import { db } from "@/lib/db";
 import { evaluateAchievements } from "@/lib/achievements";
 import { awardXpInTransaction } from "@/lib/xp";
 import { createPartyTicket } from "@/lib/watch-party-auth";
-import { chargePartyEntry, createPartyCode, getOwnedHlsEpisode, watchPartyJoinPrice } from "@/lib/watch-parties";
+import { chargePartyEntry, createPartyCode, getOwnedHlsEpisode, partyJoinCosts, watchPartyJoinPrice } from "@/lib/watch-parties";
 import { r2ObjectExists } from "@/lib/r2";
 
 export async function GET() {
@@ -39,11 +39,18 @@ export async function GET() {
       })
     : [];
   const episodeById = new Map(episodes.map((episode) => [episode.id, episode]));
+  const viewer = await getCurrentUser();
+  const costs = await partyJoinCosts(
+    viewer?.id ?? null,
+    parties.map((party) => party.episodeId),
+    entryCostCredits
+  );
   return NextResponse.json({
     entryCostCredits,
     parties: parties.flatMap((party) => {
       const episode = episodeById.get(party.episodeId);
       if (!episode) return [];
+      const cost = costs.get(party.episodeId);
       return [{
       id: party.id,
       code: party.code,
@@ -58,6 +65,8 @@ export async function GET() {
       hostName: party.host.displayName || party.host.username,
       participantCount: party.members.length,
       expiresAt: party.expiresAt.toISOString(),
+      entryCostCredits: cost?.cost ?? entryCostCredits,
+      ownsEpisode: cost?.owns ?? false,
       }];
     }),
   });

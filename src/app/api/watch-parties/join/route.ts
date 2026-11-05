@@ -4,7 +4,13 @@ import { db } from "@/lib/db";
 import { evaluateAchievements } from "@/lib/achievements";
 import { awardXpInTransaction } from "@/lib/xp";
 import { createPartyTicket } from "@/lib/watch-party-auth";
-import { chargePartyEntry, getOwnedHlsEpisode, watchPartyJoinPrice } from "@/lib/watch-parties";
+import {
+  chargePartyEntry,
+  getPartyEpisode,
+  partyJoinCost,
+  partyJoinCreatorShare,
+  watchPartyJoinPrice,
+} from "@/lib/watch-parties";
 import { expectedPlaybackPosition } from "@/lib/watch-party-sync";
 import { r2ObjectExists } from "@/lib/r2";
 
@@ -46,6 +52,21 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Watch party pricing is not configured" }, { status: 503 });
   }
 
+  // Joining does not require owning the anime: a guest who does not own it pays
+  // half its price and the dubbing creator takes half of that payment.
+  const episodeAccess = await getPartyEpisode(db, user.id, party.episodeId);
+  if ("error" in episodeAccess) {
+    if (episodeAccess.error === "NOT_FOUND") return NextResponse.json({ error: "Episode not found" }, { status: 404 });
+    return NextResponse.json({ error: "This episode has no video stream" }, { status: 409 });
+  }
+  if (!episodeAccess.hasStream) {
+    return NextResponse.json({ error: "This episode has no video stream" }, { status: 409 });
+  }
+  const entryCost = partyJoinCost({ owns: episodeAccess.owns, fullPrice: episodeAccess.fullPrice, joinPrice });
+  const creatorShare = episodeAccess.owns || !episodeAccess.creatorId || entryCost < 1
+    ? null
+    : { creatorId: episodeAccess.creatorId, amount: partyJoinCreatorShare(entryCost) };
+
   let ticket: string;
   try {
     ticket = createPartyTicket(user.id, party.id);
@@ -59,12 +80,6 @@ export async function POST(request: NextRequest) {
   const result = await db.$transaction(async (tx) => {
     const currentParty = await tx.watchParty.findUnique({ where: { id: party.id } });
     if (!currentParty || currentParty.endedAt || currentParty.expiresAt <= now) return { error: "PARTY_ENDED" as const };
-    const episodeAccess = await getOwnedHlsEpisode(tx, user.id, currentParty.episodeId);
-    if ("error" in episodeAccess) {
-      if (episodeAccess.error === "NOT_FOUND") return { error: "EPISODE_MISSING" as const };
-      if (episodeAccess.error === "FORBIDDEN") return { error: "PURCHASE_REQUIRED" as const };
-      return { error: "NO_HLS_STREAM" as const };
-    }
     const existing = await tx.watchPartyMember.findUnique({
       where: { partyId_userId: { partyId: currentParty.id, userId: user.id } },
     });
@@ -79,7 +94,7 @@ export async function POST(request: NextRequest) {
 
     let charged = false;
     if (!existing) {
-      const charge = await chargePartyEntry(tx, user.id, currentParty.id, joinPrice);
+      const charge = await chargePartyEntry(tx, user.id, currentParty.id, entryCost, creatorShare);
       if ("error" in charge) return { error: charge.error };
       charged = charge.charged;
     }
@@ -108,15 +123,12 @@ export async function POST(request: NextRequest) {
   });
   if ("error" in result) {
     if (result.error === "PARTY_FULL") return NextResponse.json({ error: "Party is full" }, { status: 409 });
-    if (result.error === "PURCHASE_REQUIRED") return NextResponse.json({ error: "You must own this anime to join" }, { status: 403 });
-    if (result.error === "NO_HLS_STREAM") return NextResponse.json({ error: "This episode has no video stream" }, { status: 409 });
     if (result.error === "INSUFFICIENT_CREDITS") {
       return NextResponse.json(
-        { error: `Joining Watch Together requires ${joinPrice} credits`, requiredCredits: joinPrice },
+        { error: `Joining Watch Together requires ${entryCost} credits`, requiredCredits: entryCost },
         { status: 402 },
       );
     }
-    if (result.error === "EPISODE_MISSING") return NextResponse.json({ error: "Episode not found" }, { status: 404 });
     return NextResponse.json({ error: "Party is no longer active" }, { status: 410 });
   }
 
@@ -135,7 +147,9 @@ export async function POST(request: NextRequest) {
 
   return NextResponse.json({
     ticket,
-    entryCostCredits: result.charged ? joinPrice : 0,
+    entryCostCredits: result.charged ? entryCost : 0,
+    ownsEpisode: episodeAccess.owns,
+    animeFullPrice: episodeAccess.fullPrice,
     state: {
       video_id: joined.episodeId,
       position: expectedPlaybackPosition({

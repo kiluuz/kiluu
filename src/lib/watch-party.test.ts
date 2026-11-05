@@ -10,7 +10,13 @@ import { io, type Socket } from "socket.io-client";
 import type { PrismaClient } from "@prisma/client";
 import { createPartyTicket, verifyPartyTicket } from "@/lib/watch-party-auth";
 import { expectedPlaybackPosition, playbackCorrection } from "@/lib/watch-party-sync";
-import { chargePartyEntry, getOwnedHlsEpisode } from "@/lib/watch-parties";
+import {
+  chargePartyEntry,
+  getOwnedHlsEpisode,
+  getPartyEpisode,
+  partyJoinCost,
+  partyJoinCreatorShare,
+} from "@/lib/watch-parties";
 
 const secret = "watch-party-test-secret-with-more-than-thirty-two-characters";
 let tempDir: string;
@@ -225,6 +231,78 @@ test("episode HLS access is denied without ownership and allowed for free episod
   const freeEpisode = await getOwnedHlsEpisode(client, stranger.id, episodeId);
   assert.ok(freeEpisode.episode);
   assert.equal(freeEpisode.episode.hlsKey, "hls/watch-party-test-anime/1/index.m3u8");
+
+  const guestAccess = await getPartyEpisode(client, stranger.id, paidEpisode.id);
+  if ("error" in guestAccess) throw new Error("a non-owner must still resolve the party episode");
+  assert.equal(guestAccess.owns, false);
+  assert.equal(guestAccess.hasStream, true);
+});
+
+test("a guest pays half the anime price and the dubbing creator takes half of that", async () => {
+  assert.equal(partyJoinCost({ owns: true, fullPrice: 100, joinPrice: 20 }), 20);
+  assert.equal(partyJoinCost({ owns: false, fullPrice: 100, joinPrice: 20 }), 50);
+  assert.equal(partyJoinCost({ owns: false, fullPrice: 101, joinPrice: 20 }), 51);
+  assert.equal(partyJoinCreatorShare(50), 25);
+  assert.equal(partyJoinCreatorShare(51), 25);
+
+  const creator = await client.user.create({
+    data: { email: "party-creator@example.test", username: "partycreator", password: "test-hash" },
+  });
+  const guest = await client.user.create({
+    data: { email: "party-guest@example.test", username: "partyguest", password: "test-hash", credits: 60 },
+  });
+  const anime = await client.anime.create({
+    data: {
+      slug: "watch-party-half-price",
+      title: "Half Price Watch Party",
+      description: "Test anime",
+      coverImage: "",
+      genres: "Action",
+      year: 2026,
+      price: 100,
+      isFree: false,
+      hidden: false,
+      moderationStatus: "APPROVED",
+    },
+  });
+  const version = await client.animeVersion.create({
+    data: { animeId: anime.id, kind: "creator", creatorId: creator.id, price: 100, status: "published" },
+  });
+  const episode = await client.episode.create({
+    data: {
+      animeId: anime.id,
+      versionId: version.id,
+      number: 1,
+      title: "Half Price Episode",
+      videoUrl: "r2-hls",
+      hlsKey: "hls/watch-party-test-anime/3/index.m3u8",
+    },
+  });
+
+  const access = await getPartyEpisode(client, guest.id, episode.id);
+  if ("error" in access) throw new Error("the half-price episode must resolve");
+  assert.equal(access.owns, false);
+  assert.equal(access.fullPrice, 100);
+  assert.equal(access.creatorId, creator.id);
+
+  const charge = await client.$transaction((tx) =>
+    chargePartyEntry(tx, guest.id, "half-price-party", 50, { creatorId: creator.id, amount: 25 })
+  );
+  assert.deepEqual(charge, { charged: true });
+  assert.equal((await client.user.findUniqueOrThrow({ where: { id: guest.id } })).credits, 10);
+  assert.equal((await client.user.findUniqueOrThrow({ where: { id: creator.id } })).credits, 25);
+  assert.equal(await client.creditTransaction.count({
+    where: { OR: [
+      { userId: guest.id, idempotencyKey: `watch-party-entry:half-price-party:${guest.id}`, amount: -50 },
+      { userId: creator.id, idempotencyKey: `watch-party-creator:half-price-party:${guest.id}`, amount: 25 },
+    ] },
+  }), 2);
+
+  const retry = await client.$transaction((tx) =>
+    chargePartyEntry(tx, guest.id, "half-price-party", 50, { creatorId: creator.id, amount: 25 })
+  );
+  assert.deepEqual(retry, { charged: false });
+  assert.equal((await client.user.findUniqueOrThrow({ where: { id: creator.id } })).credits, 25);
 });
 
 test("Watch Together entry charges credits and records the debit atomically and idempotently", async () => {
