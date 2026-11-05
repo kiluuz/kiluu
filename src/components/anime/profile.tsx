@@ -1175,6 +1175,7 @@ function GiftsTab({ profile }: { profile: PublicProfile }) {
 
 function PostCard({ post, profile }: { post: PublicProfile["posts"][number]; profile: PublicProfile }) {
   const navigate = useAppStore((s) => s.navigate);
+  const { t } = useI18n();
   const [liked, setLiked] = useState(post.liked);
   const [likeCount, setLikeCount] = useState(post.likeCount);
   const [busy, setBusy] = useState(false);
@@ -1185,11 +1186,15 @@ function PostCard({ post, profile }: { post: PublicProfile["posts"][number]; pro
     if (!me) { useAppStore.getState().setAuthOpen(true); return; }
     setBusy(true);
     try {
-      const res = await fetch(`/api/community/${post.id}/like`, { method: liked ? "DELETE" : "POST" });
-      if (res.ok) {
-        setLiked(!liked);
-        setLikeCount((c) => c + (liked ? -1 : 1));
-      }
+      // The like endpoint toggles server-side and has no DELETE handler, so an
+      // unlike is the same POST; trusting its payload keeps the count honest.
+      const res = await fetch(`/api/community/${post.id}/like`, { method: "POST" });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Could not update like");
+      setLiked(Boolean(data.liked));
+      setLikeCount(Number(data.likeCount) || 0);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : t("community.likeFailed"));
     } finally { setBusy(false); }
   }
 
