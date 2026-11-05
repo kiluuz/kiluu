@@ -21,7 +21,6 @@ function sameState(a: string, b: string): boolean {
 export async function GET(req: NextRequest) {
   const origin = req.nextUrl.origin;
   const loginUrl = new URL("/login", origin);
-  const redirectHome = new URL("/", origin);
 
   const fail = (reason: string) => {
     loginUrl.searchParams.set("authError", reason);
@@ -101,7 +100,7 @@ export async function GET(req: NextRequest) {
 
     await createSession(userId);
 
-    const next = stored.next && stored.next.startsWith("/") ? stored.next : "/";
+    const next = stored.next && stored.next.startsWith("/") ? stored.next : "/app";
     const res = NextResponse.redirect(new URL(next, origin));
     res.cookies.delete(GOOGLE_STATE_COOKIE);
     return res;

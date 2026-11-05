@@ -24,10 +24,11 @@ export async function GET(req: NextRequest) {
 
   const state = randomBytes(24).toString("hex");
   const nextParam = req.nextUrl.searchParams.get("next");
+  // The app lives under the catch-all routes (/app), while "/" is the marketing page.
   const next =
     nextParam && nextParam.startsWith("/") && !nextParam.startsWith("//") && !nextParam.startsWith("/\\")
       ? nextParam.slice(0, 300)
-      : "/";
+      : "/app";
 
   const res = NextResponse.redirect(
     buildGoogleAuthUrl({ redirectUri: googleRedirectUri(origin), state })
