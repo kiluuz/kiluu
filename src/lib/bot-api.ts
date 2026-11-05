@@ -111,6 +111,14 @@ export async function getUserStatus(siteUserId: string) {
   } as RequestInit);
 }
 
+/** Drops the bot-side Telegram binding so the site and the bot never disagree. */
+export async function unlinkBotAccount(siteUserId: string) {
+  return fetchBotApi(`/api/unlink`, {
+    method: "POST",
+    body: JSON.stringify({ site_user_id: siteUserId }),
+  } as RequestInit);
+}
+
 // ─── Stars invoice ────────────────────────────────────────────────────────
 
 export async function createStarsInvoice(body: {

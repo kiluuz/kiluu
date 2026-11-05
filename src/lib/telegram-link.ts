@@ -60,3 +60,24 @@ export async function consumeLinkToken(opts: {
 
   return { ok: true, userId: row.userId };
 }
+
+/**
+ * Releases the Telegram account bound to a site profile and drops any link still in
+ * flight, so the next link always binds the account the user taps it from.
+ */
+export async function unlinkTelegramAccount(userId: string): Promise<boolean> {
+  const account = await db.user.findUnique({
+    where: { id: userId },
+    select: { telegramId: true },
+  });
+  if (!account?.telegramId) return false;
+
+  await db.$transaction([
+    db.user.update({
+      where: { id: userId },
+      data: { telegramId: null, telegramUsername: null },
+    }),
+    db.telegramLinkToken.deleteMany({ where: { userId } }),
+  ]);
+  return true;
+}

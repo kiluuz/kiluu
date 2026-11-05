@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Loader2, ExternalLink, Link2, Send, Star, CheckCircle2, Coins, Copy, Check } from "lucide-react";
+import { Loader2, ExternalLink, Link2, Unlink, Send, Star, CheckCircle2, Coins, Copy, Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
@@ -24,6 +24,7 @@ export function TelegramLinkWidget({
 }) {
   const { t } = useI18n();
   const [linking, setLinking] = useState(false);
+  const [unlinking, setUnlinking] = useState(false);
   const [linkUrl, setLinkUrl] = useState<string | null>(null);
   const [startCommand, setStartCommand] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
@@ -67,6 +68,21 @@ export function TelegramLinkWidget({
       toast.error("Could not get the Telegram link");
     } finally {
       setLinking(false);
+    }
+  }
+
+  async function unlinkAccount() {
+    setUnlinking(true);
+    try {
+      const res = await fetch("/api/bot/unlink", { method: "POST" });
+      const data = await res.json().catch(() => null);
+      if (!res.ok) throw new Error(data?.error || "unlink failed");
+      toast.success(t("telegram.unlinked"));
+      onLinked();
+    } catch {
+      toast.error(t("telegram.unlinkFailed"));
+    } finally {
+      setUnlinking(false);
     }
   }
 
@@ -253,6 +269,19 @@ export function TelegramLinkWidget({
             ? t("telegram.switchButton")
             : t("telegram.openAppButton")}
       </Button>
+      {linkedHandle && (
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          disabled={unlinking}
+          onClick={() => void unlinkAccount()}
+          className="rounded-xl w-full gap-2"
+        >
+          {unlinking ? <Loader2 className="w-4 h-4 animate-spin" /> : <Unlink className="w-4 h-4" />}
+          {t("telegram.unlinkButton")}
+        </Button>
+      )}
     </div>
   );
 }

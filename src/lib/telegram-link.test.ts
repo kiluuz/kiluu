@@ -9,6 +9,7 @@ let tempDir: string;
 let db: import("@prisma/client").PrismaClient;
 let issueLinkToken: typeof import("./telegram-link").issueLinkToken;
 let consumeLinkToken: typeof import("./telegram-link").consumeLinkToken;
+let unlinkTelegramAccount: typeof import("./telegram-link").unlinkTelegramAccount;
 
 before(async () => {
   tempDir = await mkdtemp(path.join(os.tmpdir(), "dubanix-telegram-link-test-"));
@@ -27,6 +28,7 @@ before(async () => {
   const link = await import("./telegram-link");
   issueLinkToken = link.issueLinkToken;
   consumeLinkToken = link.consumeLinkToken;
+  unlinkTelegramAccount = link.unlinkTelegramAccount;
 });
 
 after(async () => {
@@ -90,4 +92,19 @@ test("an expired or unknown link reports why instead of a generic failure", asyn
   await expectRefused(issued.token, "555", "expired");
   await expectRefused("never-issued-token", "555", "unknown");
   assert.equal((await db.user.findUniqueOrThrow({ where: { id: user.id } })).telegramId, null);
+});
+
+test("unlinking releases the Telegram binding and every link still in flight", async () => {
+  const user = await makeUser("link-unlink@example.test", "link-unlink");
+  const issued = await issueLinkToken(user.id);
+  await consumeLinkToken({ token: issued.token, telegramId: "666", telegramUsername: "old-account" });
+
+  assert.equal(await unlinkTelegramAccount(user.id), true);
+  const released = await db.user.findUniqueOrThrow({ where: { id: user.id } });
+  assert.equal(released.telegramId, null);
+  assert.equal(released.telegramUsername, null);
+  assert.equal(await db.telegramLinkToken.count({ where: { userId: user.id } }), 0);
+
+  // The button stays safe to press when nothing is bound.
+  assert.equal(await unlinkTelegramAccount(user.id), false);
 });
