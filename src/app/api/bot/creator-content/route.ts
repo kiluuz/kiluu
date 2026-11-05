@@ -4,6 +4,7 @@ import { z } from "zod";
 import { db } from "@/lib/db";
 import { botRequestAuthorized } from "@/lib/bot-secret";
 import { canonicalRole } from "@/lib/rbac";
+import { APP_CONFIG } from "@/lib/config";
 import { releaseAnimeOnFirstEpisode } from "@/lib/creator-release";
 
 const Identity = z.object({
@@ -23,6 +24,30 @@ const CreateAnime = Identity.extend({
   type: z.enum(["TV", "MOVIE", "OVA"]),
   is_free: z.boolean(),
   price: z.number().int().min(0).max(10000),
+});
+
+/**
+ * Kartochka tahririda poster — doim tashqi rasm havolasi. Bot o'z serverida
+ * rasm uzatmaydi, shuning uchun bu yerda ham faqat to'g'ridan-to'g'ri
+ * http(s) manzil qabul qilinadi.
+ */
+const ImageUrl = z.string().trim().max(1000).refine(
+  (value) => /^https?:\/\/\S+$/.test(value),
+  { message: "cover_image must be a direct http(s) image link" },
+);
+
+const UpdateAnime = Identity.extend({
+  action: z.literal("update_anime"),
+  slug: z.string().regex(/^[a-z0-9][a-z0-9_-]{0,63}$/),
+  title: z.string().trim().min(2).max(120).optional(),
+  description: z.string().trim().min(20).max(5000).optional(),
+  cover_image: ImageUrl.optional(),
+  genres: z.array(z.string().trim().min(1).max(40)).min(1).max(12).optional(),
+  year: z.number().int().min(1900).max(2200).optional(),
+  status: z.enum(["ONGOING", "COMPLETED", "UPCOMING"]).optional(),
+  type: z.enum(["TV", "MOVIE", "OVA"]).optional(),
+  is_free: z.boolean().optional(),
+  price: z.number().int().min(0).max(10000).optional(),
 });
 
 const CreateEpisode = Identity.extend({
@@ -77,6 +102,8 @@ export async function GET(req: NextRequest) {
       year: true,
       status: true,
       type: true,
+      isFree: true,
+      price: true,
       moderationStatus: true,
       hidden: true,
       _count: { select: { episodes: true } },
@@ -188,6 +215,98 @@ export async function POST(req: NextRequest) {
       }
       console.error("Bot creator anime creation failed", error);
       return NextResponse.json({ error: "Could not save creator anime" }, { status: 500 });
+    }
+  }
+
+  if (action.data.action === "update_anime") {
+    const parsed = UpdateAnime.safeParse(body);
+    if (!parsed.success) return NextResponse.json({ error: "Invalid anime update", details: parsed.error.flatten() }, { status: 400 });
+    const input = parsed.data;
+    const sentValues = [
+      input.title, input.description, input.cover_image, input.genres,
+      input.year, input.status, input.type, input.is_free, input.price,
+    ];
+    if (!sentValues.some((value) => value !== undefined)) {
+      return NextResponse.json({ error: "No fields to update" }, { status: 400 });
+    }
+    const user = await linkedCreator(input.site_user_id, input.telegram_id);
+    if (!user) return NextResponse.json({ error: "Creator role and linked Telegram account required" }, { status: 403 });
+
+    const anime = await db.anime.findFirst({
+      where: { slug: input.slug, creatorId: user.id },
+      select: {
+        id: true,
+        title: true,
+        description: true,
+        coverImage: true,
+        bannerImage: true,
+        genres: true,
+        year: true,
+        status: true,
+        type: true,
+        isFree: true,
+        price: true,
+      },
+    });
+    if (!anime) return NextResponse.json({ error: "Anime not found in your Creator Studio" }, { status: 404 });
+
+    const data: Record<string, unknown> = {};
+    if (input.title !== undefined) data.title = input.title;
+    if (input.description !== undefined) data.description = input.description;
+    if (input.cover_image !== undefined) {
+      data.coverImage = input.cover_image;
+      // Banner kartochkadagi posterdan ko'chirilgan bo'lsa, yangi poster bilan birga yangilanadi.
+      if (anime.bannerImage === anime.coverImage) data.bannerImage = input.cover_image;
+    }
+    if (input.genres !== undefined) data.genres = input.genres.join(",");
+    if (input.year !== undefined) data.year = input.year;
+    if (input.status !== undefined) data.status = input.status;
+    if (input.type !== undefined) data.type = input.type;
+    if (input.is_free !== undefined) data.isFree = input.is_free;
+
+    const isFree = input.is_free ?? anime.isFree;
+    const nextPrice = isFree ? 0 : (input.price ?? anime.price);
+    if (!isFree && nextPrice < APP_CONFIG.minAnimePrice) {
+      return NextResponse.json({ error: `Paid anime must cost at least ${APP_CONFIG.minAnimePrice} credits` }, { status: 400 });
+    }
+    if (input.price !== undefined || isFree !== anime.isFree) data.price = nextPrice;
+
+    try {
+      const updated = await db.$transaction(async (tx) => {
+        const record = await tx.anime.update({
+          where: { id: anime.id },
+          data,
+          select: {
+            id: true,
+            slug: true,
+            title: true,
+            description: true,
+            coverImage: true,
+            genres: true,
+            year: true,
+            status: true,
+            type: true,
+            isFree: true,
+            price: true,
+            moderationStatus: true,
+            hidden: true,
+            _count: { select: { episodes: true } },
+          },
+        });
+        // Sotish narxi AnimeVersion'dan o'qiladi, shuning uchun uni ham tenglashtiramiz.
+        if (data.price !== undefined) {
+          await tx.animeVersion.updateMany({
+            where: { animeId: anime.id, kind: "creator" },
+            data: { price: nextPrice },
+          });
+        }
+        return record;
+      });
+      const { _count, ...animeCard } = updated;
+      return NextResponse.json({ anime: { ...animeCard, episode_count: _count.episodes } });
+    } catch (error) {
+      console.error("Bot creator anime update failed", error);
+      return NextResponse.json({ error: "Could not update creator anime" }, { status: 500 });
     }
   }
 
